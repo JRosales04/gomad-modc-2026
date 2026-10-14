@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Muévete Cerca · Prototipo interactivo</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>
+:root{--page:#E8EEF3;--page-ink:#33475B}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--page:#101820;--page-ink:#C9D6E2}}
+:root[data-theme="dark"]{--page:#101820;--page-ink:#C9D6E2}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html,body{height:100%}
+body{margin:0;background:var(--page);color:var(--page-ink);font-family:Figtree,'Segoe UI',Helvetica,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+.phone{position:relative;width:390px;max-width:100%;height:min(844px,calc(100% - 56px));background:#F3F7FA;color:#12395B;border-radius:28px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 0 0 1px #DCE5EC,0 18px 40px rgba(18,57,91,.18)}
+.caption{font-size:13px;display:flex;gap:12px;align-items:center}
+.caption button{font:inherit;font-weight:600;color:inherit;background:none;border:1px solid currentColor;border-radius:8px;padding:6px 10px;cursor:pointer}
+@media (max-width:480px){body{justify-content:stretch;gap:0}.phone{width:100%;height:100%;border-radius:0;box-shadow:none}.caption{display:none}}
+.top{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:#fff;border-bottom:1px solid #DCE5EC;flex-shrink:0}
+.logo{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:700;line-height:1.05;text-align:left}
+.view{flex:1;overflow-y:auto;overscroll-behavior:contain}
+.screen{display:flex;flex-direction:column;animation:in .22s ease-out}
+.screen[hidden]{display:none}
+@keyframes in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.draw{stroke-dasharray:900;animation:draw 1.2s ease-out}
+@keyframes draw{from{stroke-dashoffset:900}to{stroke-dashoffset:0}}
+@media (prefers-reduced-motion:reduce){.screen,.draw,#sheet{animation:none!important;transition:none!important}}
+button,select,input{font-family:inherit;color:inherit}
+button{border:none;background:none;cursor:pointer;padding:0}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #2C7BE5;outline-offset:2px}
+h1,h2{margin:0;font-weight:700}h2{font-size:16px}
+.col{display:flex;flex-direction:column}.row{display:flex}
+.pad{padding:16px 20px}
+.card{background:#fff;border:1px solid #DCE5EC;border-radius:16px}
+button.card{width:100%;box-sizing:border-box}
+.acts{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.act{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;font-weight:600}
+.act-ic{width:52px;height:52px;border-radius:14px;background:#E1F2E8;display:flex;align-items:center;justify-content:center}
+.act:active .act-ic{background:#C9E8D5}
+.btn1{min-height:48px;border-radius:12px;background:#1E7B4F;color:#fff;font-size:15px;font-weight:700}
+.btn1.navy{background:#12395B}
+.btn2{min-height:48px;border-radius:12px;background:#fff;border:1.5px solid #12395B;font-size:15px;font-weight:700}
+.btn2.sm{min-height:44px;padding:0 12px;border-radius:10px;font-size:14px;display:inline-flex;align-items:center;gap:6px}
+.back{display:inline-flex;align-items:center;gap:4px;min-height:44px;font-size:14px;font-weight:600;align-self:flex-start}
+.score{min-width:44px;padding:6px 0;border-radius:10px;background:#135C3A;color:#fff;font-size:17px;font-weight:700;text-align:center;display:inline-block}
+.score.mid{background:#8A4B00}
+.res{padding:12px;gap:12px;text-align:left}
+.tabs{display:flex;background:#fff;border-top:1px solid #DCE5EC;flex-shrink:0}
+.tabs button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:60px;font-size:12px;font-weight:500;color:#55677A}
+.tabs button.on{color:#1E7B4F;font-weight:700}
+#backdrop{position:absolute;inset:0;background:rgba(18,57,91,.35)}
+#sheet{position:absolute;left:0;right:0;bottom:0;max-height:86%;overflow-y:auto;background:#fff;border-radius:20px 20px 0 0;padding:16px 20px 20px;display:flex;flex-direction:column;gap:14px;animation:up .22s ease-out}
+#sheet[hidden],#backdrop[hidden]{display:none}
+@keyframes up{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+input[type=range]{width:100%;accent-color:#1E7B4F;height:28px}
+select{min-height:44px;border-radius:10px;border:1.5px solid #DCE5EC;padding:0 10px;font-size:15px;background:#fff}
+.seg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1.5px solid #12395B;border-radius:10px;overflow:hidden}
+.seg button{min-height:44px;font-size:14px;font-weight:600}.seg button.on{background:#12395B;color:#fff}
+#toast{position:absolute;left:20px;right:20px;bottom:76px;background:#12395B;color:#fff;border-radius:12px;padding:12px 14px;font-size:14px;font-weight:600;text-align:center}
+#toast[hidden]{display:none}
+.empty{padding:16px;font-size:14px;line-height:1.45}
+</style>
+</head>
+<body>
+<main class="phone">
+<header class="top"><button class="logo" data-go="inicio" aria-label="Muévete Cerca, ir al inicio"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1E7B4F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M12 21s-6-5.2-6-10a6 6 0 1 1 12 0c0 4.8-6 10-6 10z"></path><circle cx="12" cy="11" r="2"></circle></svg><span>Muévete<br>Cerca</span></button>
+<button id="menu" aria-label="Abrir menú" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#12395B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M4 7h16M4 12h16M4 17h16"></path></svg></button></header>
+<div class="view">
+<section id="s-inicio" class="screen"><div style="position: relative"><svg viewBox="0 0 390 230" width="100%" height="230" preserveAspectRatio="xMidYMax slice" aria-hidden="true" style="display: block">
+<rect width="390" height="230" fill="#CFE6F5"></rect>
+<circle cx="318" cy="90" r="26" fill="#F7C948"></circle>
+<g fill="#A9C6DA"><rect x="200" y="110" width="22" height="80"></rect><rect x="228" y="130" width="18" height="60"></rect><rect x="252" y="98" width="14" height="92"></rect><rect x="150" y="138" width="26" height="52"></rect><rect x="110" y="124" width="20" height="66"></rect></g>
+<path d="M0 178 C80 138 170 200 250 168 S350 150 390 174 V230 H0z" fill="#8CC79B"></path>
+<path d="M0 206 C100 172 220 222 390 194 V230 H0z" fill="#5FA777"></path>
+<g fill="#2F7D55"><circle cx="48" cy="164" r="22"></circle><circle cx="84" cy="176" r="16"></circle><circle cx="352" cy="170" r="18"></circle></g>
+<g stroke="#5B4636" stroke-width="4" stroke-linecap="round"><path d="M48 184V208"></path><path d="M84 190V210"></path><path d="M352 186V206"></path></g>
+<path d="M150 230 C190 200 250 208 300 230" fill="none" stroke="#F3EBD8" stroke-width="10"></path>
+</svg>
+<div style="position: absolute; left: 20px; right: 20px; top: 20px; display: flex; flex-direction: column; gap: 8px">
+<h1 style="margin: 0; font-size: 28px; line-height: 1.1; font-weight: 700">Hoy es un gran día<br>para moverte</h1>
+<div style="display: flex; gap: 6px; flex-wrap: wrap"><span style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 999px; background: #E3EEF8; color: #12395B; font-size: 12px; font-weight: 600; white-space: nowrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#12395B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M12 21s-6-5.2-6-10a6 6 0 1 1 12 0c0 4.8-6 10-6 10z"></path><circle cx="12" cy="11" r="2"></circle></svg><span>Getafe</span></span><span style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 999px; background: #E1F2E8; color: #135C3A; font-size: 12px; font-weight: 600; white-space: nowrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#135C3A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><circle cx="12" cy="12" r="4"></circle><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6L7 7M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"></path></svg><span>22 °C</span></span><span style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 999px; background: #E1F2E8; color: #135C3A; font-size: 12px; font-weight: 600; white-space: nowrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#135C3A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M5 19c0-8 5-13 14-14-1 9-6 14-14 14zM5 19l8-8"></path></svg><span>Aire bueno</span></span></div></div></div>
+<div class="pad col" style="gap: 16px">
+<div class="card col" style="padding: 16px; gap: 14px"><h2>¿Qué te apetece hacer?</h2><div class="acts"><button class="act" data-act="Correr"><span class="act-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#135C3A" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><circle cx="14.5" cy="4.5" r="2"></circle><path d="M5 20l4-5-1-5 5-2 3 4h3M9 10l-3 3M12 14l3 2 1 4"></path></svg></span><span>Correr</span></button><button class="act" data-act="Caminar"><span class="act-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#135C3A" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><circle cx="12" cy="4.5" r="2"></circle><path d="M12 8v6l-3 6M12 14l4 6M8 11l4-3 4 3"></path></svg></span><span>Caminar</span></button><button class="act" data-act="Nadar"><span class="act-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#135C3A" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><circle cx="16" cy="7" r="2"></circle><path d="M3 15c2-2 4-2 6 0s4 2 6 0 4-2 6 0M3 19c2-2 4-2 6 0s4 2 6 0 4-2 6 0M7 12l5-4 3 3"></path></svg></span><span>Nadar</span></button><button class="act" data-act="Pádel"><span class="act-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#135C3A" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><circle cx="9" cy="9" r="5"></circle><path d="M12.5 12.5L19 19"></path><circle cx="18.5" cy="6.5" r="1.5"></circle></svg></span><span>Pádel</span></button><button class="act" data-act="Otra"><span class="act-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#135C3A" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M12 5v14M5 12h14"></path></svg></span><span>Otra</span></button></div></div>
+<div style="font-size: 14px; font-weight: 600; color: #55677A">O simplemente…</div>
+<button class="card row" data-act="Sorpréndeme" style="padding: 16px; gap: 12px; align-items: flex-start; text-align: left">
+<span style="width: 44px; height: 44px; border-radius: 12px; background: #E3EEF8; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#12395B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M12 4l2 6 6 2-6 2-2 6-2-6-6-2 6-2z"></path></svg></span>
+<span class="col" style="gap: 4px"><span style="font-size: 16px; font-weight: 700">Sorpréndeme</span><span style="font-size: 13px; line-height: 1.4; color: #55677A; font-weight: 400">Te propongo un plan según tu ubicación y tu tiempo libre.</span></span></button>
+<div class="card row" style="padding: 12px 16px; align-items: center; justify-content: space-between; gap: 12px">
+<div class="col" style="gap: 2px"><span style="font-size: 12px; color: #55677A">Tus preferencias</span><span id="pref-sum" style="font-size: 14px; font-weight: 600"></span></div>
+<button class="btn2 sm" data-sheet><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#12395B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"></path><circle cx="16" cy="7" r="2"></circle><circle cx="8" cy="17" r="2"></circle></svg><span>Ajustar</span></button></div></div></section><section id="s-resultados" class="screen" hidden><div class="pad col" style="gap: 2px; padding-top: 4px; padding-bottom: 12px"><button class="back" data-go="inicio"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#12395B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M15 6l-6 6 6 6"></path></svg><span>Volver</span></button>
+<h1 id="res-title" style="font-size: 22px"></h1><div id="res-sub" style="font-size: 14px; color: #55677A"></div></div>
+<svg viewBox="0 0 390 190" width="100%" height="190" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Mapa de Getafe" style="display: block">
+<rect width="390" height="190" fill="#E9EFF3"></rect>
+<path d="M20 30 L110 18 L130 78 L40 96z" fill="#CFE8D6"></path>
+<path d="M250 70 L340 50 L372 120 L280 150z" fill="#CFE8D6"></path>
+<path d="M150 100 L210 90 L222 138 L160 150z" fill="#CFE8D6"></path>
+<g stroke="#FFFFFF" stroke-width="6" fill="none" stroke-linecap="round"><path d="M0 120 H390"></path><path d="M0 40 L390 10"></path><path d="M70 0 V190"></path><path d="M190 0 L210 190"></path><path d="M310 0 V190"></path><path d="M0 60 L390 40"></path></g>
+<path d="M-10 170 L400 120" stroke="#F4D7A1" stroke-width="12" fill="none"></path>
+<text x="200" y="112" font-size="13" font-weight="600" fill="#6B7C8C" font-family="Figtree, sans-serif">Getafe</text>
+<text x="20" y="162" font-size="10" fill="#8A6A2A" font-family="Figtree, sans-serif">A-42</text>
+<g><path d="M74 64 c-8 -9 -12 -14 -12 -20 a12 12 0 1 1 24 0 c0 6 -4 11 -12 20z" fill="#135C3A" stroke="#FFFFFF" stroke-width="2"></path><text x="74" y="48" text-anchor="middle" font-size="12" font-weight="700" fill="#FFFFFF" font-family="Figtree, sans-serif">1</text></g><g><path d="M236 112 c-8 -9 -12 -14 -12 -20 a12 12 0 1 1 24 0 c0 6 -4 11 -12 20z" fill="#12395B" stroke="#FFFFFF" stroke-width="2"></path><text x="236" y="96" text-anchor="middle" font-size="12" font-weight="700" fill="#FFFFFF" font-family="Figtree, sans-serif">2</text></g><g><path d="M322 166 c-8 -9 -12 -14 -12 -20 a12 12 0 1 1 24 0 c0 6 -4 11 -12 20z" fill="#12395B" stroke="#FFFFFF" stroke-width="2"></path><text x="322" y="150" text-anchor="middle" font-size="12" font-weight="700" fill="#FFFFFF" font-family="Figtree, sans-serif">3</text></g><circle cx="170" cy="128" r="9" fill="#2C7BE5" stroke="#FFFFFF" stroke-width="3"></circle>
+</svg>
+<div class="pad col" style="gap: 10px; padding-top: 14px"><div id="res-list" class="col" style="gap: 10px" aria-live="polite"></div>
+<button id="more" class="btn2">Ver más opciones</button></div></section><section id="s-detalle" class="screen" hidden><div class="pad" style="padding-top: 4px; padding-bottom: 0"><button class="back" data-go="resultados"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#12395B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M15 6l-6 6 6 6"></path></svg><span>Volver</span></button></div>
+<svg viewBox="0 0 390 150" width="100%" height="150" preserveAspectRatio="xMidYMax slice" aria-hidden="true" style="display: block">
+<rect width="390" height="150" fill="#CFE6F5"></rect>
+<circle cx="318" cy="10" r="26" fill="#F7C948"></circle>
+<g fill="#A9C6DA"><rect x="200" y="30" width="22" height="80"></rect><rect x="228" y="50" width="18" height="60"></rect><rect x="252" y="18" width="14" height="92"></rect><rect x="150" y="58" width="26" height="52"></rect><rect x="110" y="44" width="20" height="66"></rect></g>
+<path d="M0 98 C80 58 170 120 250 88 S350 70 390 94 V150 H0z" fill="#8CC79B"></path>
+<path d="M0 126 C100 92 220 142 390 114 V150 H0z" fill="#5FA777"></path>
+<g fill="#2F7D55"><circle cx="48" cy="84" r="22"></circle><circle cx="84" cy="96" r="16"></circle><circle cx="352" cy="90" r="18"></circle></g>
+<g stroke="#5B4636" stroke-width="4" stroke-linecap="round"><path d="M48 104V128"></path><path d="M84 110V130"></path><path d="M352 106V126"></path></g>
+<path d="M150 150 C190 120 250 128 300 150" fill="none" stroke="#F3EBD8" stroke-width="10"></path>
+</svg>
+<div class="pad col" style="gap: 14px">
+<div class="row" style="justify-content: space-between; gap: 12px; align-items: flex-start">
+<div class="col" style="gap: 4px"><h1 id="det-name" style="font-size: 22px; line-height: 1.15"></h1><span id="det-meta" style="font-size: 14px; color: #55677A"></span></div>
+<div class="col" style="align-items: center; gap: 4px; flex-shrink: 0"><span id="det-score" class="score" style="font-size: 20px; padding: 6px 12px"></span><span id="det-verdict" style="font-size: 11px; font-weight: 600"></span></div></div>
+<div id="det-tiles" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px"></div>
+<div class="col" style="gap: 8px"><h2>¿Por qué te recomendamos este lugar?</h2><ul id="det-why" class="col" style="margin: 0; padding: 0; list-style: none; gap: 6px"></ul></div>
+<div class="row" style="background: #E3EEF8; border-radius: 14px; padding: 14px; gap: 10px; align-items: flex-start"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#12395B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><circle cx="12" cy="12" r="8"></circle><path d="M12 8v4l3 2"></path></svg>
+<div class="col" style="gap: 2px"><span style="font-size: 12px; font-weight: 600; color: #55677A">Mejor franja horaria</span><span id="det-slot" style="font-size: 17px; font-weight: 700"></span><span id="det-slot-why" style="font-size: 13px; line-height: 1.4; color: #3E5165"></span></div></div>
+<div class="col" style="gap: 10px"><button class="btn1" data-go="ruta">Ver ruta en el mapa</button><button class="btn2" data-go="resultados">Ver otras opciones</button></div></div></section><section id="s-ruta" class="screen" hidden><div class="pad" style="padding-top: 4px; padding-bottom: 0"><button class="back" data-go="detalle"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#12395B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M15 6l-6 6 6 6"></path></svg><span>Volver</span></button></div>
+<div style="position: relative"><svg viewBox="0 0 390 380" width="100%" height="380" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Mapa de Getafe" style="display: block">
+<rect width="390" height="380" fill="#E9EFF3"></rect>
+<path d="M20 30 L110 18 L130 78 L40 96z" fill="#CFE8D6"></path>
+<path d="M250 260 L340 240 L372 310 L280 340z" fill="#CFE8D6"></path>
+<path d="M150 290 L210 280 L222 328 L160 340z" fill="#CFE8D6"></path>
+<g stroke="#FFFFFF" stroke-width="6" fill="none" stroke-linecap="round"><path d="M0 120 H390"></path><path d="M0 230 L390 200"></path><path d="M70 0 V380"></path><path d="M190 0 L210 380"></path><path d="M310 0 V380"></path><path d="M0 60 L390 40"></path></g>
+<path d="M-10 360 L400 310" stroke="#F4D7A1" stroke-width="12" fill="none"></path>
+<text x="200" y="112" font-size="13" font-weight="600" fill="#6B7C8C" font-family="Figtree, sans-serif">Getafe</text>
+<text x="20" y="352" font-size="10" fill="#8A6A2A" font-family="Figtree, sans-serif">A-42</text>
+<path d="M170 250 L190 250 L196 300 L70 310 L70 120 L60 96 L74 70" fill="none" stroke="#C9D3DB" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"></path>
+<path d="M170 250 L190 250 L196 300 L70 310 L70 120 L60 96 L74 70" fill="none" stroke="#B4530A" stroke-width="4" stroke-dasharray="2 8" stroke-linecap="round" stroke-linejoin="round"></path>
+<path d="M170 250 L160 290 L190 270 L215 300 L160 320 L120 250 L96 170 L40 96 L74 70" fill="none" stroke="#FFFFFF" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"></path>
+<path class="draw" d="M170 250 L160 290 L190 270 L215 300 L160 320 L120 250 L96 170 L40 96 L74 70" fill="none" stroke="#1E7B4F" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"></path>
+<circle cx="170" cy="250" r="9" fill="#2C7BE5" stroke="#FFFFFF" stroke-width="3"></circle><g><path d="M74 70 c-8 -9 -12 -14 -12 -20 a12 12 0 1 1 24 0 c0 6 -4 11 -12 20z" fill="#135C3A" stroke="#FFFFFF" stroke-width="2"></path><text x="74" y="54" text-anchor="middle" font-size="12" font-weight="700" fill="#FFFFFF" font-family="Figtree, sans-serif">1</text></g>
+</svg>
+<div class="card col" style="position: absolute; left: 12px; top: 12px; width: 240px; border-radius: 12px; padding: 10px 12px; gap: 8px; box-sizing: border-box">
+<div class="col" style="gap: 2px"><span class="row" style="align-items: center; gap: 6px; font-size: 13px; font-weight: 700"><span style="width: 18px; height: 5px; border-radius: 3px; background: #1E7B4F"></span>Ruta recomendada</span><span id="rt-rec" style="font-size: 12px; color: #55677A"></span></div>
+<div class="col" style="gap: 2px"><span class="row" style="align-items: center; gap: 6px; font-size: 13px; font-weight: 700"><span style="width: 18px; height: 0; border-top: 4px dotted #B4530A"></span>Ruta directa</span><span id="rt-dir" style="font-size: 12px; color: #55677A"></span></div></div></div>
+<div class="row" style="gap: 14px; flex-wrap: wrap; padding: 10px 20px; background: #FFFFFF; border-bottom: 1px solid #DCE5EC">
+<span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600"><span style="width: 14px; height: 14px; border-radius: 4px; background: #CFE8D6; border: 1px solid #8CC79B"></span><span>Zonas verdes</span></span><span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600"><span style="width: 18px; height: 5px; border-radius: 3px; background: #1E7B4F"></span><span>Recomendada</span></span><span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600"><span style="width: 18px; height: 6px; border-radius: 3px; background: #F4D7A1; border: 1px solid #C99A3C"></span><span>Tráfico intenso</span></span></div>
+<div class="pad col" style="gap: 6px; padding-top: 14px">
+<h2 id="rt-title"></h2>
+<div class="col"><div class="row" style="align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid #DCE5EC; font-size: 14px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#135C3A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M4 12h16M4 9v6M20 9v6"></path></svg><span style="flex: 1">Distancia</span><span id="rt-km" style="font-weight: 700"></span></div><div class="row" style="align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid #DCE5EC; font-size: 14px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#135C3A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><circle cx="12" cy="12" r="8"></circle><path d="M12 8v4l3 2"></path></svg><span style="flex: 1">Tiempo estimado</span><span id="rt-min" style="font-weight: 700"></span></div><div class="row" style="align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid #DCE5EC; font-size: 14px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#135C3A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M3 19l7-9 4 5 3-4 4 8z"></path></svg><span style="flex: 1">Desnivel</span><span id="rt-up" style="font-weight: 700"></span></div><div class="row" style="align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid #DCE5EC; font-size: 14px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#135C3A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M12 21v-6M12 15a5 5 0 0 1-4-8 4 4 0 0 1 8 0 5 5 0 0 1-4 8z"></path></svg><span style="flex: 1">Zonas verdes</span><span id="rt-green" style="font-weight: 700"></span></div><div class="row" style="align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid #DCE5EC; font-size: 14px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#135C3A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M3 12a9 9 0 0 1 18 0zM12 12v7a2 2 0 0 0 4 0"></path></svg><span style="flex: 1">Sombra</span><span id="rt-shade" style="font-weight: 700"></span></div><div class="row" style="align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid #DCE5EC; font-size: 14px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#135C3A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M12 3c4 5 6 8 6 11a6 6 0 0 1-12 0c0-3 2-6 6-11z"></path></svg><span style="flex: 1">Fuentes</span><span id="rt-water" style="font-weight: 700"></span></div></div>
+<div id="rt-note" style="font-size: 12px; line-height: 1.4; color: #55677A; padding: 4px 0 8px"></div>
+<button class="btn1" id="choose">Elegir esta ruta</button></div></section><section id="s-municipio" class="screen" hidden><div class="pad col" style="gap: 2px; padding-top: 4px; padding-bottom: 12px"><button class="back" data-go="inicio"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#12395B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M15 6l-6 6 6 6"></path></svg><span>Volver</span></button>
+<h1 style="font-size: 24px">Getafe</h1><div style="font-size: 14px; color: #55677A">Lo que ofrece el municipio para tu bienestar</div></div>
+<svg viewBox="0 0 390 140" width="100%" height="140" preserveAspectRatio="xMidYMax slice" aria-hidden="true" style="display: block">
+<rect width="390" height="140" fill="#CFE6F5"></rect>
+<circle cx="318" cy="0" r="26" fill="#F7C948"></circle>
+<g fill="#A9C6DA"><rect x="200" y="20" width="22" height="80"></rect><rect x="228" y="40" width="18" height="60"></rect><rect x="252" y="8" width="14" height="92"></rect><rect x="150" y="48" width="26" height="52"></rect><rect x="110" y="34" width="20" height="66"></rect></g>
+<path d="M0 88 C80 48 170 110 250 78 S350 60 390 84 V140 H0z" fill="#8CC79B"></path>
+<path d="M0 116 C100 82 220 132 390 104 V140 H0z" fill="#5FA777"></path>
+<g fill="#2F7D55"><circle cx="48" cy="74" r="22"></circle><circle cx="84" cy="86" r="16"></circle><circle cx="352" cy="80" r="18"></circle></g>
+<g stroke="#5B4636" stroke-width="4" stroke-linecap="round"><path d="M48 94V118"></path><path d="M84 100V120"></path><path d="M352 96V116"></path></g>
+<path d="M150 140 C190 110 250 118 300 140" fill="none" stroke="#F3EBD8" stroke-width="10"></path>
+</svg>
+<div class="pad col" style="gap: 14px">
+<div class="row" style="align-items: baseline; justify-content: space-between; gap: 8px"><h2>¿Qué ofrece este municipio?</h2><span style="font-size: 12px; color: #55677A">Cifras pendientes de datos reales</span></div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+<div class="card col" style="border-radius: 12px; padding: 12px 8px; align-items: center; gap: 6px; text-align: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#135C3A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><circle cx="14.5" cy="4.5" r="2"></circle><path d="M5 20l4-5-1-5 5-2 3 4h3M9 10l-3 3M12 14l3 2 1 4"></path></svg><span style="font-size: 13px; font-weight: 700">Deporte</span><span style="font-size: 12px; line-height: 1.3; color: #55677A">[N] instalaciones deportivas</span></div><div class="card col" style="border-radius: 12px; padding: 12px 8px; align-items: center; gap: 6px; text-align: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#135C3A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M12 21v-6M12 15a5 5 0 0 1-4-8 4 4 0 0 1 8 0 5 5 0 0 1-4 8z"></path></svg><span style="font-size: 13px; font-weight: 700">Naturaleza</span><span style="font-size: 12px; line-height: 1.3; color: #55677A">[N] zonas verdes próximas</span></div><div class="card col" style="border-radius: 12px; padding: 12px 8px; align-items: center; gap: 6px; text-align: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#135C3A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><rect x="5" y="4" width="14" height="13" rx="2"></rect><path d="M5 11h14M8 20v-3M16 20v-3"></path></svg><span style="font-size: 13px; font-weight: 700">Movilidad</span><span style="font-size: 12px; line-height: 1.3; color: #55677A">[N] % accesible a pie o en bici</span></div>
+<div class="card col" style="border-radius: 12px; padding: 12px 8px; align-items: center; gap: 6px; text-align: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#135C3A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"></path></svg><span style="font-size: 13px; font-weight: 700">Salud</span><span style="font-size: 12px; line-height: 1.3; color: #55677A">[N] centros de salud y hospital</span></div><div class="card col" style="border-radius: 12px; padding: 12px 8px; align-items: center; gap: 6px; text-align: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#135C3A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M12 7v13M12 7c-2-2-5-2-8-1v13c3-1 6-1 8 1 2-2 5-2 8-1V6c-3-1-6-1-8 1z"></path></svg><span style="font-size: 13px; font-weight: 700">Educación</span><span style="font-size: 12px; line-height: 1.3; color: #55677A">[N] centros educativos</span></div><div class="card col" style="border-radius: 12px; padding: 12px 8px; align-items: center; gap: 6px; text-align: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#135C3A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M4 10c5-5 11-5 16 0M7 13.5c3-3 7-3 10 0"></path><circle cx="12" cy="17" r="1"></circle></svg><span style="font-size: 13px; font-weight: 700">Conectividad</span><span style="font-size: 12px; line-height: 1.3; color: #55677A">Cobertura 4G y 5G</span></div></div>
+<div class="col" style="background: #E3EEF8; border-radius: 14px; padding: 14px; gap: 10px">
+<div class="row" style="gap: 10px; align-items: flex-start"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#12395B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><circle cx="12" cy="8" r="4"></circle><path d="M4 20c1.5-4.5 14.5-4.5 16 0"></path></svg><div class="col" style="gap: 4px"><span style="font-size: 15px; font-weight: 700">¿Cómo encaja contigo?</span><span id="mun-fit" style="font-size: 13px; line-height: 1.45; color: #3E5165"></span></div></div>
+<button class="btn1 navy" data-act="Sorpréndeme">Buscar actividad en Getafe</button></div></div></section>
+</div>
+<nav class="tabs" aria-label="Navegación principal"><button data-go="inicio" data-tab="entorno"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M12 21s-6-5.2-6-10a6 6 0 1 1 12 0c0 4.8-6 10-6 10z"></path><circle cx="12" cy="11" r="2"></circle></svg><span>Mi entorno</span></button><button data-go="municipio" data-tab="municipios"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M4 20V8l8-4 8 4v12M9 20v-5h6v5M3 20h18"></path></svg><span>Municipios</span></button><button data-sheet data-tab="perfil"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><circle cx="12" cy="8" r="4"></circle><path d="M4 20c1.5-4.5 14.5-4.5 16 0"></path></svg><span>Perfil</span></button></nav>
+<div id="backdrop" hidden></div>
+<div id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-t" hidden>
+<div class="row" style="justify-content: space-between; align-items: center"><h2 id="sheet-t" style="font-size: 18px">Tus preferencias</h2><button class="btn2 sm" id="sheet-x">Listo</button></div>
+<label class="col" style="gap: 6px; font-size: 14px; font-weight: 600"><span class="row" style="justify-content: space-between"><span>Tiempo disponible</span><output id="p-time-o" style="color: #55677A; font-weight: 500"></output></span><input type="range" id="p-time" min="15" max="120" step="15" value="45" data-unit=" min"></label><label class="col" style="gap: 6px; font-size: 14px; font-weight: 600"><span class="row" style="justify-content: space-between"><span>Distancia máxima a pie</span><output id="p-dist-o" style="color: #55677A; font-weight: 500"></output></span><input type="range" id="p-dist" min="1" max="5" step="0.5" value="3" data-unit=" km"></label>
+<div class="col" style="gap: 6px; font-size: 14px; font-weight: 600"><span>Lugar</span><div class="seg" id="p-where"><button data-v="any" class="on">Indiferente</button><button data-v="out">Exterior</button><button data-v="in">Interior</button></div></div>
+<label class="col" style="gap: 6px; font-size: 14px; font-weight: 600"><span>Perfil (opcional)</span><select id="p-prof"><option value="general">General</option><option value="mayor">Persona mayor</option><option value="familia">Familia con carrito</option><option value="sensible">Sensible a la contaminación</option></select></label>
+<div style="font-size: 14px; font-weight: 700; padding-top: 4px">¿A qué le das más importancia?</div>
+<label class="col" style="gap: 6px; font-size: 14px; font-weight: 600"><span class="row" style="justify-content: space-between"><span>Cercanía y rapidez</span><output id="w-near-o" style="color: #55677A; font-weight: 500"></output></span><input type="range" id="w-near" min="0" max="10" step="1" value="5" data-unit=""></label><label class="col" style="gap: 6px; font-size: 14px; font-weight: 600"><span class="row" style="justify-content: space-between"><span>Sombra y zona verde</span><output id="w-green-o" style="color: #55677A; font-weight: 500"></output></span><input type="range" id="w-green" min="0" max="10" step="1" value="5" data-unit=""></label><label class="col" style="gap: 6px; font-size: 14px; font-weight: 600"><span class="row" style="justify-content: space-between"><span>Aire limpio</span><output id="w-air-o" style="color: #55677A; font-weight: 500"></output></span><input type="range" id="w-air" min="0" max="10" step="1" value="5" data-unit=""></label><label class="col" style="gap: 6px; font-size: 14px; font-weight: 600"><span class="row" style="justify-content: space-between"><span>Meteorología</span><output id="w-meteo-o" style="color: #55677A; font-weight: 500"></output></span><input type="range" id="w-meteo" min="0" max="10" step="1" value="5" data-unit=""></label>
+</div>
+<div id="toast" role="status" hidden></div>
+</main>
+<div class="caption"><span>Prototipo interactivo · Getafe · datos de ejemplo</span><button id="restart">Reiniciar</button></div>
+<script>
+const P={"pin": "<path d=\"M12 21s-6-5.2-6-10a6 6 0 1 1 12 0c0 4.8-6 10-6 10z\"></path><circle cx=\"12\" cy=\"11\" r=\"2\"></circle>", "menu": "<path d=\"M4 7h16M4 12h16M4 17h16\"></path>", "back": "<path d=\"M15 6l-6 6 6 6\"></path>", "building": "<path d=\"M4 20V8l8-4 8 4v12M9 20v-5h6v5M3 20h18\"></path>", "user": "<circle cx=\"12\" cy=\"8\" r=\"4\"></circle><path d=\"M4 20c1.5-4.5 14.5-4.5 16 0\"></path>", "run": "<circle cx=\"14.5\" cy=\"4.5\" r=\"2\"></circle><path d=\"M5 20l4-5-1-5 5-2 3 4h3M9 10l-3 3M12 14l3 2 1 4\"></path>", "walk": "<circle cx=\"12\" cy=\"4.5\" r=\"2\"></circle><path d=\"M12 8v6l-3 6M12 14l4 6M8 11l4-3 4 3\"></path>", "swim": "<circle cx=\"16\" cy=\"7\" r=\"2\"></circle><path d=\"M3 15c2-2 4-2 6 0s4 2 6 0 4-2 6 0M3 19c2-2 4-2 6 0s4 2 6 0 4-2 6 0M7 12l5-4 3 3\"></path>", "padel": "<circle cx=\"9\" cy=\"9\" r=\"5\"></circle><path d=\"M12.5 12.5L19 19\"></path><circle cx=\"18.5\" cy=\"6.5\" r=\"1.5\"></circle>", "plus": "<path d=\"M12 5v14M5 12h14\"></path>", "clock": "<circle cx=\"12\" cy=\"12\" r=\"8\"></circle><path d=\"M12 8v4l3 2\"></path>", "sun": "<circle cx=\"12\" cy=\"12\" r=\"4\"></circle><path d=\"M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6L7 7M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4\"></path>", "leaf": "<path d=\"M5 19c0-8 5-13 14-14-1 9-6 14-14 14zM5 19l8-8\"></path>", "car": "<path d=\"M4 15l1.5-5h13L20 15v3H4zM7 18v1.5M17 18v1.5M4 15h16\"></path>", "check": "<path d=\"M5 12l4 4 10-10\"></path>", "drop": "<path d=\"M12 3c4 5 6 8 6 11a6 6 0 0 1-12 0c0-3 2-6 6-11z\"></path>", "ruler": "<path d=\"M4 12h16M4 9v6M20 9v6\"></path>", "slope": "<path d=\"M3 19l7-9 4 5 3-4 4 8z\"></path>", "tree": "<path d=\"M12 21v-6M12 15a5 5 0 0 1-4-8 4 4 0 0 1 8 0 5 5 0 0 1-4 8z\"></path>", "shade": "<path d=\"M3 12a9 9 0 0 1 18 0zM12 12v7a2 2 0 0 0 4 0\"></path>", "heart": "<path d=\"M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z\"></path>", "book": "<path d=\"M12 7v13M12 7c-2-2-5-2-8-1v13c3-1 6-1 8 1 2-2 5-2 8-1V6c-3-1-6-1-8 1z\"></path>", "wifi": "<path d=\"M4 10c5-5 11-5 16 0M7 13.5c3-3 7-3 10 0\"></path><circle cx=\"12\" cy=\"17\" r=\"1\"></circle>", "bus": "<rect x=\"5\" y=\"4\" width=\"14\" height=\"13\" rx=\"2\"></rect><path d=\"M5 11h14M8 20v-3M16 20v-3\"></path>", "spark": "<path d=\"M12 4l2 6 6 2-6 2-2 6-2-6-6-2 6-2z\"></path>", "sliders": "<path d=\"M4 7h10M18 7h2M4 17h2M10 17h10\"></path><circle cx=\"16\" cy=\"7\" r=\"2\"></circle><circle cx=\"8\" cy=\"17\" r=\"2\"></circle>"}, GREY="#55677A";
+const ico=(n,s=20,c="#12395B",w=1.8)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0">${P[n]}</svg>`;
+const chip=(i,t,tone="good")=>{const [bg,fg]={good:["#E1F2E8","#135C3A"],warn:["#FCEBCB","#7A4300"],info:["#E3EEF8","#12395B"]}[tone];return `<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:999px;background:${bg};color:${fg};font-size:12px;font-weight:600;white-space:nowrap">${ico(i,14,fg,2)}<span>${t}</span></span>`};
+const $=id=>document.getElementById(id);
+// Datos de ejemplo (Getafe). green/air de 0 a 1; traf: 0 bajo, 1 medio.
+const park=(name,kind,km,green,air,traf)=>({name,kind,km,green,air,traf,indoor:false});
+const hall=(name,kind,km,indoor)=>({name,kind,km,green:indoor?0.2:0.45,air:indoor?0.9:0.78,traf:0,indoor});
+const OUT=[park("Parque de la Alhóndiga","Parque",1.8,0.9,0.85,0),park("Polideportivo Juan de la Cierva","Pista de atletismo",2.6,0.4,0.8,0),park("Cerro de los Ángeles","Pinar y senderos",3.9,0.95,0.9,1),park("Parque Lorenzo Azofra","Parque urbano",1.2,0.6,0.7,1),park("Parque de Castilla-La Mancha","Parque",2.2,0.75,0.8,0)];
+const DATA={
+ "Correr":OUT,"Caminar":OUT,
+ "Nadar":[hall("Polideportivo Juan de la Cierva","Piscina cubierta",2.6,true),hall("Complejo Alhóndiga-Sector III","Piscina cubierta",2.0,true),hall("Polideportivo El Bercial","Piscina cubierta",3.4,true),hall("Piscina de verano Getafe Norte","Piscina exterior",3.1,false),hall("Polideportivo de Perales del Río","Piscina exterior",4.8,false)],
+ "Pádel":[hall("Polideportivo San Isidro","Pistas de pádel",1.5,false),hall("Complejo Alhóndiga-Sector III","Pistas de pádel",2.0,false),hall("Polideportivo Juan de la Cierva","Pistas de pádel",2.6,false),hall("Polideportivo El Bercial","Pádel cubierto",3.4,true),hall("Polideportivo de Perales del Río","Pistas de pádel",4.8,false)],
+ "Otra":[park("Parque de la Alhóndiga","Circuito de calistenia",1.8,0.9,0.85,0),hall("Polideportivo San Isidro","Pista multideporte",1.5,false),hall("Complejo Alhóndiga-Sector III","Sala de actividades",2.0,true),park("Cerro de los Ángeles","Senderismo",3.9,0.95,0.9,1),hall("Polideportivo El Bercial","Rocódromo cubierto",3.4,true)],
+ "Sorpréndeme":[park("Parque de la Alhóndiga","Paseo por el parque",1.8,0.9,0.85,0),hall("Polideportivo San Isidro","Partido de pádel",1.5,false),hall("Complejo Alhóndiga-Sector III","Natación en piscina cubierta",2.0,true),park("Cerro de los Ángeles","Ruta de senderismo",3.9,0.95,0.9,1),park("Parque de Castilla-La Mancha","Carrera suave",2.2,0.75,0.8,0)]
+};
+const TITLE={"Correr":"Correr cerca de ti","Caminar":"Caminar cerca de ti","Nadar":"Nadar cerca de ti","Pádel":"Pádel cerca de ti","Otra":"Otras actividades cerca de ti","Sorpréndeme":"Planes para ti hoy"};
+const S={act:"Correr",shown:3,sel:null,time:45,dist:3,where:"any",prof:"general",w:{near:5,green:5,air:5,meteo:5}};
+const fmt=n=>String(n).replace(".",",");
+const mins=km=>Math.round(km*12);
+function score(p){const w={...S.w}; if(S.prof==="sensible")w.air+=4; if(S.prof==="mayor"||S.prof==="familia")w.near+=3;
+  const near=Math.max(0,1-p.km/5.5), meteo=p.indoor?0.8:0.92, sum=w.near+w.green+w.air+w.meteo||1;
+  return Math.round((w.near*near+w.green*p.green+w.air*p.air+w.meteo*meteo)/sum*100)/10+ (p.traf?-0.2:0.3);}
+const verdict=s=>s>=8.5?"Muy buena opción":s>=7?"Buena opción":"Opción aceptable";
+function ranked(){return DATA[S.act].filter(p=>p.km<=S.dist && mins(p.km)*2<=S.time+60 && (S.where==="any"||(S.where==="in")===p.indoor||(S.where==="out"&&!p.indoor&&true)||(S.where==="out"&&p.indoor&&false)))
+  .map(p=>({...p,s:Math.min(9.8,Math.max(4,score(p)))})).sort((a,b)=>b.s-a.s);}
+const PROF={general:"",mayor:"Perfil: persona mayor",familia:"Perfil: familia con carrito",sensible:"Perfil: sensible a la contaminación"};
+function renderResults(){const all=ranked(), list=all.slice(0,S.shown);
+  $("res-title").textContent=TITLE[S.act];
+  $("res-sub").textContent=(all.length?`Las ${Math.min(S.shown,all.length)} mejores opciones en Getafe`:"Sin opciones con estos filtros")+" · datos de ejemplo"+(PROF[S.prof]?" · "+PROF[S.prof]:"");
+  $("res-list").innerHTML=list.length?list.map((p,i)=>`<button class="card row res" data-i="${i}">
+<span style="width:28px;height:28px;border-radius:50%;background:#12395B;color:#fff;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${i+1}</span>
+<span class="col" style="flex:1;min-width:0;gap:6px"><span style="font-size:15px;font-weight:700">${p.name}</span>
+<span style="font-size:13px;color:${GREY};font-weight:400">${p.kind} · ${fmt(p.km)} km · ${mins(p.km)} min a pie</span>
+<span class="row" style="gap:6px;flex-wrap:wrap">${p.indoor?chip("building","Cubierta","info"):chip("sun","22 °C")}${chip("leaf",p.air>=0.8?"Aire bueno":"Aire aceptable",p.air>=0.8?"good":"warn")}${chip("car",p.traf?"Tráfico medio":"Bajo tráfico",p.traf?"warn":"good")}</span></span>
+<span class="col" style="align-items:center;gap:4px;flex-shrink:0"><span class="score ${p.s<7?"mid":""}">${fmt(p.s.toFixed(1))}</span><span style="font-size:11px;font-weight:600;color:${p.s<7?"#8A4B00":"#135C3A"};text-align:center;max-width:60px;line-height:1.2">${verdict(p.s)}</span></span></button>`).join("")
+  :`<div class="card empty"><strong>Ningún destino encaja con tus preferencias.</strong><br>Prueba a ampliar la distancia máxima o a cambiar entre interior y exterior.</div>`;
+  $("res-list").querySelectorAll(".res").forEach(b=>b.onclick=()=>{S.sel=list[+b.dataset.i];go("detalle")});
+  const m=$("more"); if(!list.length){m.textContent="Ajustar preferencias";m.hidden=false;m.onclick=openSheet}
+  else{m.hidden=all.length<=S.shown;m.textContent="Ver más opciones";m.onclick=()=>{S.shown+=2;renderResults()}}}
+function renderDetail(){const p=S.sel; if(!p)return; $("det-name").textContent=p.name; $("det-meta").textContent=`${p.kind} · ${fmt(p.km)} km · ${mins(p.km)} min a pie`;
+  $("det-score").textContent=fmt(p.s.toFixed(1)); $("det-score").className="score "+(p.s<7?"mid":""); $("det-verdict").textContent=verdict(p.s); $("det-verdict").style.color=p.s<7?"#8A4B00":"#135C3A";
+  const tile=(i,b,s)=>`<div class="card col" style="border-radius:12px;padding:10px;gap:4px;align-items:flex-start">${ico(i,20,"#135C3A")}<span style="font-size:15px;font-weight:700">${b}</span><span style="font-size:12px;color:${GREY}">${s}</span></div>`;
+  $("det-tiles").innerHTML=(p.indoor?tile("building","Cubierta","No depende del tiempo"):tile("sun","22 °C","Temperatura ideal"))+tile("leaf",p.air>=0.8?"Aire bueno":"Aceptable","Calidad del aire")+tile("car",p.traf?"Medio":"Bajo tráfico",p.traf?"Tráfico en el acceso":"Menos exposición");
+  const why=[]; if(p.indoor)why.push("Instalación cubierta: puedes ir aunque llueva o haga calor."); else why.push("Temperatura agradable para hacer ejercicio.");
+  why.push(p.air>=0.8?"Buena calidad del aire en la zona.":"Calidad del aire aceptable en la zona.");
+  if(p.green>=0.6)why.push(`El ${Math.round(p.green*75)} % del recorrido va por zonas verdes y con sombra.`);
+  why.push(p.km<=2?`Está a solo ${mins(p.km)} minutos a pie.`:(p.traf?"Hay algo de tráfico en el acceso: la ruta recomendada lo evita.":"Ruta con poco tráfico y sin grandes pendientes."));
+  $("det-why").innerHTML=why.map(t=>`<li class="row" style="gap:8px;align-items:flex-start;font-size:14px;line-height:1.4">${ico("check",18,"#135C3A",2.2)}<span>${t}</span></li>`).join("");
+  $("det-slot").textContent=p.indoor?"A cualquier hora":"De 19:00 a 21:00"; $("det-slot-why").textContent=p.indoor?"Al ser cubierta, no depende de la temperatura ni de la lluvia.":"La temperatura baja y la calidad del aire mejora.";}
+function renderRoute(){const p=S.sel||ranked()[0]; if(!p)return; const rk=Math.round(p.km*1.17*10)/10, g=Math.round(p.green*75), extra=mins(rk)-mins(p.km);
+  $("rt-rec").textContent=`${fmt(rk)} km · ${mins(rk)} min · ${g} % zonas verdes`; $("rt-dir").textContent=`${fmt(p.km)} km · ${mins(p.km)} min · ${Math.round(g/5)} % zonas verdes`;
+  $("rt-title").textContent="Ruta recomendada a "+p.name; $("rt-km").textContent=fmt(rk)+" km"; $("rt-min").textContent=mins(rk)+" min"; $("rt-up").textContent=Math.round(8+p.km*6)+" m";
+  $("rt-green").textContent=g+" %"; $("rt-shade").textContent=Math.round(g*0.8)+" %"; $("rt-water").textContent=p.green>=0.6?"2":"1";
+  $("rt-note").textContent=`${extra} minutos más que la ruta directa, lejos de la A-42. Estimación orientativa; el trazado del mapa es ilustrativo.`;}
+function renderPrefs(){const where={any:"interior o exterior",out:"exterior",in:"interior"}[S.where]; $("pref-sum").textContent=`${S.time} min · hasta ${fmt(S.dist)} km · ${where}`;
+  const top=Object.entries(S.w).sort((a,b)=>b[1]-a[1])[0][0], txt={near:"tener las cosas cerca",green:"la naturaleza y la sombra",air:"respirar aire limpio",meteo:"hacer deporte con buen tiempo"}[top];
+  $("mun-fit").textContent=`Según tus preferencias, lo que más valoras es ${txt}. Explora qué opciones te ofrece Getafe para ello.`;}
+const RENDER={resultados:renderResults,detalle:renderDetail,ruta:renderRoute};
+let cur="inicio";
+function go(id){cur=id; document.querySelectorAll(".screen").forEach(s=>s.hidden=s.id!=="s-"+id); (RENDER[id]||(()=>{}))(); document.querySelector(".view").scrollTop=0;
+  document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab===(id==="municipio"?"municipios":"entorno")));}
+function toast(t){const el=$("toast"); el.textContent=t; el.hidden=false; clearTimeout(toast.t); toast.t=setTimeout(()=>el.hidden=true,2400);}
+function openSheet(){$("sheet").hidden=false;$("backdrop").hidden=false;$("sheet-x").focus()}
+function closeSheet(){$("sheet").hidden=true;$("backdrop").hidden=true;renderPrefs();(RENDER[cur]||(()=>{}))()}
+document.addEventListener("click",e=>{const t=e.target.closest("[data-go],[data-act],[data-sheet]"); if(!t)return;
+  if(t.dataset.act){S.act=t.dataset.act;S.shown=3;go("resultados")} else if(t.dataset.go)go(t.dataset.go); else openSheet();});
+$("sheet-x").onclick=closeSheet; $("backdrop").onclick=closeSheet;
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("sheet").hidden)closeSheet()});
+$("menu").onclick=()=>toast("El menú no forma parte de este prototipo");
+$("choose").onclick=()=>{toast("Ruta elegida. ¡A moverse!");setTimeout(()=>go("inicio"),1200)};
+$("restart").onclick=()=>{go("inicio")};
+[["p-time","time"],["p-dist","dist"]].forEach(([id,k])=>{const el=$(id),o=$(id+"-o"),u=()=>{S[k]=+el.value;o.textContent=fmt(el.value)+el.dataset.unit};el.oninput=u;u()});
+["near","green","air","meteo"].forEach(k=>{const el=$("w-"+k),o=$("w-"+k+"-o"),lab=v=>v<=2?"Poca":v<=6?"Media":"Mucha",u=()=>{S.w[k]=+el.value;o.textContent=lab(+el.value)};el.oninput=u;u()});
+$("p-where").querySelectorAll("button").forEach(b=>b.onclick=()=>{S.where=b.dataset.v;$("p-where").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b))});
+$("p-prof").onchange=e=>S.prof=e.target.value;
+renderPrefs(); go("inicio");
+</script>
+</body>
+</html>
