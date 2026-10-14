@@ -66,14 +66,18 @@ docs/bases/                       ← bases del reto (Bases-MAD-Open-Data-Challe
 
 **Arranque en un equipo nuevo:**
 ```bash
-cd app/ingest && python3 -m venv .venv && . .venv/bin/activate    # cada servicio Python tiene su venv
-pip install -e ".[dev]"                                        # igual en app/api
-python3 scripts/download_sources.py --listar
-python3 scripts/download_sources.py --grupo completo          # ~15 s, ~100 MB, 44 fuentes (probado el 14/10)
-python3 scripts/download_sources.py --solo vpla_redes         # planeamiento: 107 MB, imprescindible para % verde
-cp ../.env.example ../.env                                     # (app/.env) y poner la clave de AEMET del equipo en AEMET_API_KEY
+# solo la primera vez (cada servicio Python tiene su venv; igual en app/api):
+#   cd app/ingest && python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
+cd app/ingest && . .venv/bin/activate
+python3 scripts/download_sources.py --list
+python3 scripts/download_sources.py --group full
+python3 scripts/download_sources.py --refresh reference --include-heavy   # mensual
+python3 scripts/download_sources.py --refresh daily                       # 04:00
+python3 scripts/download_sources.py --refresh hourly                      # cada hora
+python3 scripts/download_sources.py --refresh weekly --include-heavy      # OSM (y despues el grafo)
+cp ../.env.example ../.env                                                # y poner la clave de AEMET
 ```
-Capas marcadas PESADAS (no se bajan por defecto): `vpla_redes`, `viales`, `cubierta_terrestre` (~137.000 polígonos: mejor pedirla filtrada por `bbox` del piloto), `aire_historico`, `ay_bancos`.
+Capas marcadas PESADAS (no se bajan por defecto; `--include-heavy`): `vpla_redes`, `viales`, `cubierta_terrestre` (~137.000 polígonos: mejor pedirla filtrada por `bbox` del piloto), `aire_historico`, `ay_bancos`, `osm` (~85 MB), `callejero` (~33 MB zip). `--force` descarga aunque la fuente no haya cambiado.
 
 Página de trabajo publicada (privada): https://claude.ai/artifact/MT3co6p1UKtJypQwBGqZpK
 
@@ -215,18 +219,20 @@ Código de municipio: INE de 5 dígitos `28` + 3 dígitos (`MUN` en EIEL, `CMUN`
 4. LLM: redacta la respuesta solo con esos resultados («14,6 km… no hay bancos entre el km 3 y el 5»).
 Riesgos: la ruta circular por distancia es la parte difícil; latencia de 1–2 s; dependencia externa en la demo (guardar respuestas de reserva). Proveedor por decidir: OCI Generative AI (Oracle, patrocinador) u otro.
 
-### 6.4 Política de recarga de datos (decidida 14/10, por implementar)
+### 6.4 Política de recarga de datos (decidida 14/10, implementada en el script de descarga el 14/10)
 Cada fuente se recarga según la frecuencia con que la publica su portal: ni más (gasta recursos y cuota), ni menos (datos viejos). Sustituye y afina el RNF «estáticos a diario, aire y previsión cada hora». Frecuencias declaradas en los metadatos de CKAN (6/10): sanitarios DIARIO, farmacias SEMANAL, centros educativos ANUAL, atención social MENSUAL, zonas de baño ANUAL, estaciones de aire MENSUAL, aire del día HORARIO; Ayuntamiento: aire y meteo continuo, equipamientos diario.
 
 | Nivel | Cuándo se recarga | Fuentes (ids de `app/ingest/scripts/download_sources.py`) |
 |---|---|---|
-| **1. Referencia** | Al publicarse una versión nueva: comprobación mensual + botón «Recargar todas las fuentes» solo en administración | `eiel_*` (EIEL 2023), `vpla_redes` (planeamiento 2025), `sendas`, `vias_pecuarias`, `municipios`, `zonas_aire`, `areas_recreativas`, `cubierta_terrestre`, `viales`, `padron`, `densidad`, `renta`, `zonas_bano`, `educativos`, `aire_estaciones`, `estaciones_aire_idem`, `ay_aire_estaciones`, `aire_historico` |
+| **1. Referencia** | Al publicarse una versión nueva: comprobación mensual + botón «Recargar todas las fuentes» solo en administración | `eiel_*` (EIEL 2023), `vpla_redes` (planeamiento 2025), `sendas`, `vias_pecuarias`, `municipios`, `zonas_aire`, `areas_recreativas`, `cubierta_terrestre`, `viales`, `padron`, `densidad`, `renta`, `zonas_bano`, `educativos`, `aire_estaciones`, `estaciones_aire_idem`, `ay_aire_estaciones`, `aire_historico`, `aire_zonas` (CKAN, municipio → zona; no estaba en la tabla original), `callejero` |
 | **2. Diario** | Una vez al día, de madrugada (tarea programada) | `sanitarios`, `farmacias`, `desfibriladores`, `atencion_social`, `nmc_*` (Nomecalles), `ay_polideportivos`, `ay_idb`, `ay_piscinas`, `ay_parques`, `ay_fuentes`, `ay_bancos`, `ay_areas_caninas`; OSM **semanal** (rehacer el grafo de rutas es costoso) |
 | **3. Horario** | Cada hora, automático, con caché del último dato válido | `aire_dia`, `ay_aire`, `ay_meteo`, previsión AEMET (respetar su cuota) |
 | **4. Bajo demanda** | Al pedirlo el usuario, con caché corta (5–15 min) | `ay_trafico` (cambia cada 5 min); botón de usuario «Actualizar ahora», que **solo** refresca aire, tráfico y previsión, limitado a una vez cada pocos minutos |
 
+**Implementado el 14/10** (`refresh`, `--refresh`, comprobación de cambios por `metadata_modified` / `ETag`-`Last-Modified` / sha256); nivel extra `weekly` para OSM; `aire_zonas` en `reference`. En las capas WFS de IDEM el sha256 ignora el `timeStamp` de la respuesta y los ids `fid-…` que GeoServer genera en cada petición (no manda `ETag` ni `Last-Modified`). Falta la tarea programada por nivel (sábado, S-D2).
+
 Implementación mínima (no sobredimensionar):
-- Añadir un campo `refresh` a cada entrada de `FUENTES` en el script y una opción `--refresh <nivel>` para descargar solo ese nivel. Valores en código: `reference` (nivel 1), `weekly` (OSM), `daily` (nivel 2), `hourly` (nivel 3), `on_demand` (nivel 4).
+- Añadir un campo `refresh` a cada entrada de `SOURCES` en el script y una opción `--refresh <nivel>` para descargar solo ese nivel. Valores en código: `reference` (nivel 1), `weekly` (OSM), `daily` (nivel 2), `hourly` (nivel 3), `on_demand` (nivel 4).
 - **Antes de descargar, comprobar si la fuente ha cambiado** (`metadata_modified` de CKAN o cabecera `Last-Modified`/`ETag`); si no ha cambiado, no se descarga ni se reprocesa.
 - Una tarea programada (cron o el planificador del despliegue) por nivel; tras cada descarga, reprocesar solo las tablas afectadas.
 - Guardar en `data/raw/manifest.json` la fecha de cada recarga y mostrarla en la app («Aire actualizado hace 12 min», RF-19).
