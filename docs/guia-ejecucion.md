@@ -2,7 +2,7 @@
 
 Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso a paso con Claude Code. El plan dice *qué* hay que construir; esta guía dice **en qué orden lanzarlo, con qué prompt, qué necesita cada paso y cómo saber que ha salido bien**.
 
-- **Actualizada:** miércoles 14/10/2026, 18:45 (Tasks 5 y 8 fusionadas).
+- **Actualizada:** miércoles 14/10/2026, 19:45 (Tasks 5 y 8 fusionadas; Task 7 verificada, pendiente de PR).
 - **Prompts que usa:** `docs/prompt_task_executer.md` (ejecutar) y `docs/prompt_task_checker.md` (verificar). En ambos solo se cambia la primera línea.
 
 ---
@@ -57,6 +57,7 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 | Task 4 — AEMET verificado con la clave | ✅ fusionada | PR #2 |
 | Task 8 — red peatonal de OSM medida (pyosmium; pyrosm no compila en 3.12) | ✅ fusionada | PR #3 |
 | Task 5 — Docker Compose (api + frontend), Caddy sin claves ni ubicación en logs | ✅ fusionada | PR #4 |
+| Task 7 — umbrales de calor del plan de Sanidad y tabla municipio → zona (179) | ✅ verificada, **falta PR** | rama `motor/mie14-calor` |
 | **P-13** — cuota de AEMET (`AEMET_PAUSE_S` mal calculado) | ⚠️ pendiente de decisión | `docs/PENDIENTES.md` → DEC-13 abajo |
 
 ---
@@ -66,11 +67,11 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 | # | Día | Tipo | Tareas | Rama | Rol | Necesita antes |
 |---|---|---|---|---|---|---|
 | — | Mié | ✅ hecho | 1, 2, 3, 4 | — | — | — |
-| M1 | Mié | MANUAL | prerrequisitos | — | quien ejecute | — (Docker ✅; faltan Node 20 y poppler si no están) |
+| M1 | Mié | MANUAL | prerrequisitos | — | quien ejecute | — (Docker ✅, poppler ✅; falta Node 20 si no está) |
 | L1 | Mié | ✅ hecho | 5 | `motor/mie14-compose` | Motor | PR #4 |
 | L2 | Mié | ✅ hecho | 8 | `rutas/mie14-osm` | Rutas | PR #3 |
 | L3 | Mié | EJECUTAR + VERIFICAR | 10 | `front/mie14-vite` | Front | Node 20 (M1) y **L1 fusionado** |
-| L4 | Mié | EJECUTAR + VERIFICAR | 7 | `motor/mie14-calor` | Motor | `poppler-utils` (M1) |
+| L4 | Mié | ✅ verificado (falta PR) | 7 | `motor/mie14-calor` | Motor | — |
 | M2 | Mié | MANUAL | 6 (VM de OCI) | — | Motor | **L1 fusionado** |
 | M3 | Mié | MANUAL | 9 (bocetos) | — | Front + maquetadora | — |
 | D1 | Mié | DECISIÓN | DEC-P04, DEC-13 | — | Equipo | — |
@@ -159,7 +160,17 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
   grep -r "googleapis" index.html src || echo "sin Google"
   ```
 
-### L4 · EJECUTAR + VERIFICAR — Task 7: umbrales de calor del plan de Sanidad
+### L4 · ✅ VERIFICADO (falta PR) — Task 7: umbrales de calor del plan de Sanidad
+
+> **Resultado (14/10):** ejecutada, verificada, corregida en una ronda y verificada otra vez. Lo que queda en el repositorio:
+> - **Umbrales oficiales** (`docs/assets/umbrales.md` §2.1, Anexo I, pág. 41): Sierra de Madrid (722801) 35,8 °C · Metropolitana y Henares (722802) 37,4 °C · Sur, Vegas y Oeste (722803) 39,2 °C. Son de **temperatura máxima diaria**, no horaria ni de sensación térmica.
+> - **Regla de niveles** (§2.2, págs. 22–24): suma de grados por encima del umbral en 3 días → 0 verde, ≤ 3,5 amarillo, ≤ 7 naranja, > 7 rojo. Grupos de riesgo del Anexo V (mayores de 65, menores de 4, gestantes…).
+> - **Tabla municipio → zona de los 179** en `docs/assets/heat_zones.csv` (`ine_code`, `municipality`, `zone_code`), sacada del mapa de la pág. 41 sobre las geometrías de `municipios.geojson`. Comprobada: 179 sin huecos ni repetidos, pilotos correctos (Madrid y Getafe 722802, San Lorenzo 722801) y los 54 municipios de frontera cotejados con el mapa.
+> - **Propuesta para DEC-06** (§2.3, no es decisión): «nivel estimado» con la previsión horaria de AEMET y el umbral de la zona; avisar desde naranja a la población general y desde amarillo a «mayor», «niños menores de 4 años» y «carrito» (el carrito es lectura nuestra); dentro del día, la hora con menor `sensTermica`, evitando 14:00–19:00.
+> - **Aviso para DEC-06 y L7:** el contrato actual `heat.max_feels_like_c` de `app/config/rules.yaml` (Task 12) **no admite umbrales por zona**; si se acepta la propuesta, hay que ampliarlo.
+> - P-03 ✅ en `docs/PENDIENTES.md`; D-06 y A-06 ya no están bloqueados.
+> - **Pendientes menores:** `decisiones-pendientes.md` D-06 todavía dice «Sanidad o AEMET» (Meteoalerta no se localizó); el script que generó el CSV está solo en el workspace (`.superpowers/…/t7tools/`), no versionado.
+
 
 - **Qué hace:** descarga el PDF del plan de calor 2026, lo convierte a texto y copia **literalmente** los umbrales de la Comunidad de Madrid a `docs/assets/umbrales.md` §2, con página citada, más una **propuesta** (no decisión) para DEC-06.
 - **Por qué en este orden:** desbloquea DEC-06 (calor), que el motor necesita el viernes; no depende de nada más.
@@ -167,7 +178,7 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 - **Necesita:** `poppler-utils` (M1).
 - **Prompt de ejecución:** `TAREAS={7}   RAMA={motor/mie14-calor}   BASE={main}   MANUALES_HECHOS={Task 7 paso 1: poppler-utils instalado}`
 - **Prompt de verificación:** `TAREAS={7}   RAMA={motor/mie14-calor}   BASE={main}` (apenas hay pruebas: el verificador debe cotejar los valores con el PDF).
-- **Comprobación rápida:** `umbrales.md` §2 ya no dice «PENDIENTE»; cada valor lleva página del PDF.
+- **Comprobación rápida:** `umbrales.md` §2 ya no dice «PENDIENTE»; cada valor lleva página del PDF; `heat_zones.csv` tiene 179 filas (`tail -n +2 docs/assets/heat_zones.csv | wc -l`).
 
 ### M2 · MANUAL — Task 6: VM de OCI
 
@@ -301,7 +312,7 @@ Están en el plan como tablas (V-…, S-…, D-…, L-…). **Se detallan cada t
 
 | Día | Lo principal | Hito |
 |---|---|---|
-| Vie 16 | `/recommend` y `/route` reales, `/location`, indicadores F5, mapa, detalle, ajustes | **Primer despliegue con HTTPS** en la VM; DEC-06 y DEC-09 a las 12:00; DEC-13 (cuota AEMET) |
+| Vie 16 | `/recommend` y `/route` reales, `/location`, indicadores F5, mapa, detalle, ajustes | **Primer despliegue con HTTPS** en la VM; DEC-06 (propuesta lista en `umbrales.md` §2.3) y DEC-09 a las 12:00; DEC-13 (cuota AEMET) |
 | Sáb 17 | `/municipality`, `/sources`, ingesta programada, **grafo de toda la Comunidad**, pantallas Ruta y Municipio | DEC-A11 a las 14:00 (si no llega: solo Getafe) |
 | Dom 18 | Servicio `ingest` en Compose con cron, caché ante caídas, F6 asistente, ruta circular | **23:59: congelación de alcance** |
 | Lun 19 | Ensayo con las personas de la demo, errores, guion, demo sin red, accesibilidad | — |
