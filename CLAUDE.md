@@ -47,7 +47,7 @@ app/                              ← TODO el código (desde el 14/10). Un direc
     scripts/profile_sources.py    ← perfil de los datos descargados (app/data/perfil/)
   frontend/                       ← servicio web (React + Vite, compilado y servido con Caddy)
   config/                         ← YAML compartidos (montado en solo lectura en api e ingest); README.md dice qué decisión rellena cada uno
-  deploy/                         ← docker-compose.yml
+  deploy/                         ← docker-compose.yml + .env.example (solo DOMAIN; copiar a deploy/.env)
   data/raw/<fuente>/              ← volumen compartido: datos descargados + manifest.json (URL, fecha, tamaño)
 ```
 
@@ -62,6 +62,8 @@ docs/assets/matriz-datos.html          ← página de trabajo (copia local del a
 docs/idea/                        ← documento de idea .docx (DESACTUALIZADO, ver §4.3), prototipo visual .png y .html, logo_gomad.png, notas ChatGPT
 docs/idea/pdf/                    ← GoMAD: aproximación técnica, fuentes de datos e interfaz de usuario (PDF)
 docs/bases/                       ← bases del reto (Bases-MAD-Open-Data-Challenge-2026.pdf) + 8 PDF de la jornada del 6/10
+docs/plan-implementacion.md       ← plan por tareas (Task N) hasta la demo; docs/guia-ejecucion.md ← orden de ejecución por días y roles
+docs/prompt_task_executer.md      ← plantilla para ejecutar tareas (executing-plans); docs/prompt_task_checker.md ← plantilla del verificador
 ```
 
 **Arranque en un equipo nuevo:**
@@ -79,6 +81,15 @@ python3 scripts/download_sources.py --refresh weekly --include-heavy      # OSM 
 ```
 `aemet` está en el grupo `minimal` y en el nivel `hourly`: sin `AEMET_API_KEY` en `app/.env` falla (las demás fuentes siguen) y con `AEMET_MUNICIPALITIES=todos` son 179 × 2 peticiones por ejecución, que gastan cuota.
 Capas marcadas PESADAS (no se bajan por defecto; `--include-heavy`): `vpla_redes`, `viales`, `cubierta_terrestre` (~137.000 polígonos: mejor pedirla filtrada por `bbox` del piloto), `aire_historico`, `ay_bancos`, `osm` (~85 MB), `callejero` (~33 MB zip). `--force` descarga aunque la fuente no haya cambiado.
+
+**Levantar la app con Docker Compose** (desde `app/`):
+```bash
+mkdir -p frontend/dist && echo '<!doctype html><title>GoMad</title>' > frontend/dist/index.html   # provisional hasta Task 10
+cp deploy/.env.example deploy/.env        # solo DOMAIN: ":80" en local, el dominio en la VM
+docker compose -f deploy/docker-compose.yml up -d --build
+curl -s localhost/api/health             # {"status":"ok"}
+```
+Las claves de `app/.env` solo llegan al contenedor `api`; Caddy (`frontend`) recibe solo `DOMAIN`. Si `docker` da «permission denied» en el socket tras añadirte al grupo `docker`, abre una terminal nueva (o `newgrp docker`).
 
 Página de trabajo publicada (privada): https://claude.ai/artifact/MT3co6p1UKtJypQwBGqZpK
 
@@ -185,7 +196,7 @@ Soporte: Discord https://discord.gg/ZfNFQvrRb · Web: https://datathon-mad.sel.i
 - **API (FastAPI, `app/api/`):** `/recommend`, `/route`, `/municipality/{ine_code}`, `/assistant/*` (F6), `/sources` (atribución y fechas), `/activities`, `/location`.
 - **Rutas:** grafo peatonal de OSM (extracto Geofabrik + OSMnx o similar) precalculado por municipio piloto; coste por tramo = longitud × penalización por tráfico/tipo de vía − bonificación por verde, sombra y fuentes.
 - **Frontend:** SPA móvil con MapLibre GL; navegación inferior «Mi entorno · Municipios · Perfil»; 5 pantallas (inicio «¿Qué quieres hacer?», resultados mapa+lista, detalle con «¿Por qué?» y mejor franja, ruta saludable, vista de municipio) + asistente F6.
-- **Despliegue:** HTTPS obligatorio (la geolocalización del navegador lo exige); claves solo en `.env`; página de fuentes y licencias; aviso legal y de privacidad.
+- **Despliegue:** HTTPS obligatorio (la geolocalización del navegador lo exige); claves solo en `app/.env` (solo las recibe la api); `DOMAIN` de Caddy en `app/deploy/.env` (copiar de `app/deploy/.env.example`: `:80` en local, el dominio en la VM), así el contenedor expuesto no recibe claves; página de fuentes y licencias; aviso legal y de privacidad.
 
 ### 6.1 Modelo de datos destino
 Tablas con nombre en inglés desde el 14/10 (`municipio` → `municipality`, `destino` → `destination`, `estacion_aire` → `air_station`, `lectura_aire` → `air_reading`, `prevision` → `forecast`, `tramo` → `edge`, `poi_ruta` → `route_poi`, `servicio` → `service`, `indicador_municipio` → `municipality_indicator`); columnas en inglés según `build_db.py` (Task 19 del plan); las que Task 19 no define siguen en español y los campos se fijan en el contrato y en `build_db.py`.
