@@ -11,7 +11,7 @@ Orden propuesto: primero las **bloqueantes** (D-01 a D-04), que impiden empezar 
 | D-03 | Proveedor de IA (F6) | F6, `.env` | El que se pueda dar de alta mañana; ver criterios |
 | D-04 | Geocodificación (RF-01) | Primera pantalla | Buscador de Nomecalles + callejero completo |
 | D-05 | Regla de aire por perfil | Motor (RF-09, RF-15) | Derivada del texto del BOE |
-| D-06 | Calor: qué umbral usar | Motor (RF-09) | Esperar a leer el plan de Sanidad (P-03) |
+| D-06 | Calor: qué umbral usar | Motor (RF-09) | Desbloqueado: umbrales oficiales, tabla municipio → zona (`docs/assets/heat_zones.csv`) y propuesta en `docs/assets/umbrales.md` §2.3 |
 | D-07 | Pesos por defecto y velocidades | Motor (RF-07) | Propuesta de partida abajo |
 | D-08 | Tabla actividad → destino | RF-02, RF-04 | Propuesta con cifras reales abajo |
 | D-09 | Indicadores de F5 | F5 | Uno o dos por categoría, con cobertura conocida |
@@ -97,7 +97,7 @@ Orden propuesto: primero las **bloqueantes** (D-01 a D-04), que impiden empezar 
 
 **Contexto:** no hay umbral verificado (`umbrales.md` §2). Hay tres fuentes posibles: el plan de Sanidad 2026 (umbral por zona meteosalud, pensado para días de alerta), Meteoalerta de AEMET (avisos por zona) y la sensación térmica horaria de AEMET (para la franja).
 **Recomendación:** decidir **después** de leer el plan de Sanidad (P-03). Combinación probable: «día en alerta» (Sanidad o AEMET) → proponer cubierto o franja temprana; dentro del día, elegir la hora con menor sensación térmica.
-**Bloqueado por:** P-03 y P-01 (esquema real de AEMET).
+**Desbloqueado: umbrales oficiales, tabla municipio → zona (`docs/assets/heat_zones.csv`) y propuesta en `docs/assets/umbrales.md` §2.3.**
 
 ## D-07 · Pesos por defecto y velocidades (RF-07, RF-16)
 
