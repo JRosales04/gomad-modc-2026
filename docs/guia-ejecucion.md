@@ -2,7 +2,7 @@
 
 Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso a paso con Claude Code. El plan dice *qué* hay que construir; esta guía dice **en qué orden lanzarlo, con qué prompt, qué necesita cada paso y cómo saber que ha salido bien**.
 
-- **Actualizada:** miércoles 14/10/2026, tarde.
+- **Actualizada:** miércoles 14/10/2026, 18:45 (Tasks 5 y 8 fusionadas).
 - **Prompts que usa:** `docs/prompt_task_executer.md` (ejecutar) y `docs/prompt_task_checker.md` (verificar). En ambos solo se cambia la primera línea.
 
 ---
@@ -55,6 +55,8 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 | Task 2 — descarga por niveles, cambios, OSM, callejero | ✅ fusionada | PR #2 |
 | Task 3 — AEMET en el script | ✅ fusionada | PR #2 |
 | Task 4 — AEMET verificado con la clave | ✅ fusionada | PR #2 |
+| Task 8 — red peatonal de OSM medida (pyosmium; pyrosm no compila en 3.12) | ✅ fusionada | PR #3 |
+| Task 5 — Docker Compose (api + frontend), Caddy sin claves ni ubicación en logs | ✅ fusionada | PR #4 |
 | **P-13** — cuota de AEMET (`AEMET_PAUSE_S` mal calculado) | ⚠️ pendiente de decisión | `docs/PENDIENTES.md` → DEC-13 abajo |
 
 ---
@@ -64,9 +66,9 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 | # | Día | Tipo | Tareas | Rama | Rol | Necesita antes |
 |---|---|---|---|---|---|---|
 | — | Mié | ✅ hecho | 1, 2, 3, 4 | — | — | — |
-| M1 | Mié | MANUAL | prerrequisitos | — | quien ejecute | — |
-| L1 | Mié | EJECUTAR + VERIFICAR | 5 | `motor/mie14-compose` | Motor | Docker (M1) |
-| L2 | Mié | EJECUTAR + VERIFICAR | 8 | `rutas/mie14-osm` | Rutas | OSM descargado (Task 2 ✅) |
+| M1 | Mié | MANUAL | prerrequisitos | — | quien ejecute | — (Docker ✅; faltan Node 20 y poppler si no están) |
+| L1 | Mié | ✅ hecho | 5 | `motor/mie14-compose` | Motor | PR #4 |
+| L2 | Mié | ✅ hecho | 8 | `rutas/mie14-osm` | Rutas | PR #3 |
 | L3 | Mié | EJECUTAR + VERIFICAR | 10 | `front/mie14-vite` | Front | Node 20 (M1) y **L1 fusionado** |
 | L4 | Mié | EJECUTAR + VERIFICAR | 7 | `motor/mie14-calor` | Motor | `poppler-utils` (M1) |
 | M2 | Mié | MANUAL | 6 (VM de OCI) | — | Motor | **L1 fusionado** |
@@ -100,8 +102,16 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
   ```
   Docker (para L1, Task 5): instalar **Docker Desktop** en Windows → Settings → Resources → WSL Integration → activar la distribución. Comprobar: `docker compose version`.
 - **Listo cuando:** `pdftotext -v`, `node -v` (v20) y `docker compose version` responden.
+- **Docker con «permission denied» en `/var/run/docker.sock`** aunque estés en el grupo `docker`: la sesión no tiene el grupo aplicado. Cierra y abre la terminal de WSL (o `newgrp docker`). Mientras tanto, Claude puede usar `sg docker -c '…'`.
 
-### L1 · EJECUTAR + VERIFICAR — Task 5: Docker Compose básico (api + frontend)
+### L1 · ✅ HECHO (PR #4) — Task 5: Docker Compose básico (api + frontend)
+
+> **Resultado (14/10):** ejecutada, verificada, corregida en dos rondas y fusionada. Cambios respecto al texto original del plan (el plan ya está al día):
+> - **Caddy filtra su log de errores** (bloque global `log default`): sin consulta de la URL, IP ni cabeceras. Con la api caída (502) el log escribía `/api/location?text=…&lat=…`.
+> - **`DOMAIN` va en `app/deploy/.env`** (copia de `app/deploy/.env.example`, `:80` en local), **no** en `app/.env`. El contenedor de Caddy, el expuesto a Internet, recibe **solo** `DOMAIN`; las claves de `app/.env` solo llegan a la `api`. Sin `DOMAIN` o vacío, Compose se niega a arrancar (para no quedarse sin HTTPS sin aviso).
+> - `app/api/.dockerignore` excluye también `.env*`, `.pytest_cache/`, `*.egg-info/` y `**/__pycache__/`.
+> - **Pendientes menores aplazados** (para D-D1 / V-F4): la API corre como root (`USER`), falta publicar `443/udp`, `/api` sin barra cae en la SPA, la imagen lleva `build/` y `egg-info`, `/config` de Caddy sin volumen, `app/frontend/` sin `.dockerignore` (L3).
+
 
 - **Qué hace:** crea `app/api/Dockerfile`, el Caddyfile y un Dockerfile provisional en `app/frontend/`, y `app/deploy/docker-compose.yml`. Levanta en local la API (`/api/health`) y una página estática detrás de Caddy, sin log de acceso (privacidad).
 - **Por qué en este orden:** es la base del despliegue; la VM de OCI (M2) y el Dockerfile definitivo del front (L3) parten de aquí.
@@ -111,13 +121,20 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 - **Prompt de verificación:** `TAREAS={5}   RAMA={motor/mie14-compose}   BASE={main}`
 - **Comprobación rápida:**
   ```bash
-  cd app && docker compose -f deploy/docker-compose.yml up -d --build
+  cd app
+  mkdir -p frontend/dist && echo '<!doctype html><title>GoMad</title>' > frontend/dist/index.html   # hasta L3
+  cp deploy/.env.example deploy/.env               # solo la primera vez: DOMAIN=:80
+  docker compose -f deploy/docker-compose.yml up -d --build
   curl -s localhost/api/health                     # {"status":"ok"}
   docker compose -f deploy/docker-compose.yml exec api ls -a /srv/api   # sin .env ni .venv
+  docker compose -f deploy/docker-compose.yml exec -T frontend env | cut -d= -f1   # DOMAIN, sin AEMET_API_KEY, IA_* ni ORACLE_*
   docker compose -f deploy/docker-compose.yml down
   ```
 
-### L2 · EJECUTAR + VERIFICAR — Task 8: extracto de OSM y prueba de pyrosm
+### L2 · ✅ HECHO (PR #3) — Task 8: extracto de OSM y prueba de pyrosm
+
+> **Resultado (14/10):** pyrosm 0.6.2 no instala en Python 3.12; se usa **pyosmium 3.7.0** (extra `routing` del `pyproject.toml` de `ingest`). Cifras medidas en `docs/arquitectura.md` §3.4 (Getafe 59.751 nodos / 68.000 tramos; región 2,4 M / 2,6 M, ~50 s, ~3,1 GB al construir). **Aviso para L10 (Task 20):** el paso 3b solo sustituye la red; los POI (bancos, fuentes, áreas caninas, juegos) necesitan también la vía pyosmium. Además hay tramos duplicados `{u,v}` que deduplicar y hay que usar solo `length_m` (EPSG:25830).
+
 
 - **Qué hace:** instala pyrosm en el venv de `ingest` (o pyosmium si no compila en Python 3.12), mide la red peatonal de Getafe y de Madrid (nodos, tramos, segundos, memoria) y apunta las cifras en `docs/arquitectura.md` §3.4.
 - **Por qué en este orden:** decide pronto si el grafo regional cabe en memoria (DEC-A11) y si pyrosm sirve; el grafo del jueves (L10) depende de ello.
@@ -132,7 +149,8 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 - **Qué hace:** crea la SPA en `app/frontend/` con los estilos del prototipo (`main.css`, `icons.css`), fuentes servidas por nosotros (Figtree y Material Symbols, sin Google), prueba con axe, y convierte el Dockerfile del front en multi-stage (compila con Node y sirve con Caddy).
 - **Por qué en este orden:** después de L1 porque **reescribe** su Dockerfile del front; el jueves las pantallas (L11) se construyen encima.
 - **Utiliza:** Node 20, npm, Vite 5, React 18, Vitest, axe, MSW; Docker para probar la imagen.
-- **Necesita:** Node 20 (M1), **L1 fusionado en main**.
+- **Necesita:** Node 20 (M1), **L1 fusionado en main** ✅.
+- **Ojo:** el Dockerfile multi-stage conserva el `Caddyfile` actual (filtro de logs y `{$DOMAIN::80}`) y añade `app/frontend/.dockerignore` (`node_modules/`, `dist/`, `.env*`). `DOMAIN` sigue llegando solo por `app/deploy/.env`.
 - **Prompt de ejecución:** `TAREAS={10}   RAMA={front/mie14-vite}   BASE={main}   MANUALES_HECHOS={Task 10 paso 1: Node 20 instalado}`
 - **Prompt de verificación:** `TAREAS={10}   RAMA={front/mie14-vite}   BASE={main}`
 - **Comprobación rápida:**
@@ -156,8 +174,9 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 - **Qué hace:** crea la máquina donde se desplegará la app y comprueba que responde desde internet.
 - **Por qué:** el primer despliegue con HTTPS es el viernes (V-F4); conviene tener la VM y su IP antes.
 - **Utiliza:** consola de OCI con la cuenta del equipo, Ubuntu 24.04, Docker.
-- **Necesita:** **L1 fusionado** (el Compose).
-- **Pasos:** los de la Task 6 del plan: forma `VM.Standard.A1.Flex` (Always Free) o de pago, puertos 80/443 abiertos en la VCN y en iptables, Docker, `git clone`, `app/.env` creado a mano en la VM, `docker compose up`.
+- **Necesita:** **L1 fusionado** ✅ (el Compose).
+- **Pasos:** los de la Task 6 del plan: forma `VM.Standard.A1.Flex` (Always Free) o de pago, puertos 80/443 abiertos en la VCN y en iptables, Docker, `git clone`, `app/.env` creado a mano en la VM (claves), **`app/deploy/.env` con `DOMAIN=:80`** hasta tener dominio (con dominio: `DOMAIN=<dominio>` y Caddy saca el certificado), `docker compose up`.
+- **Memoria:** con 4 GB la API y la construcción del grafo regional no caben a la vez (arquitectura §3.4: ~3,1 GB al construir, ~1–1,5 GB la API). Preferir A1.Flex con 12 GB o más.
 - **Listo cuando:** `curl -s http://<IP_PÚBLICA>/api/health` → `{"status":"ok"}`. Apuntar forma, región e IP en `docs/arquitectura.md` §6 (**sin** credenciales).
 
 ### M3 · MANUAL — Task 9: bocetos con la maquetadora
