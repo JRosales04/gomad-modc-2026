@@ -38,9 +38,13 @@ Este archivo es el contexto completo del proyecto para Claude Code. Se escribió
 
 ```
 CLAUDE.md                         ← este archivo
-.gitignore / .env.example         ← data/ y .env no se suben; claves en .env
-scripts/descargar_fuentes.py      ← descarga todas las fuentes a data/raw/ (solo stdlib, probado)
-data/raw/<fuente>/                ← datos descargados + data/raw/manifest.json (URL, fecha, tamaño)
+.gitignore                        ← app/data/, app/.env y app/.venv no se suben
+app/                              ← TODO el código de la app (desde el 14/10); los comandos se ejecutan desde aquí
+  .env.example                    ← copiar a app/.env; claves solo ahí
+  .venv/                          ← entorno virtual de Python (python3 -m venv .venv)
+  api/ (engine, routing, ai, services) · ingest/ (normalize) · config/ · scripts/ · web/ · deploy/ · tests/
+  scripts/descargar_fuentes.py    ← descarga todas las fuentes a app/data/raw/ (solo stdlib, probado)
+  data/raw/<fuente>/              ← datos descargados + app/data/raw/manifest.json (URL, fecha, tamaño)
 docs/contexto-muevete-cerca.md    ← documento largo: matriz requisito→fuente con enlaces, esquemas, tabla de 25 municipios
 docs/referencia/requisitos_fuentes.json   ← matriz de trazabilidad en JSON (24 requisitos), fuente de verdad
 docs/referencia/municipios_candidatos.json← 25 municipios con más datos y sus 23 indicadores
@@ -51,6 +55,7 @@ docs/presentaciones/              ← 8 PDF de la jornada del 6/10
 
 **Arranque en un equipo nuevo:**
 ```bash
+cd app && python3 -m venv .venv && . .venv/bin/activate
 python3 scripts/descargar_fuentes.py --listar
 python3 scripts/descargar_fuentes.py --grupo completo          # ~15 s, ~100 MB, 44 fuentes (probado el 14/10)
 python3 scripts/descargar_fuentes.py --solo vpla_redes         # planeamiento: 107 MB, imprescindible para % verde

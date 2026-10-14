@@ -14,6 +14,21 @@
 
 ---
 
+## Raíz del código: `app/`
+
+Desde el 14/10 todo el código vive en **`app/`** (CLAUDE.md §3). **Todas las rutas de ficheros y comandos de este plan son relativas a `app/`** y los comandos se ejecutan con `app/` como directorio de trabajo (`cd app`), salvo `CLAUDE.md` y `docs/…`, que están en la raíz del repositorio (desde `app/`: `../CLAUDE.md`, `../docs/…`).
+
+```
+app/
+  .env.example  .env (no se sube)  .venv/ (no se sube; ya creado con python3 -m venv .venv)
+  api/{engine,routing,ai,services}   ingest/normalize   config/   scripts/   web/   deploy/   tests/{api,engine,routing,ingest,scripts,data}
+  data/ (no se sube: raw, clean, *.duckdb, graph)
+```
+
+Los directorios vacíos llevan `.gitkeep`; se borra al crear el primer fichero dentro. Activar el entorno: `cd app && . .venv/bin/activate`.
+
+---
+
 ## Cómo ejecutar este plan
 
 `superpowers:executing-plans` **no tiene parámetros**: por defecto ejecuta todas las tareas del plan seguidas, sin parar. Para trabajar por días y roles, la persona se lo dice en el mensaje (las instrucciones del usuario mandan sobre la skill):
@@ -175,12 +190,13 @@ Cada decisión se apunta en `CLAUDE.md` §11 y `docs/arquitectura.md` §10 y se 
 **Ficheros:**
 - Crear: `pyproject.toml`, `api/__init__.py`, `api/main.py`, `api/engine/__init__.py`, `api/routing/__init__.py`, `api/ai/__init__.py`, `ingest/__init__.py`, `ingest/normalize/__init__.py`, `config/README.md`, `tests/__init__.py`, `tests/conftest.py`, `tests/api/__init__.py`, `tests/api/test_health.py`, `tests/data/.gitkeep`
 - Renombrar: `scripts/descargar_fuentes.py` → `scripts/download_sources.py`; `scripts/perfilar_fuentes.py` → `scripts/profile_sources.py`
-- Modificar: `CLAUDE.md` (§2.6, §3, §6.1, §6.4), `docs/arquitectura.md` (§2, §3, §4, §9b) con la tabla de nombres de «Restricciones globales»
+- Borrar: los `.gitkeep` de los directorios que reciben ficheros
+- Modificar: `../CLAUDE.md` (§2.6, §3, §6.1, §6.4), `../docs/arquitectura.md` (§2, §3, §4, §9b) con la tabla de nombres de «Restricciones globales»
 
 **Interfaces:**
 - Produce: `api.main:app` (FastAPI) con `GET /health → {"status": "ok"}`; fixture `root` en `tests/conftest.py`; marcador `slow` (se salta si faltan datos reales).
 
-- [ ] **Paso 1 [manual]: herramientas del sistema** (WSL no trae `venv` ni `pip`): `sudo apt install -y python3.12-venv python3-pip` (la persona lo ejecuta con `!` en el prompt).
+- [ ] **Paso 1: entorno.** `app/.venv` ya existe (creado el 14/10). Comprobar: `.venv/bin/python --version` → `Python 3.12.x`. Si no existe: `python3 -m venv .venv`.
 
 - [ ] **Paso 2: `pyproject.toml`**
 
@@ -228,7 +244,7 @@ markers = ["slow: necesita datos reales en data/ (se salta si faltan)"]
 
 > Si `pip` no resuelve alguna versión en Python 3.12, usar la menor que lo haga y anotarlo en el commit. `pyrosm` va aparte porque puede no compilar en 3.12 (Task 8).
 
-- [ ] **Paso 3: instalar** — `python3 -m venv .venv && . .venv/bin/activate && pip install -U pip && pip install -e ".[ingest,dev]"`. Esperado: sin errores; `python -c "import fastapi, duckdb, igraph, geopandas, pyproj"` no imprime nada.
+- [ ] **Paso 3: instalar** — `. .venv/bin/activate && pip install -U pip && pip install -e ".[ingest,dev]"`. Esperado: sin errores; `python -c "import fastapi, duckdb, igraph, geopandas, pyproj"` no imprime nada.
 
 - [ ] **Paso 4: prueba que falla** — `tests/api/test_health.py`
 
@@ -293,18 +309,18 @@ Run: `pytest -v` → Esperado: PASS.
 ```bash
 git mv scripts/descargar_fuentes.py scripts/download_sources.py
 git mv scripts/perfilar_fuentes.py scripts/profile_sources.py
-grep -rl "descargar_fuentes\|perfilar_fuentes" CLAUDE.md docs/arquitectura.md docs/informe-datos.md docs/PENDIENTES.md scripts/ \
+grep -rl "descargar_fuentes\|perfilar_fuentes" ../CLAUDE.md ../docs/arquitectura.md ../docs/informe-datos.md ../docs/PENDIENTES.md scripts/ \
   | xargs sed -i 's/descargar_fuentes/download_sources/g; s/perfilar_fuentes/profile_sources/g'
 python3 scripts/download_sources.py --listar | head -3      # sigue funcionando (flags aun en espanol hasta Task 2)
 python3 scripts/profile_sources.py --help | head -3
 ```
 
-En `CLAUDE.md` §6.1 y `docs/arquitectura.md` §2, §3, §4 y §9b, sustituir los nombres según la tabla de «Restricciones globales» (tablas, ficheros, módulos, endpoints) y añadir: «Nombres en inglés desde el 14/10 (CLAUDE.md §2.1)». No tocar `docs/contexto-muevete-cerca.md` ni los documentos de la idea (históricos).
+En `../CLAUDE.md` §6.1 y `../docs/arquitectura.md` §2, §3, §4 y §9b (que pasa a describir la estructura bajo `app/`), sustituir los nombres según la tabla de «Restricciones globales» (tablas, ficheros, módulos, endpoints) y añadir: «Nombres en inglés desde el 14/10 (CLAUDE.md §2.1)». No tocar `docs/contexto-muevete-cerca.md` ni los documentos de la idea (históricos).
 
 - [ ] **Paso 7: commit**
 
 ```bash
-git add pyproject.toml api ingest config tests scripts CLAUDE.md docs/arquitectura.md docs/informe-datos.md docs/PENDIENTES.md
+git add -A . ../CLAUDE.md ../docs/arquitectura.md ../docs/informe-datos.md ../docs/PENDIENTES.md
 git commit -m "Estructura del repositorio, entorno Python y nombres de código en inglés"
 ```
 
