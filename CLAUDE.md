@@ -9,7 +9,7 @@ Este archivo es el contexto completo del proyecto para Claude Code. Se escribió
 - **El proyecto ha sido aprobado** en la fase de ideas. Estamos en **fase de desarrollo** (13–20 oct 2026).
 - **Demo presencial: martes 20 de octubre de 2026**, 10 minutos. Después el jurado accede al prototipo y a los datasets. Ganadores ese mismo día.
 - **Objetivo del equipo:** no solo una demo, sino una **app web usable que se pueda ofrecer directamente** a la ciudadanía (desplegada, con HTTPS, rápida en móvil).
-- **El equipo ya tiene clave de AEMET OpenData.** Va en `.env` como `AEMET_API_KEY`, nunca en el repositorio. El esquema de su API aún no se ha comprobado con la clave: es una de las primeras tareas (§7.1).
+- **El equipo ya tiene clave de AEMET OpenData.** Va en `app/.env` como `AEMET_API_KEY`, nunca en el repositorio. Esquema y cuota comprobados con la clave el 14/10 (§7.1).
 - **El equipo ya tiene cuenta de Oracle** (acceso de Oracle Academy/OCI para el reto). Las credenciales **nunca** van en el repositorio ni en este archivo: solo en `.env` (ver `.env.example`).
 - **Todavía no hay código de la app.** Sí hay: análisis completo de datos, matriz de trazabilidad requisito → fuente y un script probado que descarga todas las fuentes (`scripts/download_sources.py`).
 - **Nombre del proyecto: pendiente de decidir.** Nombre de trabajo: *Muévete Cerca*. Candidatos favoritos (acrónimo en inglés con significado en español):
@@ -66,14 +66,19 @@ docs/bases/                       ← bases del reto (Bases-MAD-Open-Data-Challe
 
 **Arranque en un equipo nuevo:**
 ```bash
-cd app/ingest && python3 -m venv .venv && . .venv/bin/activate    # cada servicio Python tiene su venv
-pip install -e ".[dev]"                                        # igual en app/api
-python3 scripts/download_sources.py --listar
-python3 scripts/download_sources.py --grupo completo          # ~15 s, ~100 MB, 44 fuentes (probado el 14/10)
-python3 scripts/download_sources.py --solo vpla_redes         # planeamiento: 107 MB, imprescindible para % verde
-cp ../.env.example ../.env                                     # (app/.env) y poner la clave de AEMET del equipo en AEMET_API_KEY
+# solo la primera vez (cada servicio Python tiene su venv; igual en app/api):
+#   cd app/ingest && python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
+cd app/ingest && . .venv/bin/activate
+cp ../.env.example ../.env                                                # y poner la clave de AEMET
+python3 scripts/download_sources.py --list
+python3 scripts/download_sources.py --group full
+python3 scripts/download_sources.py --refresh reference --include-heavy   # mensual
+python3 scripts/download_sources.py --refresh daily                       # 04:00
+python3 scripts/download_sources.py --refresh hourly                      # cada hora
+python3 scripts/download_sources.py --refresh weekly --include-heavy      # OSM (y despues el grafo)
 ```
-Capas marcadas PESADAS (no se bajan por defecto): `vpla_redes`, `viales`, `cubierta_terrestre` (~137.000 polígonos: mejor pedirla filtrada por `bbox` del piloto), `aire_historico`, `ay_bancos`.
+`aemet` está en el grupo `minimal` y en el nivel `hourly`: sin `AEMET_API_KEY` en `app/.env` falla (las demás fuentes siguen) y con `AEMET_MUNICIPALITIES=todos` son 179 × 2 peticiones por ejecución, que gastan cuota.
+Capas marcadas PESADAS (no se bajan por defecto; `--include-heavy`): `vpla_redes`, `viales`, `cubierta_terrestre` (~137.000 polígonos: mejor pedirla filtrada por `bbox` del piloto), `aire_historico`, `ay_bancos`, `osm` (~85 MB), `callejero` (~33 MB zip). `--force` descarga aunque la fuente no haya cambiado.
 
 Página de trabajo publicada (privada): https://claude.ai/artifact/MT3co6p1UKtJypQwBGqZpK
 
@@ -215,18 +220,20 @@ Código de municipio: INE de 5 dígitos `28` + 3 dígitos (`MUN` en EIEL, `CMUN`
 4. LLM: redacta la respuesta solo con esos resultados («14,6 km… no hay bancos entre el km 3 y el 5»).
 Riesgos: la ruta circular por distancia es la parte difícil; latencia de 1–2 s; dependencia externa en la demo (guardar respuestas de reserva). Proveedor por decidir: OCI Generative AI (Oracle, patrocinador) u otro.
 
-### 6.4 Política de recarga de datos (decidida 14/10, por implementar)
+### 6.4 Política de recarga de datos (decidida 14/10, implementada en el script de descarga el 14/10)
 Cada fuente se recarga según la frecuencia con que la publica su portal: ni más (gasta recursos y cuota), ni menos (datos viejos). Sustituye y afina el RNF «estáticos a diario, aire y previsión cada hora». Frecuencias declaradas en los metadatos de CKAN (6/10): sanitarios DIARIO, farmacias SEMANAL, centros educativos ANUAL, atención social MENSUAL, zonas de baño ANUAL, estaciones de aire MENSUAL, aire del día HORARIO; Ayuntamiento: aire y meteo continuo, equipamientos diario.
 
 | Nivel | Cuándo se recarga | Fuentes (ids de `app/ingest/scripts/download_sources.py`) |
 |---|---|---|
-| **1. Referencia** | Al publicarse una versión nueva: comprobación mensual + botón «Recargar todas las fuentes» solo en administración | `eiel_*` (EIEL 2023), `vpla_redes` (planeamiento 2025), `sendas`, `vias_pecuarias`, `municipios`, `zonas_aire`, `areas_recreativas`, `cubierta_terrestre`, `viales`, `padron`, `densidad`, `renta`, `zonas_bano`, `educativos`, `aire_estaciones`, `estaciones_aire_idem`, `ay_aire_estaciones`, `aire_historico` |
+| **1. Referencia** | Al publicarse una versión nueva: comprobación mensual + botón «Recargar todas las fuentes» solo en administración | `eiel_*` (EIEL 2023), `vpla_redes` (planeamiento 2025), `sendas`, `vias_pecuarias`, `municipios`, `zonas_aire`, `areas_recreativas`, `cubierta_terrestre`, `viales`, `padron`, `densidad`, `renta`, `zonas_bano`, `educativos`, `aire_estaciones`, `estaciones_aire_idem`, `ay_aire_estaciones`, `aire_historico`, `aire_zonas` (CKAN, municipio → zona; no estaba en la tabla original), `callejero` |
 | **2. Diario** | Una vez al día, de madrugada (tarea programada) | `sanitarios`, `farmacias`, `desfibriladores`, `atencion_social`, `nmc_*` (Nomecalles), `ay_polideportivos`, `ay_idb`, `ay_piscinas`, `ay_parques`, `ay_fuentes`, `ay_bancos`, `ay_areas_caninas`; OSM **semanal** (rehacer el grafo de rutas es costoso) |
 | **3. Horario** | Cada hora, automático, con caché del último dato válido | `aire_dia`, `ay_aire`, `ay_meteo`, previsión AEMET (respetar su cuota) |
 | **4. Bajo demanda** | Al pedirlo el usuario, con caché corta (5–15 min) | `ay_trafico` (cambia cada 5 min); botón de usuario «Actualizar ahora», que **solo** refresca aire, tráfico y previsión, limitado a una vez cada pocos minutos |
 
+**Implementado el 14/10** (`refresh`, `--refresh`, comprobación de cambios por `metadata_modified` / `ETag`-`Last-Modified` / sha256); nivel extra `weekly` para OSM; `aire_zonas` en `reference`. En las capas WFS de IDEM el sha256 ignora el `timeStamp` de la respuesta y los ids `fid-…` que GeoServer genera en cada petición (no manda `ETag` ni `Last-Modified`). Falta la tarea programada por nivel (sábado, S-D2).
+
 Implementación mínima (no sobredimensionar):
-- Añadir un campo `refresh` a cada entrada de `FUENTES` en el script y una opción `--refresh <nivel>` para descargar solo ese nivel. Valores en código: `reference` (nivel 1), `weekly` (OSM), `daily` (nivel 2), `hourly` (nivel 3), `on_demand` (nivel 4).
+- Añadir un campo `refresh` a cada entrada de `SOURCES` en el script y una opción `--refresh <nivel>` para descargar solo ese nivel. Valores en código: `reference` (nivel 1), `weekly` (OSM), `daily` (nivel 2), `hourly` (nivel 3), `on_demand` (nivel 4).
 - **Antes de descargar, comprobar si la fuente ha cambiado** (`metadata_modified` de CKAN o cabecera `Last-Modified`/`ETag`); si no ha cambiado, no se descarga ni se reprocesa.
 - Una tarea programada (cron o el planificador del despliegue) por nivel; tras cada descarga, reprocesar solo las tablas afectadas.
 - Guardar en `data/raw/manifest.json` la fecha de cada recarga y mostrarla en la app («Aire actualizado hace 12 min», RF-19).
@@ -254,7 +261,7 @@ No hacer: recomendador que aprende del usuario (exige guardar historial), IA que
 | **Ayuntamiento de Madrid** https://datos.madrid.es | CKAN `https://datos.madrid.es/api/3/action/…`; ficha `/dataset/<id>` | **Solo capital.** Incluye LATITUD/LONGITUD |
 | **Tráfico Ayto.** | `https://informo.madrid.es/informo/tmadrid/pm.xml` (cada 5 min) | ~4.000 puntos: `idelem`, `descripcion`, `intensidad`, `ocupacion`, `carga`, `nivelServicio`, `error`, `st_x`, `st_y` (UTM) |
 | **OpenStreetMap** | Geofabrik https://download.geofabrik.de/europe/spain/madrid.html (preferido); Overpass solo para pruebas (overpass-api.de dio 406; funcionó `maps.mail.ru/osm/tools/overpass/api/interpreter`; limita peticiones) | ODbL. Mobiliario muy desigual entre municipios |
-| **AEMET OpenData** *(clave disponible; esquema sin verificar)* | `GET https://opendata.aemet.es/opendata/api/prediccion/especifica/municipio/horaria/{cod_ine_5}?api_key=…` → JSON con URL `datos` → documento con `prediccion.dia[]`: `temperatura[]`, `sensTermica[]`, `precipitacion[]`, `probPrecipitacion[]`, `estadoCielo[]`, `humedadRelativa[]`, `vientoAndRachaMax[]` (cada uno `{value, periodo}`), `orto`, `ocaso` | **Clave gratuita**: https://opendata.aemet.es/centrodedescargas/altaUsuario. Tiene cuota: cachear |
+| **AEMET OpenData** *(comprobado 14/10 con la clave del equipo: Getafe 28065, Madrid 28079, San Lorenzo 28131)* | `GET https://opendata.aemet.es/opendata/api/prediccion/especifica/municipio/horaria/{cod_ine_5}` con la clave en la **cabecera `api_key`** (aceptada; no hace falta `?api_key=`) → JSON `{descripcion, estado: 200, datos, metadatos}`; `datos` es una URL firmada (`/opendata/sh/…`, sin clave) → lista con un documento: `elaborado`, `nombre`, `provincia`, `id`, `version`, `origen` (copyright y nota legal) y `prediccion.dia[]` (**3 días**: hoy desde las 08–09 h, mañana 00–23 h, pasado 00–07 h, ~48 h). Claves de cada día: `fecha`, `orto`, `ocaso` (`"08:24"`), `estadoCielo[]` (`{value, periodo, descripcion}`; códigos con sufijo `n` de noche, p. ej. `"17n"`), `precipitacion[]`, `nieve[]`, `temperatura[]`, `sensTermica[]`, `humedadRelativa[]` (`{value, periodo}`, horarios: `periodo` = hora `"09"`), `probPrecipitacion[]`, `probTormenta[]`, `probNieve[]` (franjas de 6 h: `periodo` `"0208"`, `"0814"`, `"1420"`, `"2002"`), `vientoAndRachaMax[]` (alterna `{direccion: ["NE"], velocidad: ["7"], periodo}` y `{value: racha, periodo}`, dos por hora). Todos los `value` son **cadenas**. `temperatura`, `sensTermica` y `humedadRelativa` empiezan una hora después que `precipitacion`/`estadoCielo` el primer día. «Ip» (inapreciable) **no aparece en la muestra** (día sin lluvia): tratar como posible valor no numérico. **Codificación: ISO-8859-15** (`Content-Type: text/plain;charset=ISO-8859-15`): `data/raw/aemet/<ine>.json` guarda los bytes tal cual; la muestra `app/ingest/tests/data/aemet_28065.json` está **re-codificada a UTF-8** por `verify_aemet.py` | **Clave gratuita**: https://opendata.aemet.es/centrodedescargas/altaUsuario. **Cuota:** cabecera `Remaining-request-endpoint` (bajó 13 → 11 → 9, una unidad por petición, contando también la de `datos`); sin cabecera de reinicio. Tras 6 peticiones en ~1 min, la 7.ª dio **HTTP 429** (código HTTP, no `estado` en el JSON); ~100 s después volvió a responder. Ventana exacta sin determinar: con `AEMET_PAUSE_S=1.5` los 179 municipios no caben; ver propuesta en `app/.env.example` |
 | **MITECO ICA** | https://www.miteco.gob.es/es/calidad-y-evaluacion-ambiental/temas/atmosfera-y-calidad-del-aire/calidad-del-aire/ica.html | Umbrales oficiales (RF-15) |
 | **IGN MDT05** *(sin verificar)* | https://centrodedescargas.cnig.es/CentroDescargas/modelo-digital-terreno-mdt05 | Desnivel (RF-13, Should) |
 
@@ -330,4 +337,4 @@ Roles sugeridos (equipo de hasta 4): **Datos** (ingesta, modelo, licencias), **M
 ## 11. Decisiones
 **Tomadas:** toda la Comunidad sin límite de población · Ayuntamiento solo para la capital · foco ciudadano > administración > empresa · ideas de ejemplo opcionales · desfibriladores, bici pública y Nomecalles incluidos · F6 añadido (IA solo interpreta y explica) · sin requisitos nuevos para «espacios cubiertos» (como mucho ampliar RF-09 con bibliotecas/centros cívicos) · no ampliar fuentes (envejecimiento, discapacidad, LoDCORE, atlas de renta fuera) · recarga de datos por 4 niveles (referencia, diario, horario, bajo demanda), sin botón público de recarga total (§6.4). **Arquitectura (14/10, detalle en `docs/arquitectura.md`):** GeoParquet como núcleo + DuckDB en solo lectura para la app, Oracle ADB/APEX opcional · IA de F6: OCI Generative AI con plan B y F6 usable sin LLM · rutas: diseño regional, afinado en Getafe hasta el vie 16 y los 179 municipios el sáb 17 · grafo en memoria con A\*/Dijkstra bidireccional y coste por petición (factor multiplicativo con suelo, nunca negativo) · ubicación escrita con buscador de Nomecalles + `callejero_completo_2025` · despliegue con Docker Compose en VM de OCI, primero el vie 16. · front: React + Vite + TypeScript sobre el prototipo de `docs/idea`, MapLibre, TanStack Query, `main.css` + `icons.css`, Google Material Symbols servidos por nosotros, WCAG 2.1 AA (contraste, teclado, lectores, HTML semántico); modo oscuro con interruptor fuera del MVP.
 
-**Pendientes:** nombre final · detalle de pantallas (con la maquetadora, al maquetar) · pesos y umbrales de puntuación · tabla actividad → destino definitiva · indicadores definitivos de F5 · usos de IA de §6.5 · verificar el esquema de AEMET con la clave · desnivel (IGN) sí o no. Lista completa en `docs/arquitectura.md` §10.
+**Pendientes:** nombre final · detalle de pantallas (con la maquetadora, al maquetar) · pesos y umbrales de puntuación · tabla actividad → destino definitiva · indicadores definitivos de F5 · usos de IA de §6.5 · desnivel (IGN) sí o no. Lista completa en `docs/arquitectura.md` §10.

@@ -12,7 +12,7 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
 | # | Estado | Tarea | Tiempo |
 |---|---|---|---|
 | P-00 | ⬜ | Revisar lo que se hizo de noche y fusionar la rama `preparacion` | 15 min |
-| P-01 | ⬜ | Crear `.env` con la clave de AEMET y verificar su API | 30 min |
+| P-01 | ✅ | Crear `.env` con la clave de AEMET y verificar su API (hecho el 14/10, CLAUDE.md §7.1) | 30 min |
 | — | ⬜ | Reunión de decisiones D-01 a D-04 (`docs/decisiones-pendientes.md`) | 45 min |
 | P-03 | ⬜ | Instalar `poppler-utils` y completar los umbrales de calor | 30 min |
 | P-04 | ⬜ | Aplicar las correcciones al CLAUDE.md | 20 min |
@@ -36,7 +36,8 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
   ```
 - **Datos generados (no se suben):** `data/perfil/perfil.json` (perfil por columna) y `data/perfil/municipios_referencia.json`.
 
-### P-01 · Clave de AEMET y verificación de su API
+### P-01 · ✅ Clave de AEMET y verificación de su API
+- **Hecho:** 14/10/2026. `app/.env` creado por el equipo; AEMET en el script de descarga (Task 3) y verificado con `app/ingest/scripts/verify_aemet.py` (Task 4). Esquema, codificación y cuota en CLAUDE.md §7.1. Muestra de Getafe en `app/ingest/tests/data/aemet_28065.json`.
 - **Apuntado:** 14/10/2026 · **Para:** mié 14 (CLAUDE.md §10).
 - **Qué:** `.env` todavía **no existe**. El esquema de AEMET está «sin verificar» (CLAUDE.md §7.1). Además, el script de descarga **no incluye AEMET**.
 - **Por qué:** sin la previsión horaria no hay F2 (mejor franja) ni regla de calor (D-06).
@@ -126,6 +127,14 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
 - **Apuntado:** 14/10/2026 · **Para:** jue 15.
 - **Qué:** a las 02:08 del 14/10, `calidad_aire_datos_dia.csv` contenía **el día 13** (horas 1–23); el del Ayuntamiento ya traía el 14. Hay que ver a qué hora cambia de día el regional, para no mostrar «aire de hoy» con datos de ayer (RF-19).
 - **Cómo:** `python3 scripts/download_sources.py --solo aire_dia` a varias horas y mirar `ano/mes/dia`.
+
+### P-13 · Cuota de AEMET: `AEMET_PAUSE_S` mal calculado y propuesta sin presentar
+- **Apuntado:** 14/10/2026 (verificación de la Task 4) · **Para:** antes de programar la descarga horaria (sáb 17, S-D2).
+- **Qué:**
+  1. `app/.env.example` pone `AEMET_PAUSE_S=10` y dice «~6 peticiones/min», pero la pausa es **por municipio** y cada municipio son **2 peticiones** (`download_aemet`): salen **~12 peticiones/min**. El 14/10 dio 429 tras 6 peticiones en ~1 min, así que con 10 s la ejecución horaria fallará casi siempre (`download_aemet` es todo o nada).
+  2. CLAUDE.md §7.1 remite a una «propuesta en `app/.env.example`» que no existe: solo pone «provisional».
+- **Por qué:** sin previsión horaria no hay F2 (mejor franja) ni regla de calor.
+- **Cómo:** peticiones/min = 2 × 60 / pausa → pausa ≥ 20 s más margen (179 municipios ≈ 1 h: no cabe en el ciclo horario). Decidir en equipo entre: (a) subconjunto fijo en `AEMET_MUNICIPALITIES` (pilotos + capital); (b) solo municipios consultados recientemente; (c) recarga cada 3–6 h para el resto. Después corregir el comentario de `app/.env.example` y la referencia de CLAUDE.md §7.1.
 
 ---
 
