@@ -38,13 +38,16 @@ Este archivo es el contexto completo del proyecto para Claude Code. Se escribió
 
 ```
 CLAUDE.md                         ← este archivo
-.gitignore                        ← app/data/, app/.env y app/.venv no se suben
-app/                              ← TODO el código de la app (desde el 14/10); los comandos se ejecutan desde aquí
-  .env.example                    ← copiar a app/.env; claves solo ahí
-  .venv/                          ← entorno virtual de Python (python3 -m venv .venv)
-  api/ (engine, routing, ai, services) · ingest/ (normalize) · config/ · scripts/ · web/ · deploy/ · tests/
-  scripts/descargar_fuentes.py    ← descarga todas las fuentes a app/data/raw/ (solo stdlib, probado)
-  data/raw/<fuente>/              ← datos descargados + app/data/raw/manifest.json (URL, fecha, tamaño)
+.gitignore                        ← app/data/, app/.env y app/*/.venv no se suben
+app/                              ← TODO el código (desde el 14/10). Un directorio por servicio de Docker Compose
+  .env.example                    ← copiar a app/.env (compartido por los servicios); claves solo ahí
+  api/                            ← servicio API (FastAPI): engine, routing, ai, services, scripts, tests; .venv propio
+  ingest/                         ← servicio de ingesta: scripts, normalize, tests; .venv propio
+    scripts/descargar_fuentes.py  ← descarga todas las fuentes a app/data/raw/ (solo stdlib, probado)
+  frontend/                       ← servicio web (React + Vite, compilado y servido con Caddy)
+  config/                         ← YAML compartidos (montado en solo lectura en api e ingest)
+  deploy/                         ← docker-compose.yml
+  data/raw/<fuente>/              ← volumen compartido: datos descargados + manifest.json (URL, fecha, tamaño)
 docs/contexto-muevete-cerca.md    ← documento largo: matriz requisito→fuente con enlaces, esquemas, tabla de 25 municipios
 docs/referencia/requisitos_fuentes.json   ← matriz de trazabilidad en JSON (24 requisitos), fuente de verdad
 docs/referencia/municipios_candidatos.json← 25 municipios con más datos y sus 23 indicadores
@@ -55,11 +58,11 @@ docs/presentaciones/              ← 8 PDF de la jornada del 6/10
 
 **Arranque en un equipo nuevo:**
 ```bash
-cd app && python3 -m venv .venv && . .venv/bin/activate
+cd app/ingest && python3 -m venv .venv && . .venv/bin/activate    # cada servicio Python tiene su venv
 python3 scripts/descargar_fuentes.py --listar
 python3 scripts/descargar_fuentes.py --grupo completo          # ~15 s, ~100 MB, 44 fuentes (probado el 14/10)
 python3 scripts/descargar_fuentes.py --solo vpla_redes         # planeamiento: 107 MB, imprescindible para % verde
-cp .env.example .env                                           # y poner la clave de AEMET del equipo en AEMET_API_KEY
+cp ../.env.example ../.env                                     # (app/.env) y poner la clave de AEMET del equipo en AEMET_API_KEY
 ```
 Capas marcadas PESADAS (no se bajan por defecto): `vpla_redes`, `viales`, `cubierta_terrestre` (~137.000 polígonos: mejor pedirla filtrada por `bbox` del piloto), `aire_historico`, `ay_bancos`.
 

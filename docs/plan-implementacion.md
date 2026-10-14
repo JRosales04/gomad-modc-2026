@@ -4,28 +4,42 @@
 
 **Objetivo:** convertir el diseño aprobado de `docs/arquitectura.md` en una app web móvil desplegada con HTTPS (F1–F5 obligatorias, F6 si da tiempo) para la demo del martes 20/10/2026.
 
-**Arquitectura:** ingesta Python por niveles de recarga (`scripts/download_sources.py` → normalizadores → GeoParquet → `gomad.duckdb` + `realtime.duckdb`); API FastAPI sin estado con el grafo peatonal en memoria (igraph + `scipy.sparse.csgraph`); SPA React + Vite + TypeScript con MapLibre; Docker Compose (Caddy + API + ingesta) en una VM de OCI.
+**Arquitectura:** tres servicios de Docker Compose, cada uno en su directorio de `app/` con sus propias dependencias: **`ingest`** (descarga por niveles de recarga → normalizadores → GeoParquet → `gomad.duckdb` + `realtime.duckdb` + grafo), **`api`** (FastAPI sin estado con el grafo peatonal en memoria: igraph + `scipy.sparse.csgraph`) y **`frontend`** (SPA React + Vite + TypeScript con MapLibre, compilada y servida por Caddy con HTTPS). Comparten `app/data/` (volumen) y `app/config/` (solo lectura). Despliegue en una VM de OCI.
 
-**Stack:** Python 3.12, DuckDB (+ extensión `spatial` solo en la ingesta), GeoPandas/pyogrio/pyproj/shapely 2, pyrosm (o pyosmium de respaldo), python-igraph, SciPy, FastAPI + Pydantic v2, pytest · Node 20 LTS, React 18, Vite 5, TypeScript, react-map-gl (MapLibre), React Router, TanStack Query, Radix UI, MSW, Vitest + axe · Docker Compose, Caddy, OCI.
+**Stack:** Python 3.12, DuckDB (+ `spatial` solo en ingest), GeoPandas/pyogrio/pyproj/shapely 2, pyrosm (o pyosmium de respaldo), python-igraph, SciPy, FastAPI + Pydantic v2, pytest · Node 20 LTS, React 18, Vite 5, TypeScript, react-map-gl (MapLibre), React Router, TanStack Query, Radix UI, MSW, Vitest + axe · Docker Compose, Caddy, OCI.
 
 **Spec:** `docs/arquitectura.md` (manda sobre CLAUDE.md §6 donde difieran). Contexto: `CLAUDE.md`, `docs/PENDIENTES.md`, `docs/decisiones-pendientes.md`, `docs/informe-datos.md`, `docs/referencia/umbrales.md`, `docs/referencia/requisitos_fuentes.json`.
 
-**Fecha del plan:** miércoles 14/10/2026 (revisión: código en inglés).
+**Fecha del plan:** miércoles 14/10/2026 (revisión: código en inglés y un directorio por servicio).
 
 ---
 
-## Raíz del código: `app/`
-
-Desde el 14/10 todo el código vive en **`app/`** (CLAUDE.md §3). **Todas las rutas de ficheros y comandos de este plan son relativas a `app/`** y los comandos se ejecutan con `app/` como directorio de trabajo (`cd app`), salvo `CLAUDE.md` y `docs/…`, que están en la raíz del repositorio (desde `app/`: `../CLAUDE.md`, `../docs/…`).
+## Estructura por servicios
 
 ```
-app/
-  .env.example  .env (no se sube)  .venv/ (no se sube; ya creado con python3 -m venv .venv)
-  api/{engine,routing,ai,services}   ingest/normalize   config/   scripts/   web/   deploy/   tests/{api,engine,routing,ingest,scripts,data}
-  data/ (no se sube: raw, clean, *.duckdb, graph)
+GoMad/                                  raíz del repositorio: CLAUDE.md, docs/
+└── app/
+    ├── .env.example   .env             .env compartido por los servicios (no se sube)
+    ├── api/           servicio API     pyproject.toml · Dockerfile · .venv/ · main.py · schemas.py · settings.py
+    │                                   engine/ · routing/ · ai/ · services/ · scripts/ · tests/
+    ├── ingest/        servicio ingesta pyproject.toml · Dockerfile (domingo) · .venv/ · common.py · build_db.py · graph.py
+    │                                   normalize/ · scripts/ · tests/
+    ├── frontend/      servicio web     package.json · Dockerfile (compila y sirve con Caddy) · Caddyfile · src/ · public/
+    ├── config/        YAML compartidos (montado en solo lectura en api e ingest)
+    ├── deploy/        docker-compose.yml
+    └── data/          volumen compartido: raw/, clean/, perfil/, gomad.duckdb, realtime.duckdb, graph/ (no se sube)
 ```
 
-Los directorios vacíos llevan `.gitkeep`; se borra al crear el primer fichero dentro. Activar el entorno: `cd app && . .venv/bin/activate`.
+**Convenciones de rutas (obligatorias):**
+- Cada tarea indica su **Servicio** (`app/api/`, `app/ingest/`, `app/frontend/`, `app/deploy/`). **Las rutas de ficheros y los comandos de la tarea son relativos a ese directorio**, y los comandos se ejecutan desde él.
+- Recursos compartidos desde un servicio: `../config/`, `../data/`, `../.env`, `../frontend/…`. Documentación del repositorio: `../../CLAUDE.md`, `../../docs/…`.
+- **Commits:** con `git -C ../..` y rutas desde la raíz del repositorio (`app/ingest/…`, `CLAUDE.md`), p. ej. `git -C ../.. add app/ingest/scripts CLAUDE.md && git -C ../.. commit -m "…"`.
+- En las tablas de los días 16–19, las rutas son relativas a `app/`.
+- **Código Python:** cada servicio es su propia raíz de importación (`pythonpath = ["."]`): en `api`, `from engine.rules import …`, `from schemas import …`; en `ingest`, `from common import …`, `python -m normalize`. **Ningún servicio importa código de otro.**
+- **Rutas de datos y configuración en código:** variables de entorno `GOMAD_DATA_DIR` y `GOMAD_CONFIG_DIR`; por defecto `app/data` y `app/config` (en Docker: `/data` y `/config`).
+- **Venv por servicio Python** (`app/api/.venv`, `app/ingest/.venv`, ya creados): solo para desarrollo local. En Docker no hay venv: cada `Dockerfile` instala el `pyproject.toml` de su servicio.
+- **DuckDB con la misma versión exacta en `api` e `ingest`** (la ingesta escribe el `.duckdb` que lee la API). Lo comprueba `test_shared_versions.py` (Task 1).
+- Los directorios vacíos llevan `.gitkeep`; se borra al crear el primer fichero dentro.
 
 ---
 
@@ -38,14 +52,14 @@ Usa superpowers:executing-plans con docs/plan-implementacion.md.
 Ejecuta SOLO las tareas 2, 3 y 4 (rol Datos, miércoles). Salta lo marcado [manual]. Para al terminar la 4.
 ```
 
-- **Registro de progreso:** la skill guarda un *ledger* en `.superpowers/sdd/plan-implementacion/progress.md` (ignorado por git, uno por copia del repo). Las tareas con `Task N: complete` no se repiten. Cada persona, en su equipo, tiene su propio registro; la verdad compartida es `git log` en `main`.
+- **Registro de progreso:** la skill guarda un *ledger* en `.superpowers/sdd/plan-implementacion/progress.md` (ignorado por git, uno por copia del repo). Las tareas con `Task N: complete` no se repiten. La verdad compartida es `git log` en `main`.
 - **Rama:** la skill no trabaja en `main`. Cada rol abre su rama (`datos/mie14`, `motor/jue15`…) o *worktree* y fusiona a `main` con las pruebas en verde.
-- **Revisión final:** al acabar su rango, la skill pide una revisión de toda la rama. Con este plazo basta una por rama antes de fusionar.
-- **Días 16–19:** están como tablas, **no** como `### Task N:`, así que la skill aún no puede ejecutarlos. Cada tarde, quien coordine pide `superpowers:writing-plans` para convertir las tablas del día siguiente en tareas detalladas (Task 26 en adelante) en este mismo fichero, con lo aprendido ese día.
+- **Revisión final:** al acabar su rango, la skill pide una revisión de toda la rama.
+- **Días 16–19:** están como tablas, **no** como `### Task N:`. Cada tarde, quien coordine pide `superpowers:writing-plans` para convertir las tablas del día siguiente en tareas detalladas (Task 26 en adelante) en este mismo fichero.
 
 ### Rangos por día y rol
 
-| Día | Datos | Motor | Rutas | Front |
+| Día | Datos (`ingest`) | Motor (`api`, `deploy`) | Rutas (`ingest` + `api`) | Front (`frontend`) |
 |---|---|---|---|---|
 | Mié 14 | 2, 3, 4 | 1 (primero), 5, 6 [manual], 7 | 8 | 9 [manual], 10 |
 | Jue 15 | 16, 17, 18, 19 | 11 (9:00), 12, 13, 14, 15 | 20, 21, 22 | 23, 24, 25 |
@@ -58,32 +72,34 @@ Ejecuta SOLO las tareas 2, 3 y 4 (rol Datos, miércoles). Salta lo marcado [manu
 
 Cada tarea las incluye implícitamente.
 
-- **Idioma (CLAUDE.md §2.1, 14/10):** **código en inglés** — identificadores, nombres de ficheros y módulos, endpoints, tablas, columnas propias, claves de configuración y nombres de pruebas. **Comentarios y docstrings en español sin tildes.** Textos que ve la persona usuaria (interfaz, mensajes de error, explicaciones, avisos, salida de los scripts) en español con tildes. Los identificadores de datasets (`eiel_deporte`, `ay_bancos`…) y de campos de origen (`CDMUNICIPIO`, `UTM_X`…) **no se traducen**. Documentación y mensajes de commit en español.
+- **Idioma (CLAUDE.md §2.1):** **código en inglés** — identificadores, ficheros, módulos, endpoints, tablas, columnas propias, claves de configuración y nombres de pruebas. **Comentarios y docstrings en español sin tildes.** Textos que ve la persona usuaria (interfaz, mensajes, explicaciones, avisos, salida de los scripts) en español con tildes. Los identificadores de datasets (`eiel_deporte`…) y de campos de origen (`CDMUNICIPIO`…) **no se traducen**. Documentación y commits en español.
+- **Estructura por servicios** (sección anterior): sin importaciones entre servicios; lo compartido va por `data/`, `config/`, `.env` y el `openapi.json`.
 - **Ámbito:** 179 municipios, **sin filtro de población** (§2.2). Ayuntamiento de Madrid solo como complemento para la capital (§2.3).
 - **La IA interpreta y explica; el motor de reglas decide** (§2.4). `/recommend` y `/route` no llaman nunca a la IA.
-- **No inventar identificadores de datasets ni campos** (§2.5). Los campos de origen usados aquí se comprobaron el 14/10 en `data/perfil/perfil.json`. Si hace falta otro, comprobarlo antes contra la API real.
-- **Claves solo en `.env`** (`AEMET_API_KEY`, `IA_*`, `ORACLE_*`). Nunca en el repositorio, en la imagen Docker, en `manifest.json`, en URLs guardadas ni en logs.
+- **No inventar identificadores de datasets ni campos** (§2.5). Los campos de origen usados aquí se comprobaron el 14/10 en `app/data/perfil/perfil.json`.
+- **Claves solo en `app/.env`** (`AEMET_API_KEY`, `IA_*`, `ORACLE_*`). Nunca en el repositorio, en una imagen Docker, en `manifest.json`, en URLs guardadas ni en logs.
 - **Nomecalles:** solo la descarga pública sin clave (§2.7).
 - **Privacidad:** sin registro; **la ubicación nunca se escribe en los logs**; al proveedor de IA no se envía ubicación exacta ni datos personales (§2.8).
-- **Umbrales oficiales copiados de la fuente y citados** (§2.9). Lo que no tenga fuente oficial se marca `own_criterion: true` y la app lo dice («criterio propio del proyecto»). Aviso visible «no es consejo médico».
-- **Accesibilidad WCAG 2.1 AA**, móvil primero; cada indicador con icono + color + texto (§2.10, arquitectura §5.3).
+- **Umbrales oficiales copiados de la fuente y citados** (§2.9). Lo que no tenga fuente oficial lleva `own_criterion: true` y la app lo dice. Aviso visible «no es consejo médico».
+- **Accesibilidad WCAG 2.1 AA**, móvil primero; cada indicador con icono + color + texto (§2.10).
 - **Licencias:** atribución de cada fuente en `/sources` y en la app (§2.11).
 - **Alcance:** no añadir funcionalidades ni fuentes sin preguntar (§2.12). **Domingo 18 a las 23:59 se congela el alcance.**
 - **Orden de recorte:** F6 → ruta saludable en toda la Comunidad (solo Getafe) → Oracle/APEX (arquitectura §9).
-- **Decisiones pendientes** (arquitectura §10): el código **lee** pesos, regla de aire, calor, lluvia, velocidades, actividades e indicadores **de `config/*.yaml`**; las pruebas usan valores de prueba propios. Ninguna tarea de código fija esos valores.
-- **Coordenadas:** todo en EPSG:4326; reproyección desde EPSG:25830 con `pyproj` y `always_xy=True`, **ignorando los `.prj` de Nomecalles** (informe-datos §2.2).
+- **Decisiones pendientes** (arquitectura §10): el código **lee** pesos, regla de aire, calor, lluvia, velocidades, actividades e indicadores **de `config/*.yaml`**; las pruebas usan valores propios. Ninguna tarea de código fija esos valores.
+- **Coordenadas:** todo en EPSG:4326; reproyección desde EPSG:25830 con `pyproj` y `always_xy=True`, **ignorando los `.prj` de Nomecalles**.
 - **Código INE** siempre de 5 dígitos (`28` + 3).
 - **Si cambian requisitos o fuentes:** actualizar `docs/referencia/requisitos_fuentes.json` y `CLAUDE.md` (§2.13).
 - **Rendimiento:** recomendación < 3 s, ruta < 5 s.
-- **Cambio de nombres respecto a la spec:** como el código va en inglés, los nombres de `docs/arquitectura.md` y CLAUDE.md §6.1 cambian así (Task 1 actualiza esos documentos):
+- **Nombres respecto a la spec** (Task 1 actualiza `docs/arquitectura.md` y CLAUDE.md §6.1 con esta tabla):
 
 | Spec (español) | Código |
 |---|---|
-| `scripts/descargar_fuentes.py`, `perfilar_fuentes.py` | `scripts/download_sources.py`, `scripts/profile_sources.py` |
+| `scripts/descargar_fuentes.py`, `perfilar_fuentes.py` | `app/ingest/scripts/download_sources.py`, `app/ingest/scripts/profile_sources.py` |
 | campo `refresco`, niveles `referencia/diario/horario/demanda` | `refresh`: `reference/weekly/daily/hourly/on_demand` |
-| `ingesta/`, `normalizar/`, `construir.py`, `grafo.py` | `ingest/`, `normalize/`, `build.py`, `graph.py` |
-| `api/esquemas.py`, `motor/` (`reglas`, `puntuacion`, `franja`, `explicacion`), `rutas/`, `repositorio.py`, `ia/` | `api/schemas.py`, `engine/` (`rules`, `scoring`, `slots`, `explanation`), `routing/`, `repository.py`, `ai/` |
-| `data/tiempo_real.duckdb`, `data/grafo/{nodos,tramos}` | `data/realtime.duckdb`, `data/graph/<zona>/{nodes,edges}` |
+| `ingesta/`, `normalizar/`, `construir.py`, `grafo.py` | `app/ingest/`, `normalize/`, `build_db.py`, `graph.py` |
+| `api/esquemas.py`, `motor/` (`reglas`, `puntuacion`, `franja`, `explicacion`), `rutas/`, `repositorio.py`, `ia/` | `app/api/schemas.py`, `engine/` (`rules`, `scoring`, `slots`, `explanation`), `routing/`, `repository.py`, `ai/` |
+| `web/` | `app/frontend/` |
+| `data/tiempo_real.duckdb`, `data/grafo/{nodos,tramos}` | `app/data/realtime.duckdb`, `app/data/graph/<zona>/{nodes,edges}` |
 | tablas `municipio`, `destino`, `estacion_aire`, `lectura_aire`, `prevision`, `tramo`, `poi_ruta`, `servicio`, `indicador_municipio` | `municipality`, `destination`, `air_station`, `air_reading`, `forecast`, `edge`, `route_poi`, `service`, `municipality_indicator` |
 | `/recomendar`, `/ruta`, `/municipio/{cod_ine}`, `/asistente/*`, `/fuentes`, `/actividades`, `/ubicacion` | `/recommend`, `/route`, `/municipality/{ine_code}`, `/assistant/*`, `/sources`, `/activities`, `/location` |
 
@@ -97,66 +113,63 @@ Situaciones que una persona real se encontrará aunque ninguna prueba «obvia» 
 4. **Pesos extremos** (todos a 0, uno al 100 %): sin división por cero; todos a 0 vuelve a los pesos por defecto con aviso. → Task 13 (`test_all_zero_weights_fall_back`) y validación Pydantic en Task 11.
 5. **Ventana horaria sin previsión** (cruza medianoche, excede las horas de AEMET, empieza en el pasado): horas «sin datos» que no se eligen como mejor franja; ventana invertida → 422 legible. → Task 14 (`test_window_crosses_midnight`, `test_hours_without_forecast`) y Task 11 (`test_inverted_window_is_422`).
 
-Además (restricción global): **la ubicación nunca aparece en los logs** → `--no-access-log` desde Task 5 y prueba `test_logs_without_location` en V-M1.
+Además: **la ubicación nunca aparece en los logs** → `--no-access-log` desde Task 5 y prueba `test_logs_without_location` en V-M1.
 
 ---
 
-## Mapa de ficheros
+## Mapa de ficheros (rutas relativas a `app/`)
 
 ```
-pyproject.toml                         dependencias y pytest                                  (Task 1)
 .env.example                           + AEMET_MUNICIPALITIES, AEMET_PAUSE_S                   (Task 3)
-scripts/
-  download_sources.py                  (renombrado) + refresh, --refresh, --force, cambios, OSM, AEMET, callejero (Tasks 2, 3)
-  profile_sources.py                   (solo renombrado; traduccion interna: sabado, baja prioridad)
-  verify_aemet.py                      verificacion de AEMET con la clave                      (Task 4)
-  probe_pyrosm.py                      medicion de la red de OSM                               (Task 8)
-  export_openapi.py                    contrato -> web/src/api/openapi.json                    (Task 11)
-  probe_ai.py                          prueba del proveedor de IA                              (Task 15)
-config/
-  README.md                            que decision rellena cada fichero                       (Task 1)
-  ica_thresholds.yaml                  bandas ICA del BOE (verificadas)                        (Task 12)
-  rules.yaml                           aire por perfil, calor, lluvia                          (DEC-05/06/07b)
-  weights.yaml                         pesos por defecto y velocidades                         (DEC-07)
-  activities.yaml                      catalogo y reglas actividad -> destino                  (DEC-08)
-  routing.yaml                         trafico por tipo de via, suelo, radios                  (DEC-07; provisional en Task 20)
-  indicators.yaml                      indicadores de F5                                       (DEC-09)
-ingest/
-  common.py                            utilidades de normalizacion                             (Task 16)
-  normalize/__init__.py __main__.py    registro y CLI                                          (Task 16)
-  normalize/municipalities.py population.py sports.py green.py furniture.py   (Task 17)
-  normalize/air.py aemet.py                                                    (Task 18)
-  build.py                             GeoParquet -> gomad.duckdb / realtime.duckdb            (Task 19)
-  graph.py                             OSM -> data/graph/<zona>/{nodes,edges}.parquet          (Task 20)
 api/
+  pyproject.toml                       dependencias de la API                                  (Task 1)
+  Dockerfile  .dockerignore            imagen de la API                                        (Task 5)
   main.py                              arranque, /health, rutas del contrato                   (Tasks 1, 11)
   schemas.py                           contrato Pydantic                                       (Task 11)
-  config.py                            carga de config/*.yaml                                  (Task 12)
+  settings.py                          rutas compartidas y carga de config/*.yaml              (Task 12)
   engine/rules.py scoring.py slots.py                                          (Tasks 12–14)
   routing/graph.py                                                             (Task 21)
   ai/base.py                                                                   (Task 15)
-deploy/  Dockerfile.api docker-compose.yml Caddyfile                           (Task 5)
-web/     React + Vite                                                          (Tasks 10, 23–25)
-tests/   conftest.py scripts/ ingest/ engine/ routing/ api/ data/ (muestras reales pequeñas)
+  scripts/export_openapi.py probe_ai.py                                        (Tasks 11, 15)
+  tests/conftest.py test_health.py test_contract.py engine/ routing/
+ingest/
+  pyproject.toml                       dependencias de la ingesta                              (Task 1)
+  common.py                            utilidades de normalizacion                             (Task 16)
+  normalize/__init__.py __main__.py municipalities.py population.py sports.py green.py furniture.py air.py aemet.py (Tasks 16–18)
+  build_db.py                          GeoParquet -> gomad.duckdb / realtime.duckdb            (Task 19)
+  graph.py                             OSM -> data/graph/<zona>/{nodes,edges}.parquet          (Task 20)
+  scripts/download_sources.py          (renombrado) refresh, cambios, OSM, AEMET, callejero    (Tasks 1–3)
+  scripts/profile_sources.py           (renombrado; traduccion interna el sabado)
+  scripts/verify_aemet.py probe_pyrosm.py                                      (Tasks 4, 8)
+  tests/conftest.py test_shared_versions.py scripts/ data/ test_*.py
+frontend/
+  package.json  src/  public/fonts/    React + Vite                                            (Task 10, 23–25)
+  Caddyfile  Dockerfile                Caddy sirve el front y hace de proxy a la API           (Tasks 5, 10)
+config/
+  README.md                            que decision rellena cada fichero                       (Task 1)
+  ica_thresholds.yaml                  bandas ICA del BOE (verificadas)                        (Task 12)
+  rules.yaml weights.yaml activities.yaml routing.yaml indicators.yaml          (DEC-05/06/07/07b/08/09)
+deploy/
+  docker-compose.yml                   servicios api y frontend (ingest el domingo)            (Task 5)
 ```
 
 ---
 
 ## Decisiones del equipo (no las toma el código)
 
-Cada decisión se apunta en `CLAUDE.md` §11 y `docs/arquitectura.md` §10 y se vuelca en el fichero de `config/` indicado.
+Cada decisión se apunta en `CLAUDE.md` §11 y `docs/arquitectura.md` §10 y se vuelca en el fichero de `app/config/` indicado.
 
 | ID | Decisión (arquitectura §10) | Propone | Decide | **Fecha límite** | Fichero | Si no se decide a tiempo |
 |---|---|---|---|---|---|---|
 | DEC-P04 | Aplicar correcciones de `PENDIENTES.md` P-04 al CLAUDE.md y `requisitos_fuentes.json` | Datos | Equipo | **mié 14, 18:00** | `CLAUDE.md`, JSON | Se sigue con `informe-datos.md` como referencia |
-| DEC-10 | Nombre (D-10, A-03) | Equipo | Equipo | **jue 15, 10:00** | `CLAUDE.md` §1, `web/index.html` | Nombre provisional «GoMad» |
+| DEC-10 | Nombre (D-10, A-03) | Equipo | Equipo | **jue 15, 10:00** | `CLAUDE.md` §1, `frontend/index.html` | Nombre provisional «GoMad» |
 | DEC-05 | Regla de aire por perfil (D-05, A-05) | Motor (`umbrales.md` §1.5) | Equipo | **jue 15, 12:00** | `config/rules.yaml` → `air` | Bloquea `/recommend` real |
 | DEC-07 | Pesos por defecto, velocidades y pesos de ruta (D-07, A-04, P-11) | Motor + Rutas | Equipo | **jue 15, 12:00** | `config/weights.yaml`, `config/routing.yaml` | Bloquea `/recommend` y `/route` reales |
 | DEC-07b | Umbral de probabilidad de lluvia (umbrales.md §3) | Motor | Equipo | **jue 15, 12:00** | `config/rules.yaml` → `rain` | Regla de lluvia desactivada y aviso |
 | DEC-08 | Tabla actividad → destino y catálogo (D-08, A-07) | Datos + Motor | Equipo | **jue 15, 12:00** | `config/activities.yaml` | Bloquea la construcción real de `destination` |
 | DEC-11 | Usos de IA de §6.5 (D-11, A-09) | Equipo | Equipo | **jue 15, 20:00** | `CLAUDE.md` §11 | Solo F6 |
 | DEC-12 | Desnivel IGN sí/no (D-12) | Rutas | Equipo | **jue 15, 20:00** | `CLAUDE.md` §11 | Fuera del MVP |
-| DEC-03 | Punto de control OCI GenAI → plan B (D-03) | Motor | Motor (regla aprobada) | **jue 15, 12:00** | `.env` (`IA_*`) | Plan B automáticamente |
+| DEC-03 | Punto de control OCI GenAI → plan B (D-03) | Motor | Motor (regla aprobada) | **jue 15, 12:00** | `app/.env` (`IA_*`) | Plan B automáticamente |
 | DEC-06 | Umbrales de calor (D-06, A-06) — bloqueado por Tasks 4 y 7 | Motor | Equipo | **vie 16, 12:00** | `config/rules.yaml` → `heat` | Regla de calor desactivada; la app dice «sin umbral oficial de calor cargado» |
 | DEC-09 | Indicadores de F5 (D-09, A-08) | Datos | Equipo | **vie 16, 12:00** | `config/indicators.yaml` | Bloquea `/municipality` real |
 | DEC-A10 | Forma de la VM de OCI (A-10) | Motor | Motor | **mié 14, al crearla** | `docs/arquitectura.md` §6 | — |
@@ -172,10 +185,10 @@ Cada decisión se apunta en `CLAUDE.md` §11 y `docs/arquitectura.md` §10 y se 
 | Día | Datos | Motor | Rutas | Front (maquetadora) |
 |---|---|---|---|---|
 | **Mié 14** | T2 script (refresh, cambios, OSM, callejero) · T3 AEMET en el script · T4 verificar AEMET · DEC-P04 | **T1 estructura (primero)** · T5 Compose · T6 VM OCI · T7 plan de calor | T8 extracto OSM + pyrosm | T9 bocetos · T10 proyecto Vite |
-| **Jue 15** | T16 `common` · T17 normalizadores de referencia · T18 aire y AEMET · T19 `build` | **T11 contrato (9:00–11:00)** · T12 `rules` · T13 `scoring` · T14 `slots` · T15 IA | T20 grafo de Getafe · T21 A\* y Dijkstra con límite · T22 latencia | T23 tipos + MSW · T24 Inicio · T25 Resultados |
+| **Jue 15** | T16 `common` · T17 normalizadores de referencia · T18 aire y AEMET · T19 `build_db` | **T11 contrato (9:00–11:00)** · T12 `rules` · T13 `scoring` · T14 `slots` · T15 IA | T20 grafo de Getafe · T21 A\* y Dijkstra con límite · T22 latencia | T23 tipos + MSW · T24 Inicio · T25 Resultados |
 | **Vie 16** | V-D1 servicios + indicadores · V-D2 `/location` · V-D3 patrón horario del aire | V-M1 `/recommend` · V-M2 explicaciones | V-R1 `/route` en Getafe | V-F1 mapa · V-F2 detalle · V-F3 ajustes · **V-F4 despliegue HTTPS** |
 | **Sáb 17** | S-D1 `/sources` · S-D2 ingesta programada · S-D3 traducir `profile_sources.py` | S-M1 `/municipality` | S-R1 grafo regional · DEC-A11 | S-F1 ruta · S-F2 municipio |
-| **Dom 18** | D-D1 caché ante caídas + cron | D-M1 F6 | D-R1 ruta circular | D-F1 asistente · D-F2 fuentes · **D-X congelación 23:59** |
+| **Dom 18** | D-D1 servicio `ingest` en Compose + caché ante caídas + cron | D-M1 F6 | D-R1 ruta circular | D-F1 asistente · D-F2 fuentes · **D-X congelación 23:59** |
 | **Lun 19** | L-1 ensayo · L-2 errores · L-3 guion · L-4 demo sin red · L-5 accesibilidad |||
 | **Mar 20** | **Demo** |||
 
@@ -183,22 +196,22 @@ Cada decisión se apunta en `CLAUDE.md` §11 y `docs/arquitectura.md` §10 y se 
 
 # MIÉRCOLES 14/10 — detalle completo
 
-### Task 1: M-M1 · Estructura del repositorio (§9b), entorno Python y renombrado a inglés
+### Task 1: M-M1 · Dependencias por servicio, esqueleto de la API y renombrado a inglés
 
-**Rol:** Motor · **Duración:** 1,5 h · **Hacer primero.**
+**Rol:** Motor · **Servicio:** `app/` (la tarea toca `api/` e `ingest/`; comandos desde `app/` salvo donde se indica `cd`) · **Duración:** 1,5 h · **Hacer primero.**
 
 **Ficheros:**
-- Crear: `pyproject.toml`, `api/__init__.py`, `api/main.py`, `api/engine/__init__.py`, `api/routing/__init__.py`, `api/ai/__init__.py`, `ingest/__init__.py`, `ingest/normalize/__init__.py`, `config/README.md`, `tests/__init__.py`, `tests/conftest.py`, `tests/api/__init__.py`, `tests/api/test_health.py`, `tests/data/.gitkeep`
-- Renombrar: `scripts/descargar_fuentes.py` → `scripts/download_sources.py`; `scripts/perfilar_fuentes.py` → `scripts/profile_sources.py`
+- Crear: `api/pyproject.toml`, `api/main.py` (sin `__init__.py`: cada servicio es raíz de importación), `api/tests/conftest.py`, `api/tests/test_health.py`, `ingest/pyproject.toml`, `ingest/tests/conftest.py`, `ingest/tests/test_shared_versions.py`, `config/README.md`
+- Renombrar: `ingest/scripts/descargar_fuentes.py` → `ingest/scripts/download_sources.py`; `ingest/scripts/perfilar_fuentes.py` → `ingest/scripts/profile_sources.py`
 - Borrar: los `.gitkeep` de los directorios que reciben ficheros
-- Modificar: `../CLAUDE.md` (§2.6, §3, §6.1, §6.4), `../docs/arquitectura.md` (§2, §3, §4, §9b) con la tabla de nombres de «Restricciones globales»
+- Modificar: `../CLAUDE.md` (§2.6, §3, §6.1, §6.4), `../docs/arquitectura.md` (§2, §3, §4, §6, §9b) con la estructura por servicios y la tabla de nombres
 
 **Interfaces:**
-- Produce: `api.main:app` (FastAPI) con `GET /health → {"status": "ok"}`; fixture `root` en `tests/conftest.py`; marcador `slow` (se salta si faltan datos reales).
+- Produce: `main:app` (FastAPI, servicio `api`) con `GET /health → {"status": "ok"}`; fixture `root` (directorio del servicio) en cada `tests/conftest.py`; marcador `slow` en ambos servicios (se salta si falta `app/data/raw`).
 
-- [ ] **Paso 1: entorno.** `app/.venv` ya existe (creado el 14/10). Comprobar: `.venv/bin/python --version` → `Python 3.12.x`. Si no existe: `python3 -m venv .venv`.
+- [ ] **Paso 1 [manual]: `pip` en el sistema** (los venvs `api/.venv` e `ingest/.venv` ya existen; falta `pip` en WSL): `sudo apt install -y python3-pip`. Comprobar: `api/.venv/bin/python -m pip --version`.
 
-- [ ] **Paso 2: `pyproject.toml`**
+- [ ] **Paso 2: `api/pyproject.toml`**
 
 ```toml
 [build-system]
@@ -206,15 +219,18 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "gomad"
+name = "gomad-api"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi==0.115.0",
   "uvicorn[standard]==0.30.6",
   "pydantic==2.9.2",
-  "duckdb==1.1.1",
+  "duckdb==1.1.1",            # misma version que ingest (test_shared_versions)
   "numpy==2.1.1",
+  "pandas==2.2.3",
+  "pyarrow==17.0.0",
+  "shapely==2.0.6",
   "scipy==1.14.1",
   "python-igraph==0.11.6",
   "pyyaml==6.0.2",
@@ -222,51 +238,75 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-ingest = [
+dev = ["pytest==8.3.3"]
+
+[tool.setuptools]
+packages = []   # el codigo se importa desde la raiz del servicio (pythonpath de pytest / PYTHONPATH en Docker)
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = ["slow: necesita datos reales en app/data (se salta si faltan)"]
+```
+
+- [ ] **Paso 3: `ingest/pyproject.toml`**
+
+```toml
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gomad-ingest"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "duckdb==1.1.1",            # misma version que api (test_shared_versions)
+  "numpy==2.1.1",
   "pandas==2.2.3",
   "pyarrow==17.0.0",
   "geopandas==1.0.1",
   "pyogrio==0.10.0",
   "shapely==2.0.6",
   "pyproj==3.7.0",
+  "pyyaml==6.0.2",
 ]
+
+[project.optional-dependencies]
 routing = ["pyrosm==0.6.2"]
 dev = ["pytest==8.3.3"]
 
 [tool.setuptools]
-packages = []   # el codigo se importa desde la raiz (pythonpath de pytest / PYTHONPATH en Docker)
+packages = []
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-markers = ["slow: necesita datos reales en data/ (se salta si faltan)"]
+markers = ["slow: necesita datos reales en app/data (se salta si faltan)"]
 ```
 
-> Si `pip` no resuelve alguna versión en Python 3.12, usar la menor que lo haga y anotarlo en el commit. `pyrosm` va aparte porque puede no compilar en 3.12 (Task 8).
+> Si `pip` no resuelve alguna versión en Python 3.12, usar la menor que lo haga **en los dos servicios a la vez** si es compartida, y anotarlo en el commit. `pyrosm` va como extra porque puede no compilar en 3.12 (Task 8).
 
-- [ ] **Paso 3: instalar** — `. .venv/bin/activate && pip install -U pip && pip install -e ".[ingest,dev]"`. Esperado: sin errores; `python -c "import fastapi, duckdb, igraph, geopandas, pyproj"` no imprime nada.
+- [ ] **Paso 4: instalar**
 
-- [ ] **Paso 4: prueba que falla** — `tests/api/test_health.py`
-
-```python
-from fastapi.testclient import TestClient
-
-from api.main import app
-
-
-def test_health():
-    r = TestClient(app).get("/health")
-    assert r.status_code == 200
-    assert r.json() == {"status": "ok"}
+```bash
+(cd api && . .venv/bin/activate && pip install -U pip && pip install -e ".[dev]")
+(cd ingest && . .venv/bin/activate && pip install -U pip && pip install -e ".[dev]")
+api/.venv/bin/python -c "import fastapi, duckdb, igraph, scipy, pandas"
+ingest/.venv/bin/python -c "import duckdb, geopandas, pyproj"
 ```
+Esperado: sin errores ni salida.
 
-`tests/conftest.py`:
+- [ ] **Paso 5: pruebas que fallan**
+
+`api/tests/conftest.py`:
 ```python
 import pathlib
 
 import pytest
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
+ROOT = pathlib.Path(__file__).resolve().parents[1]      # app/api
+DATA_DIR = ROOT.parent / "data"                          # app/data
 
 
 @pytest.fixture
@@ -275,18 +315,50 @@ def root():
 
 
 def pytest_collection_modifyitems(config, items):
-    # las pruebas "slow" necesitan data/raw descargado; si no esta, se saltan
-    if (ROOT / "data" / "raw" / "municipios" / "municipios.geojson").exists():
+    # las pruebas "slow" necesitan app/data descargado; si no esta, se saltan
+    if (DATA_DIR / "raw" / "municipios" / "municipios.geojson").exists():
         return
-    skip = pytest.mark.skip(reason="faltan datos reales en data/raw (python3 scripts/download_sources.py)")
+    skip = pytest.mark.skip(reason="faltan datos reales en app/data (ingest/scripts/download_sources.py)")
     for item in items:
         if "slow" in item.keywords:
             item.add_marker(skip)
 ```
 
-Run: `pytest tests/api/test_health.py -v` → Esperado: FAIL (`ModuleNotFoundError: No module named 'api.main'`).
+`ingest/tests/conftest.py`: mismo contenido, con el comentario `# app/ingest` en `ROOT`.
 
-- [ ] **Paso 5: `api/main.py` mínimo**
+`api/tests/test_health.py`:
+```python
+from fastapi.testclient import TestClient
+
+from main import app
+
+
+def test_health():
+    r = TestClient(app).get("/health")
+    assert r.status_code == 200
+    assert r.json() == {"status": "ok"}
+```
+
+`ingest/tests/test_shared_versions.py`:
+```python
+"""La ingesta escribe el .duckdb que lee la API: la version de DuckDB debe ser identica."""
+import re
+
+
+def pinned(pyproject_text, package):
+    m = re.search(rf'"{package}==([^"]+)"', pyproject_text)
+    return m.group(1) if m else None
+
+
+def test_duckdb_version_matches_api(root):
+    ingest = pinned((root / "pyproject.toml").read_text(encoding="utf-8"), "duckdb")
+    api = pinned((root.parent / "api" / "pyproject.toml").read_text(encoding="utf-8"), "duckdb")
+    assert ingest is not None and ingest == api
+```
+
+Run: `(cd api && .venv/bin/pytest -v)` → Esperado: FAIL (`ModuleNotFoundError: No module named 'main'`). `(cd ingest && .venv/bin/pytest -v)` → Esperado: PASS (las versiones ya coinciden).
+
+- [ ] **Paso 6: `api/main.py` mínimo**
 
 ```python
 """API de GoMad. Sin estado: sin sesiones ni registro; la ubicacion nunca se escribe en los logs."""
@@ -300,61 +372,62 @@ def health() -> dict:
     return {"status": "ok"}
 ```
 
-Crear vacíos los `__init__.py` de la lista. `config/README.md`: una línea por fichero de `config/` (ver Mapa de ficheros) con la decisión que lo rellena y la regla «cada valor sin fuente oficial lleva `own_criterion: true`».
+`config/README.md`: una línea por fichero de `config/` (ver Mapa de ficheros) con la decisión que lo rellena, la regla «cada valor sin fuente oficial lleva `own_criterion: true`» y que se monta en solo lectura en `api` e `ingest`.
 
-Run: `pytest -v` → Esperado: PASS.
+Run: `(cd api && .venv/bin/pytest -v)` → Esperado: PASS.
 
-- [ ] **Paso 6: renombrar scripts y actualizar documentos**
+- [ ] **Paso 7: renombrar scripts y actualizar documentos**
 
 ```bash
-git mv scripts/descargar_fuentes.py scripts/download_sources.py
-git mv scripts/perfilar_fuentes.py scripts/profile_sources.py
-grep -rl "descargar_fuentes\|perfilar_fuentes" ../CLAUDE.md ../docs/arquitectura.md ../docs/informe-datos.md ../docs/PENDIENTES.md scripts/ \
+git mv ingest/scripts/descargar_fuentes.py ingest/scripts/download_sources.py
+git mv ingest/scripts/perfilar_fuentes.py ingest/scripts/profile_sources.py
+grep -rl "descargar_fuentes\|perfilar_fuentes" ../CLAUDE.md ../docs/arquitectura.md ../docs/informe-datos.md ../docs/PENDIENTES.md ingest/scripts/ \
   | xargs sed -i 's/descargar_fuentes/download_sources/g; s/perfilar_fuentes/profile_sources/g'
-python3 scripts/download_sources.py --listar | head -3      # sigue funcionando (flags aun en espanol hasta Task 2)
-python3 scripts/profile_sources.py --help | head -3
+(cd ingest && python3 scripts/download_sources.py --listar | head -3)   # flags aun en espanol hasta Task 2
+find api ingest config -name .gitkeep -delete
 ```
 
-En `../CLAUDE.md` §6.1 y `../docs/arquitectura.md` §2, §3, §4 y §9b (que pasa a describir la estructura bajo `app/`), sustituir los nombres según la tabla de «Restricciones globales» (tablas, ficheros, módulos, endpoints) y añadir: «Nombres en inglés desde el 14/10 (CLAUDE.md §2.1)». No tocar `docs/contexto-muevete-cerca.md` ni los documentos de la idea (históricos).
+En `../CLAUDE.md` §6.1 y `../docs/arquitectura.md` §2, §3, §4, §6 y §9b: sustituir los nombres según la tabla de «Restricciones globales», describir la estructura por servicios (sección «Estructura por servicios») y añadir «Nombres en inglés y un directorio por servicio desde el 14/10 (CLAUDE.md §2.1 y §3)». No tocar `docs/contexto-muevete-cerca.md` ni la idea (históricos).
 
-- [ ] **Paso 7: commit**
+- [ ] **Paso 8: commit**
 
 ```bash
-git add -A . ../CLAUDE.md ../docs/arquitectura.md ../docs/informe-datos.md ../docs/PENDIENTES.md
-git commit -m "Estructura del repositorio, entorno Python y nombres de código en inglés"
+git -C .. add -A app CLAUDE.md docs/arquitectura.md docs/informe-datos.md docs/PENDIENTES.md
+git -C .. commit -m "Dependencias por servicio, esqueleto de la API y nombres de código en inglés"
 ```
 
-**Terminado cuando:** `pip install -e ".[ingest,dev]"` funciona en un equipo limpio, `pytest` pasa y no queda ninguna referencia a `descargar_fuentes`/`perfilar_fuentes` en CLAUDE.md ni en `docs/arquitectura.md`.
+**Terminado cuando:** ambos venvs instalan su `pyproject.toml`, `pytest` pasa en `api` y en `ingest`, y no queda referencia a `descargar_fuentes`/`perfilar_fuentes` en CLAUDE.md ni en `docs/arquitectura.md`.
 
 ---
 
 ### Task 2: M-D1 · Script de descarga: `refresh`, `--refresh`, `--force`, comprobación de cambios, OSM y callejero
 
-**Rol:** Datos · **Depende de:** Task 1 · **Duración:** 2,5–3 h
+**Rol:** Datos · **Servicio:** `app/ingest/` · **Depende de:** Task 1 · **Duración:** 2,5–3 h
 
 **Ficheros:**
 - Modificar: `scripts/download_sources.py` (traducción completa de identificadores y CLI + funcionalidad nueva)
-- Crear: `tests/scripts/__init__.py`, `tests/scripts/test_download_sources.py`
-- Modificar: `CLAUDE.md` §3 (comandos de arranque) y §6.4 (estado «implementado»)
+- Crear: `tests/scripts/test_download_sources.py`
+- Modificar: `../../CLAUDE.md` §3 (comandos de arranque) y §6.4 (estado «implementado»)
 
 **Interfaces:**
 - Produce:
+  - `ROOT` (app/ingest), `APP_DIR` (app), `DATA_DIR` (`GOMAD_DATA_DIR` o `app/data`), `RAW_DIR = DATA_DIR / "raw"`
   - `Source = namedtuple("Source", "kind ident group heavy desc refresh")`
   - `REFRESH_LEVELS = ("reference", "weekly", "daily", "hourly", "on_demand")`
   - `select(args) -> list[str]`
   - `download_source(key: str, src: Source, previous: dict, force: bool, aemet_municipalities: str | None = None) -> dict` (entrada nueva del manifiesto con `changed: bool`)
   - `run(args) -> int`
   - CLI: `--list`, `--group {minimal,full}`, `--only`, `--refresh <level>`, `--include-heavy`, `--force`, `--aemet-municipalities`
-  - `data/raw/manifest.json[key]`: `kind`, `identifier`, `refresh`, `urls`, `downloaded`, `checked`, `files`, `bytes`, `sha256`, `changed`, `modified` (CKAN), `etag`, `last_modified`, `last_failure {date, error}`. Las entradas antiguas con claves en español se sustituyen en la primera descarga (sin `sha256` previo cuentan como cambiadas).
-- Los **ids de fuente** (`eiel_deporte`, `ay_bancos`…) y las carpetas `data/raw/<id>/` **no cambian** (son identificadores de datasets citados en CLAUDE.md y `requisitos_fuentes.json`).
+  - `RAW_DIR/manifest.json[key]`: `kind`, `identifier`, `refresh`, `urls`, `downloaded`, `checked`, `files` (rutas relativas a `RAW_DIR`), `bytes`, `sha256`, `changed`, `modified` (CKAN), `etag`, `last_modified`, `last_failure {date, error}`. Las entradas antiguas con claves en español se sustituyen en la primera descarga.
+- Los **ids de fuente** (`eiel_deporte`, `ay_bancos`…) y las carpetas `data/raw/<id>/` **no cambian**.
 
-> **Nivel `weekly`:** la spec nombra 4 niveles, pero su tabla dice «OSM **semanal**». Se añade `weekly` como valor propio para que el cron semanal (OSM + grafo) sea un nivel seleccionable.
+> **Nivel `weekly`:** la spec nombra 4 niveles, pero su tabla dice «OSM **semanal**». Se añade `weekly` para que el cron semanal (OSM + grafo) sea un nivel seleccionable.
 
 **Traducción de identificadores existentes** (renombrar en todo el fichero):
 
 | Antes | Después |
 |---|---|
-| `RAIZ`, `DESTINO` | `ROOT`, `RAW_DIR` |
+| `RAIZ` (app/ingest), `DESTINO` | `ROOT`, `RAW_DIR` (vía `APP_DIR` y `DATA_DIR`, ver paso 3) |
 | `FUENTES` (tupla de 5) | `_SOURCES` (tupla de 6) → `SOURCES` (`Source`) |
 | `pedir`, `guardar`, `nombre_desde_url`, `descomprimir_seguro` | `fetch`, `save`, `filename_from_url`, `safe_unzip` |
 | `bajar_ckan`, `bajar_nomecalles` | `download_ckan`, `download_nomecalles` |
@@ -386,7 +459,7 @@ import pathlib
 
 import pytest
 
-ROOT = pathlib.Path(__file__).resolve().parents[2]
+ROOT = pathlib.Path(__file__).resolve().parents[2]      # app/ingest
 
 
 @pytest.fixture
@@ -395,7 +468,7 @@ def dl(tmp_path, monkeypatch):
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     monkeypatch.setattr(mod, "RAW_DIR", tmp_path / "raw")
-    monkeypatch.setattr(mod, "ROOT", tmp_path)
+    monkeypatch.setattr(mod, "APP_DIR", tmp_path)
     return mod
 
 
@@ -450,11 +523,12 @@ def test_same_content_is_not_a_change(dl, monkeypatch):
     e1 = dl.download_source("ay_trafico", dl.SOURCES["ay_trafico"], {}, force=False)
     e2 = dl.download_source("ay_trafico", dl.SOURCES["ay_trafico"], e1, force=False)
     assert e1["changed"] is True and e2["changed"] is False
+    assert e1["files"] == ["ay_trafico/pm.xml"]                  # relativas a RAW_DIR
 
 
 def test_304_is_not_downloaded(dl, monkeypatch):
     monkeypatch.setattr(dl, "fetch_conditional", lambda url, previous, timeout=300: (None, {}))
-    previous = {"etag": '"v1"', "sha256": "abc", "files": ["data/raw/osm/madrid-latest.osm.pbf"]}
+    previous = {"etag": '"v1"', "sha256": "abc", "files": ["osm/madrid-latest.osm.pbf"]}
     entry = dl.download_source("osm", dl.SOURCES["osm"], previous, force=False)
     assert entry["changed"] is False and entry["etag"] == '"v1"'
 
@@ -475,11 +549,11 @@ def test_failure_keeps_manifest(dl, monkeypatch):
     assert "error" in manifest["aire_dia"]["last_failure"]
 ```
 
-Run: `.venv/bin/pytest tests/scripts/test_download_sources.py -v` → Esperado: FAIL (`AttributeError: module 'download_sources' has no attribute 'REFRESH_LEVELS'` o similar).
+Run: `.venv/bin/pytest tests/scripts/test_download_sources.py -v` → Esperado: FAIL (`AttributeError: … 'REFRESH_LEVELS'` o similar).
 
-- [ ] **Paso 2: traducir los identificadores existentes** según la tabla de arriba (sin cambiar comportamiento). Comprobar: `python3 scripts/download_sources.py --listar` sigue funcionando antes de cambiar la CLI.
+- [ ] **Paso 2: traducir los identificadores existentes** según la tabla (sin cambiar comportamiento). Comprobar: `python3 scripts/download_sources.py --listar` sigue funcionando.
 
-- [ ] **Paso 3: cabecera y tipos** (tras `import zipfile`):
+- [ ] **Paso 3: rutas, cabecera y tipos** (sustituyen a `ROOT`/`RAW_DIR` del paso 2; tras `import zipfile`):
 
 ```python
 import hashlib
@@ -487,6 +561,11 @@ import os
 import time
 import urllib.error
 from collections import namedtuple
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent       # app/ingest
+APP_DIR = ROOT.parent                                        # app (donde esta .env)
+DATA_DIR = pathlib.Path(os.environ.get("GOMAD_DATA_DIR", APP_DIR / "data"))   # volumen compartido
+RAW_DIR = DATA_DIR / "raw"
 
 Source = namedtuple("Source", "kind ident group heavy desc refresh")
 REFRESH_LEVELS = ("reference", "weekly", "daily", "hourly", "on_demand")
@@ -507,7 +586,7 @@ GEOFABRIK_MADRID = "https://download.geofabrik.de/europe/spain/madrid-latest.osm
 SOURCES = {key: Source(*value) for key, value in _SOURCES.items()}
 ```
 
-Comentario de cabecera del bloque: `# id: (kind, identificador, grupo, pesada, descripcion, refresh)`. Corregir la descripción de `nmc_parques` a «Parques y jardines (845 filas, 62 municipios)» (informe-datos §3). Hasta Task 3:
+Comentario de cabecera del bloque: `# id: (kind, identificador, grupo, pesada, descripcion, refresh)`. Corregir la descripción de `nmc_parques` a «Parques y jardines (845 filas, 62 municipios)». Hasta Task 3:
 
 ```python
 def download_aemet(folder, municipalities):
@@ -604,7 +683,7 @@ def download_source(key, src, previous, force, aemet_municipalities=None):
     digest = file_hash(paths)
     return {"kind": src.kind, "identifier": src.ident, "refresh": src.refresh, "urls": urls,
             "downloaded": now(), "checked": now(),
-            "files": [str(p.relative_to(ROOT)) for p in paths],
+            "files": [str(p.relative_to(RAW_DIR)) for p in paths],
             "bytes": sum(p.stat().st_size for p in paths), "sha256": digest,
             "changed": force or digest != previous.get("sha256"),
             **{k: v for k, v in extra.items() if v}}
@@ -612,7 +691,7 @@ def download_source(key, src, previous, force, aemet_municipalities=None):
 
 > `download_ckan(..., src.heavy)`: hoy el script decide con `--incluir-pesadas` si baja todos los CSV de un paquete; solo `aire_historico` tiene varios y es pesado, así que `src.heavy` equivale.
 
-- [ ] **Paso 7: `run` y `main`** (un fallo **no** borra la entrada anterior: se anota `last_failure`; el manifiesto se escribe de forma atómica):
+- [ ] **Paso 7: `run` y `main`** (un fallo **no** borra la entrada anterior; manifiesto escrito de forma atómica):
 
 ```python
 def run(args):
@@ -644,7 +723,7 @@ def run(args):
     tmp = manifest_path.with_suffix(".tmp")
     tmp.write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8")
     os.replace(tmp, manifest_path)
-    print(f"\nHecho: {len(keys) - failures} correctas, {failures} con error. Manifiesto: {manifest_path.relative_to(ROOT)}")
+    print(f"\nHecho: {len(keys) - failures} correctas, {failures} con error. Manifiesto: {manifest_path}")
     return 1 if failures else 0
 
 
@@ -679,40 +758,42 @@ python3 scripts/download_sources.py --refresh reference          # 1.ª vez: des
 python3 scripts/download_sources.py --refresh reference          # 2.ª vez: casi todo «sin cambios»
 python3 scripts/download_sources.py --only osm,callejero --include-heavy
 python3 scripts/download_sources.py --only osm                   # 2.ª vez: «sin cambios» por 304 o sha256
-python3 -c "import json;m=json.load(open('data/raw/manifest.json'));print({k:(v.get('refresh'),v.get('changed')) for k,v in m.items()})"
+python3 -c "import json;m=json.load(open('../data/raw/manifest.json'));print({k:(v.get('refresh'),v.get('changed')) for k,v in m.items()})"
 ```
-Esperado: en la segunda pasada, las CKAN salen «sin cambios» **sin descargar** y las WFS «sin cambios» por sha256 o 304. Existen `data/raw/osm/madrid-latest.osm.pbf` y `data/raw/callejero/`.
+Esperado: en la segunda pasada, las CKAN salen «sin cambios» **sin descargar** y las WFS «sin cambios» por sha256 o 304. Existen `../data/raw/osm/madrid-latest.osm.pbf` y `../data/raw/callejero/`.
 
-- [ ] **Paso 11: documentar y commit.** En `CLAUDE.md` §3, sustituir los comandos de arranque por:
+- [ ] **Paso 11: documentar y commit.** En `../../CLAUDE.md` §3, sustituir los comandos de arranque por:
 ```bash
+cd app/ingest && . .venv/bin/activate
 python3 scripts/download_sources.py --list
 python3 scripts/download_sources.py --group full
 python3 scripts/download_sources.py --refresh reference --include-heavy   # mensual
 python3 scripts/download_sources.py --refresh daily                       # 04:00
 python3 scripts/download_sources.py --refresh hourly                      # cada hora
 python3 scripts/download_sources.py --refresh weekly --include-heavy      # OSM (y despues el grafo)
+cp ../.env.example ../.env                                                # y poner la clave de AEMET
 ```
 En §6.4: «Implementado el 14/10 (`refresh`, `--refresh`, comprobación de cambios por `metadata_modified` / `ETag`-`Last-Modified` / sha256); nivel extra `weekly` para OSM; `aire_zonas` en `reference`».
 
 ```bash
-git add scripts/download_sources.py tests/scripts CLAUDE.md
-git commit -m "Descarga por niveles de recarga, comprobación de cambios, OSM y callejero"
+git -C ../.. add app/ingest/scripts/download_sources.py app/ingest/tests/scripts CLAUDE.md
+git -C ../.. commit -m "Descarga por niveles de recarga, comprobación de cambios, OSM y callejero"
 ```
 
-**Terminado cuando:** las 9 pruebas pasan; la segunda ejecución de `--refresh reference` no vuelve a descargar los CSV de CKAN; `osm` y `callejero` están en `data/raw/` y en el manifiesto con `refresh`, `sha256` y `changed`; un fallo no borra la entrada anterior.
+**Terminado cuando:** las 9 pruebas pasan; la segunda ejecución de `--refresh reference` no vuelve a descargar los CSV de CKAN; `osm` y `callejero` están en `app/data/raw/` y en el manifiesto con `refresh`, `sha256` y `changed`; un fallo no borra la entrada anterior.
 
 ---
 
 ### Task 3: M-D2 · AEMET en el script de descarga
 
-**Rol:** Datos · **Depende de:** Task 2 · **Duración:** 1 h
+**Rol:** Datos · **Servicio:** `app/ingest/` · **Depende de:** Task 2 · **Duración:** 1 h
 
 **Ficheros:**
 - Modificar: `scripts/download_sources.py` (`read_env`, `aemet_municipalities`, `download_aemet`; `fetch` admite cabeceras)
-- Modificar: `.env.example`, `tests/scripts/test_download_sources.py`
+- Modificar: `../.env.example`, `tests/scripts/test_download_sources.py`
 
 **Interfaces:**
-- Produce: `read_env(path=None) -> dict[str, str]`; `aemet_municipalities(value: str | None) -> list[str]`; `download_aemet(folder, municipalities: str | None) -> (list[Path], list[str])`; ficheros `data/raw/aemet/<ine>.json` (documento `datos`, bytes tal cual) y `data/raw/aemet/<ine>.meta.json` (primer nivel, sin la clave).
+- Produce: `read_env(path=None) -> dict[str, str]` (por defecto `APP_DIR / ".env"`); `aemet_municipalities(value: str | None) -> list[str]`; `download_aemet(folder, municipalities: str | None) -> (list[Path], list[str])`; ficheros `data/raw/aemet/<ine>.json` (documento `datos`, bytes tal cual) y `data/raw/aemet/<ine>.meta.json` (primer nivel, sin la clave).
 - La clave va en la **cabecera `api_key`**, no en la URL, para que nunca acabe en `manifest.json` ni en logs. (Task 4 comprueba que AEMET la acepta; si no, se usa `?api_key=` y se **quita** de las URLs antes de guardarlas.)
 
 - [ ] **Paso 1: pruebas que fallan** (añadir a `tests/scripts/test_download_sources.py`)
@@ -757,13 +838,18 @@ def test_aemet_all_reads_179_municipalities(dl):
     (folder / "municipios.geojson").write_text(json.dumps({"type": "FeatureCollection", "features": feats}))
     assert len(dl.aemet_municipalities("todos")) == 179
     assert dl.aemet_municipalities("28065,28079") == ["28065", "28079"]
+
+
+def test_read_env_reads_app_env(dl):
+    (dl.APP_DIR / ".env").write_text("AEMET_API_KEY=abc\n# comentario\n", encoding="utf-8")
+    assert dl.read_env()["AEMET_API_KEY"] == "abc"
 ```
 
-Run: `.venv/bin/pytest tests/scripts/test_download_sources.py -k aemet -v` → Esperado: FAIL (`no attribute 'read_env'`).
+Run: `.venv/bin/pytest tests/scripts/test_download_sources.py -k "aemet or env" -v` → Esperado: FAIL (`no attribute 'read_env'`).
 
 - [ ] **Paso 2: implementar**
 
-`fetch` con cabeceras opcionales (compatible con las llamadas existentes):
+`fetch` con cabeceras opcionales:
 
 ```python
 def fetch(url, timeout=300, headers=None):
@@ -777,8 +863,8 @@ AEMET_URL = "https://opendata.aemet.es/opendata/api/prediccion/especifica/munici
 
 
 def read_env(path=None):
-    """Lee .env (CLAVE=valor por linea) sin dependencias. Las variables de entorno reales mandan."""
-    path = pathlib.Path(path or (ROOT / ".env"))
+    """Lee app/.env (CLAVE=valor por linea) sin dependencias. Las variables de entorno reales mandan."""
+    path = pathlib.Path(path or (APP_DIR / ".env"))
     values = {}
     if path.exists():
         for line in path.read_text(encoding="utf-8").splitlines():
@@ -801,7 +887,7 @@ def download_aemet(folder, municipalities):
     env = read_env()
     key = env.get("AEMET_API_KEY")
     if not key:
-        raise RuntimeError("Falta AEMET_API_KEY en .env (ver .env.example)")
+        raise RuntimeError("Falta AEMET_API_KEY en app/.env (ver app/.env.example)")
     pause = float(env.get("AEMET_PAUSE_S", "1.5"))
     codes = aemet_municipalities(municipalities or env.get("AEMET_MUNICIPALITIES", "todos"))
     paths, urls = [], []
@@ -817,9 +903,9 @@ def download_aemet(folder, municipalities):
     return paths, urls
 ```
 
-> `estado`, `datos`, `descripcion` son claves de la respuesta de AEMET (CLAUDE.md §7.1), no identificadores nuestros. Si un municipio falla, `download_aemet` lanza y `run` conserva la entrada anterior. Si Task 4 muestra fallos sueltos frecuentes, cambiar a «seguir con el siguiente y anotar los fallidos».
+> `estado`, `datos`, `descripcion` son claves de la respuesta de AEMET (CLAUDE.md §7.1), no identificadores nuestros. Si un municipio falla, `download_aemet` lanza y `run` conserva la entrada anterior.
 
-`.env.example`, debajo de `AEMET_API_KEY=`:
+`../.env.example`, debajo de `AEMET_API_KEY=`:
 ```
 # Municipios a pedir cada hora: 'todos' (179) o codigos INE separados por comas. Ajustar a la cuota real (Task 4).
 AEMET_MUNICIPALITIES=todos
@@ -827,8 +913,8 @@ AEMET_MUNICIPALITIES=todos
 AEMET_PAUSE_S=1.5
 ```
 
-- [ ] **Paso 3:** Run: `.venv/bin/pytest tests/scripts/test_download_sources.py -v` → Esperado: 13 PASS.
-- [ ] **Paso 4: commit** — `git add scripts/download_sources.py tests/scripts .env.example && git commit -m "AEMET: previsión horaria por municipio con la clave en cabecera"`
+- [ ] **Paso 3:** Run: `.venv/bin/pytest tests/scripts/test_download_sources.py -v` → Esperado: 14 PASS.
+- [ ] **Paso 4: commit** — `git -C ../.. add app/ingest/scripts/download_sources.py app/ingest/tests/scripts app/.env.example && git -C ../.. commit -m "AEMET: previsión horaria por municipio con la clave en cabecera"`
 
 **Terminado cuando:** las pruebas pasan, incluida la de que la clave no aparece en URLs ni ficheros.
 
@@ -836,22 +922,22 @@ AEMET_PAUSE_S=1.5
 
 ### Task 4: M-D3 · Verificar la API de AEMET con la clave del equipo (P-01)
 
-**Rol:** Datos · **Depende de:** Task 3 · **Duración:** 45 min · El paso 1 es **[manual]**.
+**Rol:** Datos · **Servicio:** `app/ingest/` · **Depende de:** Task 3 · **Duración:** 45 min · El paso 1 es **[manual]**.
 
 **Ficheros:**
 - Crear: `scripts/verify_aemet.py`, `tests/data/aemet_28065.json` (muestra real **sin clave**)
-- Modificar: `CLAUDE.md` §7.1, `docs/referencia/umbrales.md` §3, `docs/PENDIENTES.md` (P-01 ✅)
+- Modificar: `../../CLAUDE.md` §7.1, `../../docs/referencia/umbrales.md` §3, `../../docs/PENDIENTES.md` (P-01 ✅)
 
-- [ ] **Paso 1 [manual]:** `cp .env.example .env` y pegar la clave en `AEMET_API_KEY` (la persona; la clave no se pega en el chat). Comprobar: `git check-ignore .env` → imprime `.env`.
+- [ ] **Paso 1 [manual]:** `cp ../.env.example ../.env` y pegar la clave en `AEMET_API_KEY` (la persona; la clave no se pega en el chat). Comprobar: `git check-ignore ../.env` → imprime la ruta.
 
 - [ ] **Paso 2: `scripts/verify_aemet.py`**
 
 ```python
 #!/usr/bin/env python3
-"""Comprueba la API de AEMET con la clave de .env y resume el esquema real.
+"""Comprueba la API de AEMET con la clave de app/.env y resume el esquema real.
 
 Uso: python3 scripts/verify_aemet.py 28065 28079
-Guarda las respuestas en data/raw/aemet_verificacion/ (no se versiona) e imprime las claves
+Guarda las respuestas en app/data/raw/aemet_verificacion/ (no se versiona) e imprime las claves
 de cada dia, los periodos de cada campo, las cabeceras de cuota y la codificacion.
 """
 import importlib.util
@@ -860,7 +946,7 @@ import pathlib
 import sys
 import urllib.request
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
+ROOT = pathlib.Path(__file__).resolve().parent.parent      # app/ingest
 spec = importlib.util.spec_from_file_location("dl", ROOT / "scripts" / "download_sources.py")
 dl = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(dl)
@@ -875,8 +961,8 @@ def fetch_with_headers(url, headers):
 def main(codes):
     key = dl.read_env().get("AEMET_API_KEY")
     if not key:
-        sys.exit("Falta AEMET_API_KEY en .env")
-    out_dir = ROOT / "data" / "raw" / "aemet_verificacion"
+        sys.exit("Falta AEMET_API_KEY en app/.env")
+    out_dir = dl.RAW_DIR / "aemet_verificacion"
     out_dir.mkdir(parents=True, exist_ok=True)
     for code in codes:
         body, headers = fetch_with_headers(dl.AEMET_URL + code, {"api_key": key})
@@ -909,77 +995,51 @@ if __name__ == "__main__":
     main(sys.argv[1:] or ["28065", "28079"])
 ```
 
-- [ ] **Paso 3:** Run: `python3 scripts/verify_aemet.py 28065 28079 28131` → Esperado: `estado 200` en los tres. **Apuntar** para CLAUDE.md §7.1 y Task 18: (1) si acepta la clave en cabecera (si `401`, pasar a `?api_key=` en Task 3 quitándola de `urls`); (2) codificación; (3) claves reales de cada día (esperadas: `temperatura`, `sensTermica`, `precipitacion`, `probPrecipitacion`, `estadoCielo`, `humedadRelativa`, `vientoAndRachaMax`, `orto`, `ocaso`, `fecha`); (4) formato de `periodo` (hora `"07"` o franja `"0208"`) y valores no numéricos (`"Ip"`); (5) cuántos días y horas cubre; (6) cabeceras de cuota → ajustar `AEMET_MUNICIPALITIES` y `AEMET_PAUSE_S`; si 179 × 2 peticiones/hora no caben, **proponer** al equipo pedir solo los municipios consultados recientemente (no implementarlo sin preguntar).
+- [ ] **Paso 3:** Run: `python3 scripts/verify_aemet.py 28065 28079 28131` → Esperado: `estado 200` en los tres. **Apuntar** para CLAUDE.md §7.1 y Task 18: (1) si acepta la clave en cabecera (si `401`, pasar a `?api_key=` en Task 3 quitándola de `urls`); (2) codificación; (3) claves reales de cada día (esperadas: `temperatura`, `sensTermica`, `precipitacion`, `probPrecipitacion`, `estadoCielo`, `humedadRelativa`, `vientoAndRachaMax`, `orto`, `ocaso`, `fecha`); (4) formato de `periodo` (hora `"07"` o franja `"0208"`) y valores no numéricos (`"Ip"`); (5) días y horas que cubre; (6) cabeceras de cuota → ajustar `AEMET_MUNICIPALITIES` y `AEMET_PAUSE_S`; si 179 × 2 peticiones/hora no caben, **proponer** al equipo pedir solo los municipios consultados recientemente (no implementarlo sin preguntar).
 
-- [ ] **Paso 4:** copiar `data/raw/aemet_verificacion/28065.json` a `tests/data/aemet_28065.json` y comprobar que no lleva la clave: `grep -c "$(grep AEMET_API_KEY .env | cut -d= -f2)" tests/data/aemet_28065.json` → Esperado: `0`.
+- [ ] **Paso 4:** copiar `../data/raw/aemet_verificacion/28065.json` a `tests/data/aemet_28065.json` y comprobar que no lleva la clave: `grep -c "$(grep AEMET_API_KEY ../.env | cut -d= -f2)" tests/data/aemet_28065.json` → Esperado: `0`.
 
-- [ ] **Paso 5:** Run: `python3 scripts/download_sources.py --only aemet --aemet-municipalities 28065,28079` → Esperado: `ok, cambiado`. Después `grep -c "$(grep AEMET_API_KEY .env | cut -d= -f2)" data/raw/manifest.json` → `0`.
+- [ ] **Paso 5:** Run: `python3 scripts/download_sources.py --only aemet --aemet-municipalities 28065,28079` → Esperado: `ok, cambiado`. Después `grep -c "$(grep AEMET_API_KEY ../.env | cut -d= -f2)" ../data/raw/manifest.json` → `0`.
 
 - [ ] **Paso 6: documentar y commit.** CLAUDE.md §7.1 (fila AEMET: «comprobado 14/10» + lo apuntado), `docs/PENDIENTES.md` P-01 → ✅.
 
 ```bash
-git add scripts/verify_aemet.py tests/data/aemet_28065.json CLAUDE.md docs/PENDIENTES.md
-git commit -m "AEMET verificado con la clave del equipo: esquema real y muestra para pruebas"
+git -C ../.. add app/ingest/scripts/verify_aemet.py app/ingest/tests/data/aemet_28065.json CLAUDE.md docs/PENDIENTES.md
+git -C ../.. commit -m "AEMET verificado con la clave del equipo: esquema real y muestra para pruebas"
 ```
 
 **Terminado cuando:** hay muestra real de Getafe en `tests/data/`, el CLAUDE.md documenta el esquema y la cuota comprobados, y la clave no aparece en ningún fichero versionado ni en el manifiesto.
 
 ---
 
-### Task 5: M-M2 · Docker Compose básico
+### Task 5: M-M2 · Docker Compose básico (api + frontend)
 
-**Rol:** Motor · **Depende de:** Task 1 · **Duración:** 1 h · El paso 1 es **[manual]**.
+**Rol:** Motor · **Servicio:** `app/` (toca `api/`, `frontend/` y `deploy/`) · **Depende de:** Task 1 · **Duración:** 1 h · El paso 1 es **[manual]**.
 
-**Ficheros:** Crear `deploy/Dockerfile.api`, `deploy/docker-compose.yml`, `deploy/Caddyfile`, `.dockerignore`.
+**Ficheros:** Crear `api/Dockerfile`, `api/.dockerignore`, `frontend/Dockerfile` (provisional; Task 10 lo convierte en multi-stage), `frontend/Caddyfile`, `deploy/docker-compose.yml`.
 
-- [ ] **Paso 1 [manual]:** instalar Docker (Engine en la distribución WSL o integración WSL de Docker Desktop). Comprobar: `docker compose version`.
+> El servicio `ingest` se añade al Compose el domingo (D-D1), con su `Dockerfile` y el cron.
 
-- [ ] **Paso 2: `deploy/Dockerfile.api`**
+- [ ] **Paso 1 [manual]:** instalar Docker (Engine en WSL o integración WSL de Docker Desktop). Comprobar: `docker compose version`.
+
+- [ ] **Paso 2: `api/Dockerfile`**
 
 ```dockerfile
 FROM python:3.12-slim
-WORKDIR /app
+WORKDIR /srv/api
 COPY pyproject.toml ./
 RUN pip install --no-cache-dir .
-COPY api ./api
-COPY config ./config
-ENV PYTHONPATH=/app PYTHONUNBUFFERED=1
+COPY . .
+# datos y configuracion compartidos llegan por volumen (docker-compose.yml)
+ENV PYTHONPATH=/srv/api PYTHONUNBUFFERED=1 GOMAD_DATA_DIR=/data GOMAD_CONFIG_DIR=/config
 EXPOSE 8000
 # --no-access-log: el log de acceso escribiria la URL completa (GET /location?text=... = direccion del usuario)
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
 ```
 
-- [ ] **Paso 3: `deploy/docker-compose.yml`**
+`api/.dockerignore`: `.venv/`, `__pycache__/`, `tests/`, `scripts/`.
 
-```yaml
-services:
-  api:
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile.api
-    env_file: ../.env
-    volumes:
-      - ../data:/app/data:ro
-    restart: unless-stopped
-  caddy:
-    image: caddy:2.8.4
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ../web/dist:/srv/web:ro
-      - caddy_data:/data
-    environment:
-      - DOMAIN=${DOMAIN:-:80}
-    depends_on:
-      - api
-    restart: unless-stopped
-volumes:
-  caddy_data:
-```
-
-- [ ] **Paso 4: `deploy/Caddyfile`**
+- [ ] **Paso 3: `frontend/Caddyfile`**
 
 ```
 # DOMAIN=:80 sirve HTTP (pruebas); con un dominio real Caddy saca el certificado de Let's Encrypt
@@ -1001,23 +1061,57 @@ volumes:
 }
 ```
 
-`.dockerignore`: `data/`, `.venv/`, `web/node_modules/`, `.env`, `.git/`, `docs/presentaciones/`.
+`frontend/Dockerfile` (provisional hasta Task 10):
+
+```dockerfile
+FROM caddy:2.8.4
+COPY Caddyfile /etc/caddy/Caddyfile
+COPY dist /srv/web
+```
+
+- [ ] **Paso 4: `deploy/docker-compose.yml`**
+
+```yaml
+services:
+  api:
+    build: ../api
+    env_file: ../.env
+    volumes:
+      - ../data:/data:ro
+      - ../config:/config:ro
+    restart: unless-stopped
+  frontend:
+    build: ../frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN:-:80}
+    volumes:
+      - caddy_data:/data
+    depends_on:
+      - api
+    restart: unless-stopped
+volumes:
+  caddy_data:
+```
 
 - [ ] **Paso 5: probar**
 
 ```bash
-mkdir -p web/dist && echo '<!doctype html><title>GoMad</title><p>GoMad</p>' > web/dist/index.html
+mkdir -p frontend/dist && echo '<!doctype html><title>GoMad</title><p>GoMad</p>' > frontend/dist/index.html
+touch .env                                                        # si aun no existe (Task 4 lo rellena)
 docker compose -f deploy/docker-compose.yml up -d --build
-curl -s localhost/api/health                                          # {"status":"ok"}
+curl -s localhost/api/health                                      # {"status":"ok"}
 curl -s localhost/ | grep GoMad
-docker compose -f deploy/docker-compose.yml exec api ls -a /app        # no aparece .env
+docker compose -f deploy/docker-compose.yml exec api ls -a /srv/api      # no aparece .env ni .venv
 docker compose -f deploy/docker-compose.yml down
 ```
-Esperado: lo indicado en los comentarios.
+Esperado: lo indicado en los comentarios. `frontend/dist/` no se sube (`dist/` en `.gitignore`).
 
-- [ ] **Paso 6: commit** — `git add deploy .dockerignore && git commit -m "Docker Compose básico: API y Caddy"`
+- [ ] **Paso 6: commit** — `git -C .. add app/api/Dockerfile app/api/.dockerignore app/frontend/Dockerfile app/frontend/Caddyfile app/deploy && git -C .. commit -m "Docker Compose básico: servicios api y frontend"`
 
-**Terminado cuando:** `docker compose up` sirve `/api/health` y la página estática en local, y la imagen no contiene `.env`.
+**Terminado cuando:** `docker compose up` sirve `/api/health` y la página estática en local, y la imagen de la API no contiene `.env` ni `.venv`.
 
 ---
 
@@ -1030,7 +1124,7 @@ Esperado: lo indicado en los comentarios.
 - [ ] **Paso 1:** consola de OCI → Compute → Instances → Create. Ubuntu 24.04. Forma: primero **VM.Standard.A1.Flex (Always Free)** con 2 OCPU / 12 GB; si no hay capacidad, una de pago con créditos y ≥ 4 GB RAM. **DEC-A10:** apuntar forma, región y motivo.
 - [ ] **Paso 2:** *security list* de la VCN: entrada TCP 80 y 443 (0.0.0.0/0). En la VM: `sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT && sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT && sudo netfilter-persistent save`.
 - [ ] **Paso 3:** `curl -fsSL https://get.docker.com | sh && sudo usermod -aG docker ubuntu` y volver a entrar.
-- [ ] **Paso 4:** `git clone` del repo, `.env` **creado a mano en la VM** (`chmod 600 .env`), `mkdir -p web/dist data`, la página de prueba y `docker compose -f deploy/docker-compose.yml up -d --build`.
+- [ ] **Paso 4:** `git clone` del repo; `app/.env` **creado a mano en la VM** (`chmod 600 app/.env`); `mkdir -p app/frontend/dist app/data`; la página de prueba; `cd app && docker compose -f deploy/docker-compose.yml up -d --build`.
 - [ ] **Paso 5:** `curl -s http://<IP_PÚBLICA>/api/health` → Esperado: `{"status":"ok"}`.
 - [ ] **Paso 6:** commit de la nota en `docs/arquitectura.md` §6 y §10 (A-10 ✅).
 
@@ -1040,13 +1134,13 @@ Esperado: lo indicado en los comentarios.
 
 ### Task 7: M-M4 · Leer el plan de calor de Sanidad (P-03, desbloquea DEC-06)
 
-**Rol:** Motor · **Duración:** 45 min · El paso 1 es **[manual]**.
+**Rol:** Motor · **Servicio:** raíz del repositorio (solo documentación) · **Duración:** 45 min · El paso 1 es **[manual]**.
 
-- [ ] **Paso 1 [manual]:** `! sudo apt install -y poppler-utils`.
-- [ ] **Paso 2:** descargar el PDF de la URL de `umbrales.md` §2 a `data/raw/calor/plan2026.pdf` y `pdftotext -layout data/raw/calor/plan2026.pdf data/raw/calor/plan2026.txt`.
+- [ ] **Paso 1 [manual]:** `sudo apt install -y poppler-utils`.
+- [ ] **Paso 2:** descargar el PDF de la URL de `docs/referencia/umbrales.md` §2 a `app/data/raw/calor/plan2026.pdf` y `pdftotext -layout app/data/raw/calor/plan2026.pdf app/data/raw/calor/plan2026.txt`.
 - [ ] **Paso 3:** localizar la tabla de umbrales por zona meteosalud de la Comunidad de Madrid y copiarla **literalmente** a `umbrales.md` §2 (valores, unidad, zona, página del PDF, regla de niveles). Sin interpretar ni redondear.
 - [ ] **Paso 4:** con el esquema real de AEMET (Task 4), escribir en `umbrales.md` §2 la **propuesta** para DEC-06 (qué dato horario se compara y con qué). No es decisión.
-- [ ] **Paso 5:** commit `docs/referencia/umbrales.md`, `docs/PENDIENTES.md` (P-03 ✅).
+- [ ] **Paso 5:** `git add docs/referencia/umbrales.md docs/PENDIENTES.md && git commit -m "Umbrales de calor del plan de Sanidad 2026"` (P-03 ✅).
 
 **Terminado cuando:** `umbrales.md` §2 tiene los umbrales oficiales de Madrid con página citada y una propuesta para DEC-06.
 
@@ -1054,11 +1148,11 @@ Esperado: lo indicado en los comentarios.
 
 ### Task 8: M-R1 · Extracto de OSM y prueba de pyrosm en Getafe
 
-**Rol:** Rutas · **Depende de:** Task 1 y Task 2 paso 10 (si no, `curl -o data/raw/osm/madrid-latest.osm.pbf <URL de Geofabrik>`) · **Duración:** 1,5 h
+**Rol:** Rutas · **Servicio:** `app/ingest/` · **Depende de:** Task 1 y Task 2 paso 10 (si no, `curl -o ../data/raw/osm/madrid-latest.osm.pbf <URL de Geofabrik>`) · **Duración:** 1,5 h
 
-**Ficheros:** Crear `scripts/probe_pyrosm.py`. Modificar `docs/arquitectura.md` §3.4.
+**Ficheros:** Crear `scripts/probe_pyrosm.py`. Modificar `../../docs/arquitectura.md` §3.4.
 
-- [ ] **Paso 1:** `pip install -e ".[routing]"`. Si no compila en 3.12, usar el respaldo con pyosmium (`pip install osmium==3.7.0`, Task 20 paso 3b) y anotarlo.
+- [ ] **Paso 1:** `.venv/bin/pip install -e ".[routing]"`. Si no compila en 3.12, usar el respaldo con pyosmium (`.venv/bin/pip install osmium==3.7.0`, Task 20 paso 3b) y anotarlo.
 
 - [ ] **Paso 2: `scripts/probe_pyrosm.py`**
 
@@ -1069,6 +1163,7 @@ Esperado: lo indicado en los comentarios.
 Uso: python scripts/probe_pyrosm.py 28065
 """
 import json
+import os
 import pathlib
 import resource
 import sys
@@ -1076,12 +1171,13 @@ import time
 
 import geopandas as gpd
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
-PBF = ROOT / "data" / "raw" / "osm" / "madrid-latest.osm.pbf"
+ROOT = pathlib.Path(__file__).resolve().parent.parent      # app/ingest
+DATA_DIR = pathlib.Path(os.environ.get("GOMAD_DATA_DIR", ROOT.parent / "data"))
+PBF = DATA_DIR / "raw" / "osm" / "madrid-latest.osm.pbf"
 
 
 def municipality_bbox(ine_code):
-    muni = gpd.read_file(ROOT / "data" / "raw" / "municipios" / "municipios.geojson")
+    muni = gpd.read_file(DATA_DIR / "raw" / "municipios" / "municipios.geojson")
     muni = muni.set_crs(25830, allow_override=True).to_crs(4326)
     row = muni[("28" + muni["CDMUNICIPIO"].astype(str).str.zfill(3)) == ine_code]
     if row.empty:
@@ -1107,11 +1203,11 @@ if __name__ == "__main__":
     main(sys.argv[1] if len(sys.argv) > 1 else "28065")
 ```
 
-> `municipios.geojson` viene del WFS en EPSG:25830 (informe-datos §1). Comprobar que la `bbox` sale en grados (≈ −3,8, 40,3 en Getafe); si sale en metros, quitar el `set_crs` y repetir.
+> `municipios.geojson` viene del WFS en EPSG:25830. Comprobar que la `bbox` sale en grados (≈ −3,8, 40,3 en Getafe); si sale en metros, quitar el `set_crs` y repetir.
 
-- [ ] **Paso 3:** Run: `python scripts/probe_pyrosm.py 28065` y luego `28079`. Esperado: `nodes` y `edges` > 0; columnas `u`, `v`, `length`, `highway`, `geometry`.
-- [ ] **Paso 4:** anotar en `docs/arquitectura.md` §3.4 las cifras **medidas** de Getafe y capital (nodos, tramos, segundos, MB), la estimación regional y si cabe en la VM de Task 6. Primera entrada de DEC-A11.
-- [ ] **Paso 5: commit** — `git add scripts/probe_pyrosm.py docs/arquitectura.md && git commit -m "Medición de la red peatonal de OSM en Getafe y Madrid"`
+- [ ] **Paso 3:** Run: `.venv/bin/python scripts/probe_pyrosm.py 28065` y luego `28079`. Esperado: `nodes` y `edges` > 0; columnas `u`, `v`, `length`, `highway`, `geometry`.
+- [ ] **Paso 4:** anotar en `../../docs/arquitectura.md` §3.4 las cifras **medidas** de Getafe y capital (nodos, tramos, segundos, MB), la estimación regional y si cabe en la VM de Task 6. Primera entrada de DEC-A11.
+- [ ] **Paso 5: commit** — `git -C ../.. add app/ingest/scripts/probe_pyrosm.py docs/arquitectura.md && git -C ../.. commit -m "Medición de la red peatonal de OSM en Getafe y Madrid"`
 
 **Terminado cuando:** hay cifras medidas en `arquitectura.md` §3.4 y se sabe si pyrosm funciona en 3.12.
 
@@ -1124,7 +1220,7 @@ if __name__ == "__main__":
 **Ficheros:** Crear `docs/pantallas.md`.
 
 - [ ] **Paso 1:** recorrer `docs/idea/muevete-cerca-prototipo.html` y la tabla de arquitectura §5.2. Para **Inicio** y **Resultados**, cerrar: elementos, textos, orden de foco, estados (cargando, error, vacío, «sin datos») y cómo se ve cada indicador (icono + color + texto).
-- [ ] **Paso 2:** `docs/pantallas.md` con una sección por pantalla: propósito, endpoint que usa (nombres en inglés de Task 11), componentes, estados y accesibilidad. Las no cerradas: «se cierra el <día> antes de maquetar».
+- [ ] **Paso 2:** `docs/pantallas.md` con una sección por pantalla: propósito, endpoint que usa (nombres de Task 11), componentes, estados y accesibilidad. Las no cerradas: «se cierra el <día> antes de maquetar».
 - [ ] **Paso 3:** commit.
 
 **Terminado cuando:** Inicio y Resultados están cerrados en `docs/pantallas.md` (bloquean Tasks 24 y 25).
@@ -1133,29 +1229,29 @@ if __name__ == "__main__":
 
 ### Task 10: M-F2 · Proyecto Vite + React + TypeScript con estilos y fuentes propias
 
-**Rol:** Front · **Duración:** 2 h · El paso 1 es **[manual]**.
+**Rol:** Front · **Servicio:** `app/frontend/` · **Duración:** 2 h · El paso 1 es **[manual]**.
 
-**Ficheros:** Crear `web/` (Vite), `web/src/styles/main.css`, `web/src/styles/icons.css`, `web/public/fonts/`, `web/src/App.tsx`, `web/src/main.tsx`, `web/src/setupTests.ts`, `web/src/App.test.tsx`.
+**Ficheros:** Crear el proyecto Vite en este directorio, `src/styles/main.css`, `src/styles/icons.css`, `public/fonts/`, `src/App.tsx`, `src/main.tsx`, `src/setupTests.ts`, `src/App.test.tsx`. Modificar `Dockerfile` (multi-stage).
 
 - [ ] **Paso 1 [manual]:** Node 20 LTS con `nvm` (`nvm install 20 && nvm use 20`). Comprobar `node -v` → `v20.x`.
 
-- [ ] **Paso 2: crear el proyecto**
+- [ ] **Paso 2: crear el proyecto en este directorio**
 
 ```bash
-npm create vite@5.5.2 web -- --template react-ts
-cd web
+rm -f .gitkeep
+npm create vite@5.5.2 . -- --template react-ts      # si pregunta por ficheros existentes (Caddyfile, Dockerfile): "Ignore files and continue"
 npm install
 npm install react-router-dom@6.26.2 @tanstack/react-query@5.56.2 react-map-gl@7.1.7 maplibre-gl@4.7.1 \
   @radix-ui/react-slider@1.2.0 @radix-ui/react-dialog@1.1.1
 npm install -D vitest@2.1.1 @testing-library/react@16.0.1 @testing-library/jest-dom@6.5.0 jsdom@25.0.0 \
   vitest-axe@0.1.0 msw@2.4.9 openapi-typescript@7.4.1
 ```
-Si alguna versión no existe, usar la más cercana anterior y anotarla.
+Si alguna versión no existe, usar la más cercana anterior y anotarla. Comprobar que `Caddyfile` y `Dockerfile` siguen intactos.
 
-- [ ] **Paso 3: fuentes servidas por nosotros** (no `fonts.googleapis.com`, RGPD): `.woff2` de Figtree (OFL) y Material Symbols Rounded (Apache 2.0) desde sus repositorios oficiales a `web/public/fonts/` con sus licencias, declaradas con `@font-face` en `main.css`. `index.html` sin ningún `<link>` a Google.
+- [ ] **Paso 3: fuentes servidas por nosotros** (no `fonts.googleapis.com`, RGPD): `.woff2` de Figtree (OFL) y Material Symbols Rounded (Apache 2.0) desde sus repositorios oficiales a `public/fonts/` con sus licencias, declaradas con `@font-face` en `main.css`. `index.html` sin ningún `<link>` a Google.
 - [ ] **Paso 4: `main.css`** con las variables de color claro/oscuro y las clases del prototipo (`.btn1`, `.btn2`, `.score`, `.tabs`, `.seg`, `.back`, `.empty`…), `:focus-visible` visible y `@media (prefers-reduced-motion: reduce)`. `icons.css`: clase `.icon` para Material Symbols. Clases nuevas en inglés; las del prototipo se mantienen.
 
-- [ ] **Paso 5: prueba que falla** — `web/src/App.test.tsx`
+- [ ] **Paso 5: prueba que falla** — `src/App.test.tsx`
 
 ```tsx
 import { render, screen } from "@testing-library/react";
@@ -1176,9 +1272,29 @@ describe("App", () => {
 Vitest en `vite.config.ts` (`test: { environment: "jsdom", setupFiles: ["./src/setupTests.ts"] }`; `setupTests.ts` con `import "@testing-library/jest-dom/vitest"`). Run: `npx vitest run` → Esperado: FAIL.
 
 - [ ] **Paso 6: `App.tsx`** con `<header>`, `<nav aria-label="Principal">` inferior («Mi entorno · Municipios · Perfil»), `<main id="content">` con `<h1>`, enlace «Saltar al contenido»; `index.html` con `lang="es"`. Run: `npx vitest run` → PASS; `npm run build` → sin errores.
-- [ ] **Paso 7: commit** — `git add web && git commit -m "Front: proyecto Vite con estilos del prototipo y fuentes propias"`
 
-**Terminado cuando:** `npm run build` genera `web/dist/`, la prueba con axe pasa y no hay peticiones a Google.
+- [ ] **Paso 7: `Dockerfile` multi-stage** (sustituye al provisional de Task 5):
+
+```dockerfile
+# 1) compila la SPA
+FROM node:20-alpine AS build
+WORKDIR /srv/frontend
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# 2) Caddy sirve los estaticos y hace de proxy a la API
+FROM caddy:2.8.4
+COPY Caddyfile /etc/caddy/Caddyfile
+COPY --from=build /srv/frontend/dist /srv/web
+```
+
+`.dockerignore`: `node_modules/`, `dist/`. Run: `(cd ../deploy && docker compose build frontend)` → Esperado: imagen construida (si Docker ya está; si no, comprobarlo en Task 5/V-F4).
+
+- [ ] **Paso 8: commit** — `git -C ../.. add app/frontend && git -C ../.. commit -m "Front: proyecto Vite con estilos del prototipo, fuentes propias y Dockerfile multi-stage"`
+
+**Terminado cuando:** `npm run build` genera `dist/`, la prueba con axe pasa, no hay peticiones a Google y la imagen del frontend compila la SPA.
 
 ---
 
@@ -1186,16 +1302,16 @@ Vitest en `vite.config.ts` (`test: { environment: "jsdom", setupFiles: ["./src/s
 
 ### Task 11: J-M1 · Contrato de la API (9:00–11:00, bloquea al resto)
 
-**Rol:** Motor (con Front y Rutas los primeros 20 min) · **Depende de:** Task 1 · **Duración:** 2 h
+**Rol:** Motor (con Front y Rutas los primeros 20 min) · **Servicio:** `app/api/` · **Depende de:** Task 1 · **Duración:** 2 h
 
 **Ficheros:**
-- Crear: `api/schemas.py`, `scripts/export_openapi.py`, `tests/api/test_contract.py`, `web/src/api/openapi.json` (generado)
-- Modificar: `api/main.py`
+- Crear: `schemas.py`, `scripts/export_openapi.py`, `tests/test_contract.py`, `../frontend/src/api/openapi.json` (generado)
+- Modificar: `main.py`
 
 **Interfaces (produce; todos los roles lo usan):**
 
 ```python
-# api/schemas.py
+# schemas.py
 """Contrato de la API (arquitectura §4.1). Cambiarlo = regenerar openapi.json y los tipos del front."""
 from datetime import datetime
 from typing import Literal
@@ -1221,7 +1337,7 @@ class Coordinate(Strict):
 
 
 class DataSource(Strict):
-    source: str                       # id de scripts/download_sources.py, p. ej. "aire_dia"
+    source: str                       # id de ingest/scripts/download_sources.py, p. ej. "aire_dia"
     label: str                        # texto para la persona, p. ej. "Calidad del aire (Comunidad de Madrid)"
     date: datetime | None             # fecha del dato (no de la descarga) si se conoce
     own_criterion: bool = False       # True si el umbral/valor no tiene fuente oficial (CLAUDE.md §2.9)
@@ -1441,14 +1557,14 @@ class SourcesResponse(Strict):
 
 > **Dependencia de decisiones:** `Profile` y `Companion` pueden cambiar con DEC-05/DEC-08; `activity` es `str` (validado contra `config/activities.yaml` en tiempo de ejecución) para que el catálogo no obligue a regenerar tipos. Si cambian los `Literal`, se regenera (Task 23 paso 1).
 
-- [ ] **Paso 1: prueba que falla** — `tests/api/test_contract.py`
+- [ ] **Paso 1: prueba que falla** — `tests/test_contract.py`
 
 ```python
 import json
 
 from fastapi.testclient import TestClient
 
-from api.main import app
+from main import app
 
 ROUTES = {
     ("get", "/activities"), ("get", "/location"), ("post", "/recommend"), ("post", "/route"),
@@ -1465,7 +1581,7 @@ def test_all_contract_routes_exist():
 
 def test_versioned_openapi_is_up_to_date(root):
     """Si falla: python scripts/export_openapi.py y regenerar los tipos del front (Task 23)."""
-    saved = json.loads((root / "web" / "src" / "api" / "openapi.json").read_text(encoding="utf-8"))
+    saved = json.loads((root.parent / "frontend" / "src" / "api" / "openapi.json").read_text(encoding="utf-8"))
     assert saved == app.openapi()
 
 
@@ -1481,15 +1597,15 @@ def test_unknown_field_is_422():
     assert r.status_code == 422
 ```
 
-Run: `pytest tests/api/test_contract.py -v` → Esperado: FAIL.
+Run: `.venv/bin/pytest tests/test_contract.py -v` → Esperado: FAIL.
 
-- [ ] **Paso 2: rutas en `api/main.py`** (cuerpo provisional `501`):
+- [ ] **Paso 2: rutas en `main.py`** (cuerpo provisional `501`):
 
 ```python
 """API de GoMad. Sin estado: sin sesiones ni registro; la ubicacion nunca se escribe en los logs."""
 from fastapi import FastAPI, HTTPException, Query
 
-from api import schemas as s
+import schemas as s
 
 app = FastAPI(title="GoMad API", version="0.1.0")
 
@@ -1547,24 +1663,24 @@ def sources():
 
 ```python
 #!/usr/bin/env python3
-"""Exporta el contrato OpenAPI para el front: web/src/api/openapi.json."""
+"""Exporta el contrato OpenAPI para el front: app/frontend/src/api/openapi.json."""
 import json
 import pathlib
 import sys
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
+ROOT = pathlib.Path(__file__).resolve().parent.parent      # app/api
 sys.path.insert(0, str(ROOT))
-from api.main import app  # noqa: E402
+from main import app  # noqa: E402
 
-target = ROOT / "web" / "src" / "api" / "openapi.json"
+target = ROOT.parent / "frontend" / "src" / "api" / "openapi.json"
 target.parent.mkdir(parents=True, exist_ok=True)
 target.write_text(json.dumps(app.openapi(), ensure_ascii=False, indent=1), encoding="utf-8")
-print(f"Escrito {target.relative_to(ROOT)}")
+print(f"Escrito {target}")
 ```
 
-Run: `python scripts/export_openapi.py && pytest tests/api -v` → Esperado: PASS.
+Run: `.venv/bin/python scripts/export_openapi.py && .venv/bin/pytest -v` → Esperado: PASS.
 
-- [ ] **Paso 4: commit** — `git add api scripts/export_openapi.py tests/api web/src/api/openapi.json && git commit -m "Contrato de la API: modelos Pydantic y OpenAPI"`. Avisar al equipo.
+- [ ] **Paso 4: commit** — `git -C ../.. add app/api app/frontend/src/api/openapi.json && git -C ../.. commit -m "Contrato de la API: modelos Pydantic y OpenAPI"`. Avisar al equipo.
 
 **Terminado cuando:** `openapi.json` está en `main` y las 4 pruebas del contrato pasan.
 
@@ -1572,19 +1688,19 @@ Run: `python scripts/export_openapi.py && pytest tests/api -v` → Esperado: PAS
 
 ### Task 12: J-M2 · Módulo `rules` (filtros duros) y configuración
 
-**Rol:** Motor · **Depende de:** Task 11 · **Duración:** 2 h
+**Rol:** Motor · **Servicio:** `app/api/` · **Depende de:** Task 11 · **Duración:** 2 h
 
-**Ficheros:** Crear `config/ica_thresholds.yaml`, `api/config.py`, `api/engine/rules.py`, `tests/engine/__init__.py`, `tests/engine/test_rules.py`. `config/rules.yaml` lo crean DEC-05/06/07b.
+**Ficheros:** Crear `../config/ica_thresholds.yaml`, `settings.py`, `engine/__init__.py`, `engine/rules.py`, `tests/engine/test_rules.py`. `../config/rules.yaml` lo crean DEC-05/06/07b.
 
 **Interfaces:**
 - Produce:
+  - `settings.APP_DIR`, `settings.CONFIG_DIR` (`GOMAD_CONFIG_DIR` o `app/config`), `settings.DATA_DIR` (`GOMAD_DATA_DIR` o `app/data`), `settings.load(name: str) -> dict | None`
   - `CATEGORIES: tuple[str, ...]` (mejor a peor, como `AqiCategory`); `CATEGORY_LABEL: dict[str, str]` (textos del BOE)
   - `pollutant_category(pollutant: str, value: float | None, bands: dict) -> str | None`
   - `aqi_category(values: dict[str, float | None], bands: dict) -> str | None`
   - `@dataclass HourContext(hour: datetime, temperature_c, feels_like_c, precip_prob, aqi_category)`
   - `@dataclass RuleResult(outdoor_ok: bool | None, reasons: list[str])`
   - `evaluate_outdoor(ctx: HourContext, profile: str, rules: dict) -> RuleResult`
-  - `api.config.load(name: str) -> dict | None` (lee `config/<name>.yaml`)
 - Formato de `config/rules.yaml` (contrato con el código; valores de DEC-05/06/07b):
 
 ```yaml
@@ -1603,7 +1719,7 @@ rain:            # DEC-07b: null = regla desactivada
   own_criterion: true
 ```
 
-- [ ] **Paso 1: `config/ica_thresholds.yaml`** (valores **verificados**, `umbrales.md` §1.1; límite superior de cada banda)
+- [ ] **Paso 1: `../config/ica_thresholds.yaml`** (valores **verificados**, `umbrales.md` §1.1; límite superior de cada banda)
 
 ```yaml
 # Indice Nacional de Calidad del Aire. Resolucion de 2 de septiembre de 2020 (BOE-A-2020-10426),
@@ -1628,8 +1744,8 @@ from datetime import datetime
 
 import pytest
 
-from api.config import load
-from api.engine.rules import CATEGORIES, HourContext, aqi_category, evaluate_outdoor, pollutant_category
+from engine.rules import CATEGORIES, HourContext, aqi_category, evaluate_outdoor, pollutant_category
+from settings import load
 
 BANDS = load("ica_thresholds")["bands"]
 
@@ -1719,19 +1835,22 @@ def test_categories_in_order():
     assert CATEGORIES[0] == "good" and CATEGORIES[-1] == "extremely_poor"
 ```
 
-Run: `pytest tests/engine/test_rules.py -v` → Esperado: FAIL (`ModuleNotFoundError`).
+Run: `.venv/bin/pytest tests/engine/test_rules.py -v` → Esperado: FAIL (`ModuleNotFoundError`).
 
 - [ ] **Paso 3: implementar**
 
-`api/config.py`:
+`settings.py`:
 ```python
-"""Carga de config/*.yaml. Los valores decididos por el equipo viven ahi, nunca en el codigo."""
+"""Rutas compartidas y carga de config/*.yaml. Los valores decididos por el equipo viven ahi, nunca en el codigo."""
 import functools
+import os
 import pathlib
 
 import yaml
 
-CONFIG_DIR = pathlib.Path(__file__).resolve().parent.parent / "config"
+APP_DIR = pathlib.Path(__file__).resolve().parent.parent                       # app
+CONFIG_DIR = pathlib.Path(os.environ.get("GOMAD_CONFIG_DIR", APP_DIR / "config"))
+DATA_DIR = pathlib.Path(os.environ.get("GOMAD_DATA_DIR", APP_DIR / "data"))
 
 
 @functools.cache
@@ -1742,7 +1861,7 @@ def load(name: str) -> dict | None:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 ```
 
-`api/engine/rules.py`:
+`engine/__init__.py` vacío. `engine/rules.py`:
 ```python
 """Filtros duros: se puede recomendar actividad al aire libre a esta hora y con este perfil?
 
@@ -1812,8 +1931,8 @@ def evaluate_outdoor(ctx, profile, rules):
     return RuleResult(True if evaluated else None, [])
 ```
 
-- [ ] **Paso 4:** Run: `pytest tests/engine/test_rules.py -v` → Esperado: PASS.
-- [ ] **Paso 5: commit** — `git add config/ica_thresholds.yaml api/config.py api/engine/rules.py tests/engine && git commit -m "Motor: reglas de aire (ICA del BOE), calor y lluvia leídas de configuración"`
+- [ ] **Paso 4:** Run: `.venv/bin/pytest tests/engine/test_rules.py -v` → Esperado: PASS.
+- [ ] **Paso 5: commit** — `git -C ../.. add app/config/ica_thresholds.yaml app/api/settings.py app/api/engine app/api/tests/engine && git -C ../.. commit -m "Motor: reglas de aire (ICA del BOE), calor y lluvia leídas de configuración"`
 
 **Terminado cuando:** pasan las pruebas, incluidos los límites de banda del ICA y las personas Carmen y Lucía con reglas de prueba.
 
@@ -1821,14 +1940,14 @@ def evaluate_outdoor(ctx, profile, rules):
 
 ### Task 13: J-M3 · Módulo `scoring`
 
-**Rol:** Motor · **Depende de:** Task 12 · **Duración:** 1,5 h
+**Rol:** Motor · **Servicio:** `app/api/` · **Depende de:** Task 12 · **Duración:** 1,5 h
 
-**Ficheros:** Crear `api/engine/scoring.py`, `tests/engine/test_scoring.py`.
+**Ficheros:** Crear `engine/scoring.py`, `tests/engine/test_scoring.py`.
 
 **Interfaces:**
 - Produce:
   - `FACTORS = ("proximity", "suitability", "green", "air", "weather")`
-  - `normalize_weights(weights: dict | None, defaults: dict) -> tuple[dict, list[str]]` (pesos que suman 1 + avisos)
+  - `normalize_weights(weights: dict | None, defaults: dict) -> tuple[dict, list[str]]`
   - `proximity_factor(distance_m, max_distance_m) -> float`
   - `air_factor(category: str | None) -> float | None`
   - `weather_factor(precip_prob: float | None) -> float | None`
@@ -1843,8 +1962,8 @@ def evaluate_outdoor(ctx, profile, rules):
 ```python
 import pytest
 
-from api.engine.scoring import (FACTORS, air_factor, compute_score, normalize_weights, proximity_factor,
-                                weather_factor)
+from engine.scoring import (FACTORS, air_factor, compute_score, normalize_weights, proximity_factor,
+                            weather_factor)
 
 # Pesos de PRUEBA (los reales salen de DEC-07 -> config/weights.yaml)
 DEFAULTS = {"proximity": 0.2, "suitability": 0.2, "green": 0.2, "air": 0.2, "weather": 0.2}
@@ -1905,15 +2024,15 @@ def test_no_factor_available():
     assert s.value == 0.0 and s.effective_weights == {}
 ```
 
-Run: `pytest tests/engine/test_scoring.py -v` → Esperado: FAIL.
+Run: `.venv/bin/pytest tests/engine/test_scoring.py -v` → Esperado: FAIL.
 
-- [ ] **Paso 2: implementar** — `api/engine/scoring.py`
+- [ ] **Paso 2: implementar** — `engine/scoring.py`
 
 ```python
 """Puntuacion ponderada 0-10 (RF-07). Factores normalizados 0-1; None = sin datos (no cuenta)."""
 from dataclasses import dataclass
 
-from api.engine.rules import CATEGORIES
+from engine.rules import CATEGORIES
 
 FACTORS = ("proximity", "suitability", "green", "air", "weather")
 
@@ -1963,8 +2082,8 @@ def compute_score(factors, weights):
     return Score(round(value, 2), {f: factors.get(f) for f in FACTORS}, effective)
 ```
 
-- [ ] **Paso 3:** Run: `pytest tests/engine -v` → Esperado: PASS.
-- [ ] **Paso 4: commit** — `git add api/engine/scoring.py tests/engine/test_scoring.py && git commit -m "Motor: puntuación ponderada con renormalización de factores sin datos"`
+- [ ] **Paso 3:** Run: `.venv/bin/pytest tests/engine -v` → Esperado: PASS.
+- [ ] **Paso 4: commit** — `git -C ../.. add app/api/engine/scoring.py app/api/tests/engine/test_scoring.py && git -C ../.. commit -m "Motor: puntuación ponderada con renormalización de factores sin datos"`
 
 **Terminado cuando:** pasan las pruebas, incluida «dos personas, mismo sitio, distinta respuesta».
 
@@ -1972,9 +2091,9 @@ def compute_score(factors, weights):
 
 ### Task 14: J-M4 · Módulo `slots` (mejor hora y alternativa cubierta)
 
-**Rol:** Motor · **Depende de:** Tasks 12, 13 · **Duración:** 1,5 h
+**Rol:** Motor · **Servicio:** `app/api/` · **Depende de:** Tasks 12, 13 · **Duración:** 1,5 h
 
-**Ficheros:** Crear `api/engine/slots.py`, `tests/engine/test_slots.py`.
+**Ficheros:** Crear `engine/slots.py`, `tests/engine/test_slots.py`.
 
 **Interfaces:**
 - Consume: `HourContext`, `evaluate_outdoor`, `compute_score`, `air_factor`, `weather_factor`.
@@ -1991,8 +2110,8 @@ def compute_score(factors, weights):
 ```python
 from datetime import datetime
 
-from api.engine.rules import HourContext
-from api.engine.slots import best_hour, evaluate_hours, needs_indoor, window_hours
+from engine.rules import HourContext
+from engine.slots import best_hour, evaluate_hours, needs_indoor, window_hours
 
 RULES = {"air": {"general": "poor"}, "heat": {"max_feels_like_c": 30.0}, "rain": {"max_precip_prob": 50}}
 WEIGHTS = {"proximity": 0.2, "suitability": 0.2, "green": 0.2, "air": 0.2, "weather": 0.2}
@@ -2047,17 +2166,17 @@ def test_worse_air_lowers_score():
     assert res[0].score > res[1].score
 ```
 
-Run: `pytest tests/engine/test_slots.py -v` → Esperado: FAIL.
+Run: `.venv/bin/pytest tests/engine/test_slots.py -v` → Esperado: FAIL.
 
-- [ ] **Paso 2: implementar** — `api/engine/slots.py`
+- [ ] **Paso 2: implementar** — `engine/slots.py`
 
 ```python
 """Evaluacion hora a hora y mejor franja (RF-08, RF-09)."""
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-from api.engine.rules import HourContext, evaluate_outdoor
-from api.engine.scoring import air_factor, compute_score, weather_factor
+from engine.rules import HourContext, evaluate_outdoor
+from engine.scoring import air_factor, compute_score, weather_factor
 
 
 @dataclass
@@ -2111,8 +2230,8 @@ def needs_indoor(results):
     return bool(with_data) and all(r.outdoor_ok is False for r in with_data)
 ```
 
-- [ ] **Paso 3:** Run: `pytest tests/engine -v` → Esperado: PASS.
-- [ ] **Paso 4: commit** — `git add api/engine/slots.py tests/engine/test_slots.py && git commit -m "Motor: mejor franja horaria y alternativa cubierta"`
+- [ ] **Paso 3:** Run: `.venv/bin/pytest tests/engine -v` → Esperado: PASS.
+- [ ] **Paso 4: commit** — `git -C ../.. add app/api/engine/slots.py app/api/tests/engine/test_slots.py && git -C ../.. commit -m "Motor: mejor franja horaria y alternativa cubierta"`
 
 **Terminado cuando:** pasan las pruebas, incluidas ventana que cruza medianoche y horas sin previsión.
 
@@ -2120,18 +2239,18 @@ def needs_indoor(results):
 
 ### Task 15: J-M5 · Prueba de OCI Generative AI antes de mediodía (DEC-03)
 
-**Rol:** Motor · **Duración:** 1 h · **Límite: 12:00** · Paso 1 **[manual]**.
+**Rol:** Motor · **Servicio:** `app/api/` · **Duración:** 1 h · **Límite: 12:00** · Paso 1 **[manual]**.
 
-**Ficheros:** Crear `api/ai/base.py`, `scripts/probe_ai.py`. `.env` (no versionado): `IA_PROVEEDOR`, credenciales, `IA_MODELO`.
+**Ficheros:** Crear `ai/__init__.py`, `ai/base.py`, `scripts/probe_ai.py`. `../.env` (no versionado): `IA_PROVEEDOR`, credenciales, `IA_MODELO`. Si el proveedor necesita SDK, se añade **solo** al `pyproject.toml` de `api`.
 
 **Interfaces (produce; D-M1 las implementa del todo):**
 
 ```python
-# api/ai/base.py
+# ai/base.py
 """Interfaz de IA (arquitectura D-03). La IA solo interpreta texto y redacta con resultados del motor."""
 from typing import Protocol
 
-from api.schemas import Condition, InterpretResponse
+from schemas import Condition, InterpretResponse
 
 
 class AIProvider(Protocol):
@@ -2139,23 +2258,23 @@ class AIProvider(Protocol):
     def write_up(self, conditions: list[Condition], route_summary: str) -> str: ...
 ```
 
-- [ ] **Paso 1 [manual]:** en OCI, comprobar que la región tiene **Generative AI** con un modelo de chat con salida JSON o herramientas; crear credenciales (`~/.oci/config` y `.env`, nunca en el repo).
+- [ ] **Paso 1 [manual]:** en OCI, comprobar que la región tiene **Generative AI** con un modelo de chat con salida JSON o herramientas; crear credenciales (`~/.oci/config` y `app/.env`, nunca en el repo).
 - [ ] **Paso 2:** `scripts/probe_ai.py`: envía «15 km andando, por un parque, con fuentes y bancos y que pase por un supermercado» con `AssistantParams.model_json_schema()` y valida con `AssistantParams.model_validate_json`; mide la latencia de 5 llamadas. **No** envía ubicación.
 - [ ] **Paso 3 (DEC-03):** si a las **12:00** OCI no devuelve JSON válido en < 2 s de media → **plan B** (API de Anthropic, `claude-haiku-5-5` por latencia; la persona da de alta la clave). Anotar en `docs/arquitectura.md` §10 y `CLAUDE.md` §11.
-- [ ] **Paso 4:** commit `api/ai/base.py`, `scripts/probe_ai.py`, docs.
+- [ ] **Paso 4:** `git -C ../.. add app/api/ai app/api/scripts/probe_ai.py app/api/pyproject.toml docs/arquitectura.md CLAUDE.md && git -C ../.. commit -m "IA: interfaz y prueba del proveedor (DEC-03)"`.
 
 **Terminado cuando:** hay proveedor elegido con una llamada validada contra el esquema y la latencia medida.
 
 ---
 
-### Task 16: J-D1 · `ingest/common.py`: utilidades de normalización
+### Task 16: J-D1 · `common.py`: utilidades de normalización
 
-**Rol:** Datos · **Depende de:** Task 1 · **Duración:** 1,5 h
+**Rol:** Datos · **Servicio:** `app/ingest/` · **Depende de:** Task 1 · **Duración:** 1,5 h
 
-**Ficheros:** Crear `ingest/common.py`, `ingest/normalize/__init__.py`, `ingest/normalize/__main__.py`, `tests/ingest/__init__.py`, `tests/ingest/test_common.py`.
+**Ficheros:** Crear `common.py`, `normalize/__init__.py`, `normalize/__main__.py`, `tests/test_common.py`.
 
 **Interfaces (produce):**
-- `ROOT`, `RAW = ROOT/"data"/"raw"`, `CLEAN = ROOT/"data"/"clean"`
+- `ROOT` (app/ingest), `APP_DIR` (app), `DATA_DIR` (`GOMAD_DATA_DIR` o `app/data`), `RAW = DATA_DIR/"raw"`, `CLEAN = DATA_DIR/"clean"`, `CONFIG_DIR` (`GOMAD_CONFIG_DIR` o `app/config`)
 - `to_float(v) -> float | None` (coma decimal, vacíos, `None`)
 - `ine_code(v) -> str | None` (`"6"`→`"28006"`, `"079"`→`"28079"`, `"28079"`→`"28079"`, vacío/`RESERVADO`→`None`)
 - `normalize_name(name: str) -> str` («Rozas de Madrid (Las)» y «Las Rozas de Madrid» → mismo valor)
@@ -2166,16 +2285,16 @@ class AIProvider(Protocol):
 - `read_csv(path, sep=";") -> DataFrame` (`utf-8-sig` y si falla `cp1252`; todo como texto)
 - `points(df, x, y, crs) -> GeoDataFrame` (`crs` 25830 o 4326; sin filas sin coordenadas)
 - `write(gdf, name: str) -> Path` (GeoParquet en `CLEAN/<name>.parquet`, vía `.tmp` + `os.replace`)
-- `REGISTRY: dict[str, Callable]`, decorador `@normalizer("name")`, `load_all()`; CLI `python -m ingest.normalize [names…]`
+- `REGISTRY: dict[str, Callable]`, decorador `@normalizer("name")`, `load_all()`; CLI `python -m normalize [names…]`
 
-- [ ] **Paso 1: pruebas que fallan** — `tests/ingest/test_common.py`
+- [ ] **Paso 1: pruebas que fallan** — `tests/test_common.py`
 
 ```python
 import numpy as np
 import pandas as pd
 import pytest
 
-from ingest import common
+import common
 
 
 @pytest.mark.parametrize("v,expected", [("40,123", 40.123), ("40.5", 40.5), ("", None), (None, None),
@@ -2213,6 +2332,10 @@ def test_read_csv_utf8_bom(tmp_path):
     assert list(common.read_csv(path).columns) == ["municipio", "valor"]
 
 
+def test_data_dir_is_shared_app_data():
+    assert common.DATA_DIR.name == "data" and common.DATA_DIR.parent == common.APP_DIR
+
+
 @pytest.mark.slow
 def test_there_are_179_municipalities():
     m = common.municipalities()
@@ -2227,9 +2350,9 @@ def test_filter_region_drops_outside_and_zeros():
     assert len(inside) == 1 and dropped == 2
 ```
 
-Run: `pytest tests/ingest/test_common.py -v` → Esperado: FAIL.
+Run: `.venv/bin/pytest tests/test_common.py -v` → Esperado: FAIL. (`test_data_dir_is_shared_app_data` supone que `GOMAD_DATA_DIR` no está definida en el entorno local.)
 
-- [ ] **Paso 2: implementar** — `ingest/common.py`
+- [ ] **Paso 2: implementar** — `common.py`
 
 ```python
 """Utilidades comunes de normalizacion (informe-datos §2 y §4)."""
@@ -2243,9 +2366,12 @@ import numpy as np
 import pandas as pd
 from pyproj import Transformer
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
-RAW = ROOT / "data" / "raw"
-CLEAN = ROOT / "data" / "clean"
+ROOT = pathlib.Path(__file__).resolve().parent                                  # app/ingest
+APP_DIR = ROOT.parent                                                           # app
+DATA_DIR = pathlib.Path(os.environ.get("GOMAD_DATA_DIR", APP_DIR / "data"))     # volumen compartido
+CONFIG_DIR = pathlib.Path(os.environ.get("GOMAD_CONFIG_DIR", APP_DIR / "config"))
+RAW = DATA_DIR / "raw"
+CLEAN = DATA_DIR / "clean"
 _TO_WGS84 = Transformer.from_crs(25830, 4326, always_xy=True)
 _ARTICLES = ("el", "la", "los", "las")
 
@@ -2348,13 +2474,13 @@ def write(gdf, name):
 
 > Comprobar en la primera ejecución (`test_there_are_179_municipalities`) que el GeoJSON está de verdad en 25830 (antes de reproyectar, coordenadas ~370.000–500.000 / 4.410.000–4.560.000). Si no, ajustar `set_crs`.
 
-`ingest/normalize/__init__.py`:
+`normalize/__init__.py`:
 
 ```python
-"""Registro de normalizadores: uno por fuente -> data/clean/<nombre>.parquet.
+"""Registro de normalizadores: uno por fuente -> app/data/clean/<nombre>.parquet.
 
-Uso: python -m ingest.normalize                  # todos
-     python -m ingest.normalize green poi         # solo esos
+Uso: python -m normalize                  # todos
+     python -m normalize green poi         # solo esos
 """
 import importlib
 import pkgutil
@@ -2376,13 +2502,13 @@ def load_all():
     return REGISTRY
 ```
 
-`ingest/normalize/__main__.py`:
+`normalize/__main__.py`:
 
 ```python
 import sys
 import traceback
 
-from ingest.normalize import load_all
+from normalize import load_all
 
 registry = load_all()
 names = sys.argv[1:] or list(registry)
@@ -2396,8 +2522,8 @@ for name in names:
 sys.exit(1 if failures else 0)
 ```
 
-- [ ] **Paso 3:** Run: `pytest tests/ingest/test_common.py -v` → Esperado: PASS (las `slow` también, con `data/raw`).
-- [ ] **Paso 4: commit** — `git add ingest tests/ingest && git commit -m "Ingesta: utilidades comunes de normalización"`
+- [ ] **Paso 3:** Run: `.venv/bin/pytest tests/test_common.py -v` → Esperado: PASS (las `slow` también, con `app/data/raw`).
+- [ ] **Paso 4: commit** — `git -C ../.. add app/ingest/common.py app/ingest/normalize app/ingest/tests/test_common.py && git -C ../.. commit -m "Ingesta: utilidades comunes de normalización"`
 
 **Terminado cuando:** las pruebas pasan con los datos reales descargados.
 
@@ -2405,11 +2531,11 @@ sys.exit(1 if failures else 0)
 
 ### Task 17: J-D2 · Normalizadores de referencia y diario (municipios, padrón, deporte, verde, mobiliario)
 
-**Rol:** Datos · **Depende de:** Task 16 · **Duración:** 3 h
+**Rol:** Datos · **Servicio:** `app/ingest/` · **Depende de:** Task 16 · **Duración:** 3 h
 
-**Ficheros:** Crear `ingest/normalize/municipalities.py`, `population.py`, `sports.py`, `green.py`, `furniture.py`; `tests/ingest/test_normalize_reference.py`.
+**Ficheros:** Crear `normalize/municipalities.py`, `normalize/population.py`, `normalize/sports.py`, `normalize/green.py`, `normalize/furniture.py`; `tests/test_normalize_reference.py`.
 
-**Interfaces (produce — esquemas de `data/clean/` que Task 19 consume):**
+**Interfaces (produce — esquemas de `app/data/clean/` que Task 19 consume):**
 
 | Fichero | Columnas | Geometría |
 |---|---|---|
@@ -2419,7 +2545,7 @@ sys.exit(1 if failures else 0)
 | `green.parquet` | `id`, `source`, `ine_code`, `use_detail`, `area_m2` | polígono |
 | `poi.parquet` | `id`, `type` (`fountain`, `bench`, `dog_area`, `aed`; OSM añade `bin`, `playground` en Task 20), `source`, `ine_code` | punto |
 
-Campos de origen (comprobados en `data/perfil/perfil.json` el 14/10):
+Campos de origen (comprobados en `app/data/perfil/perfil.json` el 14/10):
 - `municipios`: `CDMUNICIPIO`, `DSMUNICIPIO`.
 - `padron`: `Año`, `Tipo territorio`, `Código territorio`, `Territorio`, `Sexo`, `Valor` (cp1252).
 - `eiel_deporte`: `PROV`, `MUN`, `ENT`, `POBLAMIENT`, `ORDEN_INST`, `NOMBRE`, `TIPOINSTAL`, `SUP_CUBI`, `TITULAR`, `ACCESOSILL`, `ESTADO` y columnas por deporte `SUBACUATIC`…`VELA`.
@@ -2432,15 +2558,15 @@ Campos de origen (comprobados en `data/perfil/perfil.json` el 14/10):
 - `ay_fuentes`/`ay_bancos`/`ay_areas_caninas`: `ID`, `COORD_GIS_X`, `COORD_GIS_Y` (25830; **no** `LATITUD/LONGITUD`, informe §2.1).
 - `desfibriladores`: `codigo_dea`, `municipio_codigo`, `direccion_coordenada_x`, `direccion_coordenada_y` (25830).
 
-- [ ] **Paso 1: pruebas que fallan** — `tests/ingest/test_normalize_reference.py`
+- [ ] **Paso 1: pruebas que fallan** — `tests/test_normalize_reference.py`
 
 ```python
 import geopandas as gpd
 import pandas as pd
 import pytest
 
-from ingest.common import CLEAN, municipalities
-from ingest.normalize import load_all
+from common import CLEAN, municipalities
+from normalize import load_all
 
 pytestmark = pytest.mark.slow
 R = load_all()
@@ -2508,15 +2634,15 @@ def test_poi():
 
 > Las cifras salen de `docs/informe-datos.md`. Si una descarga nueva cambia una cifra, comprobar el motivo y actualizar prueba e informe en el mismo commit.
 
-Run: `pytest tests/ingest/test_normalize_reference.py -v` → Esperado: FAIL (`KeyError: 'municipality'`).
+Run: `.venv/bin/pytest tests/test_normalize_reference.py -v` → Esperado: FAIL (`KeyError: 'municipality'`).
 
-- [ ] **Paso 2: `ingest/normalize/municipalities.py`**
+- [ ] **Paso 2: `normalize/municipalities.py`**
 
 ```python
 import geopandas as gpd
 
-from ingest.common import RAW, ine_code, municipalities, write
-from ingest.normalize import normalizer
+from common import RAW, ine_code, municipalities, write
+from normalize import normalizer
 
 
 @normalizer("municipality")
@@ -2530,13 +2656,13 @@ def run():
     return write(m, "municipality")
 ```
 
-- [ ] **Paso 3: `ingest/normalize/population.py`**
+- [ ] **Paso 3: `normalize/population.py`**
 
 ```python
 import pandas as pd
 
-from ingest.common import CLEAN, RAW, municipalities, normalize_name, read_csv
-from ingest.normalize import normalizer
+from common import CLEAN, RAW, municipalities, normalize_name, read_csv
+from normalize import normalizer
 
 
 @normalizer("population")
@@ -2562,14 +2688,14 @@ def run():
 
 > **Antes de ejecutar**, mirar en el perfil los valores reales de `Tipo territorio`, `Sexo` y el formato de `Valor` (separador de miles) y ajustar filtros y conversión a esos literales. Si `Código territorio` trae el código INE, usarlo con `ine_code()` en vez del nombre.
 
-- [ ] **Paso 4: `ingest/normalize/sports.py`**
+- [ ] **Paso 4: `normalize/sports.py`**
 
 ```python
 import geopandas as gpd
 import pandas as pd
 
-from ingest.common import RAW, assign_municipality, filter_region, ine_code, points, read_csv, to_float, write
-from ingest.normalize import normalizer
+from common import RAW, assign_municipality, filter_region, ine_code, points, read_csv, to_float, write
+from normalize import normalizer
 
 SPORT_COLUMNS = ["SUBACUATIC", "ATLETISMO", "BEISBOL", "BALONCESTO", "BALONMANO", "BOLOS", "BALONVOLEA",
                  "DEPINVIERN", "ESQUINAUTI", "FUTBOL", "GOLF", "GIMNASIA", "JUDOKARATE", "LUCHA", "NATACION",
@@ -2618,7 +2744,7 @@ def city_council(source):
 
 @normalizer("destination_raw")
 def run():
-    from ingest.normalize.green import green_destinations   # los parques tambien son destinos
+    from normalize.green import green_destinations   # los parques tambien son destinos
     parts = [eiel_sports(), nmc_sports()] + [city_council(s) for s in ("ay_polideportivos", "ay_idb", "ay_piscinas")]
     parts += green_destinations()
     alldest = pd.concat([p.reindex(columns=COLUMNS) for p in parts], ignore_index=True)
@@ -2632,13 +2758,13 @@ def run():
 
 > Si `id` no es único en EIEL, añadir `NOMBRE` al `source_id` y anotarlo. `ACCESOSILL`: mirar los literales reales en el perfil (el informe habla de 77 «SIN ACCESO») y ajustar la regla.
 
-- [ ] **Paso 5: `ingest/normalize/green.py`**
+- [ ] **Paso 5: `normalize/green.py`**
 
 ```python
 import geopandas as gpd
 
-from ingest.common import RAW, ine_code, points, read_csv, to_float, write
-from ingest.normalize import normalizer
+from common import RAW, ine_code, points, read_csv, to_float, write
+from normalize import normalizer
 
 YES_VALUES = ("S", "SI", "1", "TRUE")   # ajustar a los literales reales de IT_FUENTE y AGUA (perfil)
 
@@ -2687,13 +2813,13 @@ def run():
     return write(vpla_green(), "green")
 ```
 
-- [ ] **Paso 6: `ingest/normalize/furniture.py`**
+- [ ] **Paso 6: `normalize/furniture.py`**
 
 ```python
 import pandas as pd
 
-from ingest.common import RAW, assign_municipality, filter_region, ine_code, points, read_csv, write
-from ingest.normalize import normalizer
+from common import RAW, assign_municipality, filter_region, ine_code, points, read_csv, write
+from normalize import normalizer
 
 CITY_COUNCIL = {"ay_fuentes": "fountain", "ay_bancos": "bench", "ay_areas_caninas": "dog_area"}
 
@@ -2719,8 +2845,8 @@ def run():
 
 > El mobiliario de **OSM** se añade en Task 20, que ya lee el `.pbf`.
 
-- [ ] **Paso 7:** Run: `python -m ingest.normalize municipality population green destination_raw poi && pytest tests/ingest -v` → Esperado: PASS. Corregir lo que salga en «sin casar» o «fuera».
-- [ ] **Paso 8: commit** — `git add ingest tests/ingest && git commit -m "Ingesta: normalizadores de municipios, padrón, deporte, verde y mobiliario"`
+- [ ] **Paso 7:** Run: `.venv/bin/python -m normalize municipality population green destination_raw poi && .venv/bin/pytest tests -v` → Esperado: PASS. Corregir lo que salga en «sin casar» o «fuera».
+- [ ] **Paso 8: commit** — `git -C ../.. add app/ingest/normalize app/ingest/tests && git -C ../.. commit -m "Ingesta: normalizadores de municipios, padrón, deporte, verde y mobiliario"`
 
 **Terminado cuando:** los cinco parquet existen y las pruebas con las cifras del informe pasan.
 
@@ -2728,13 +2854,13 @@ def run():
 
 ### Task 18: J-D3 · Normalizadores de aire (estaciones y lecturas) y de AEMET
 
-**Rol:** Datos · **Depende de:** Tasks 16, 4 · **Duración:** 2,5 h
+**Rol:** Datos · **Servicio:** `app/ingest/` · **Depende de:** Tasks 16, 4 · **Duración:** 2,5 h
 
-**Ficheros:** Crear `ingest/normalize/air.py`, `ingest/normalize/aemet.py`, `tests/ingest/test_normalize_realtime.py`, `tests/data/aire_dia_sample.csv` (15 filas reales con cabecera).
+**Ficheros:** Crear `normalize/air.py`, `normalize/aemet.py`, `tests/test_normalize_realtime.py`, `tests/data/aire_dia_sample.csv` (15 filas reales con cabecera).
 
 **Interfaces (produce):**
 
-| Fichero | Columnas |
+| Fichero (en `app/data/clean/`) | Columnas |
 |---|---|
 | `air_station.parquet` | `id` (8 dígitos `28MMMEEE`), `network` (`CM`/`AY`), `name`, `ine_code`, `area_type`, geometría punto |
 | `air_reading/<fuente>_<AAAAMMDD>.parquet` | `station_id`, `magnitude` (int), `ts` (hora local, **fin** de la hora: `h01` = 01:00), `value`, `flag` (`T`/`V`) |
@@ -2745,7 +2871,7 @@ def run():
 
 > **`h24`** = 24:00 = 00:00 del día siguiente. Comprobarlo en la descripción oficial del fichero (enlace en `umbrales.md` §1.2) antes de fusionar; la prueba fija la convención.
 
-- [ ] **Paso 1: pruebas que fallan** — `tests/ingest/test_normalize_realtime.py`
+- [ ] **Paso 1: pruebas que fallan** — `tests/test_normalize_realtime.py`
 
 ```python
 import json
@@ -2754,9 +2880,9 @@ from datetime import datetime
 import pandas as pd
 import pytest
 
-from ingest.common import ROOT, read_csv
-from ingest.normalize.aemet import municipality_forecast
-from ingest.normalize.air import long_readings
+from common import ROOT, read_csv
+from normalize.aemet import municipality_forecast
+from normalize.air import long_readings
 
 DATA = ROOT / "tests" / "data"
 
@@ -2803,7 +2929,7 @@ def test_aemet_hourly_forecast():
 
 Run → Esperado: FAIL.
 
-- [ ] **Paso 2: `ingest/normalize/air.py`**
+- [ ] **Paso 2: `normalize/air.py`**
 
 ```python
 import datetime as dt
@@ -2811,8 +2937,8 @@ import datetime as dt
 import geopandas as gpd
 import pandas as pd
 
-from ingest.common import CLEAN, RAW, ine_code, points, read_csv, to_float, write
-from ingest.normalize import normalizer
+from common import CLEAN, RAW, ine_code, points, read_csv, to_float, write
+from normalize import normalizer
 
 AQI_MAGNITUDES = {1, 8, 9, 10, 14}   # SO2, NO2, PM2.5, PM10, O3 (umbrales.md §1.2)
 
@@ -2866,9 +2992,9 @@ def run_stations():
                  "air_station")
 ```
 
-> **Comprobar con datos reales:** que `estacion_codigo` (CM) y `CODIGO` (Ayto.) tienen el formato `28MMMEEE` que generan las lecturas (Getafe = `28065014`, CLAUDE.md §5.3); si no, construir el id igual que en `long_readings`. Añadir en el paso 4 la prueba `slow` **toda `station_id` de las lecturas existe en `air_station`**.
+> **Comprobar con datos reales:** que `estacion_codigo` (CM) y `CODIGO` (Ayto.) tienen el formato `28MMMEEE` que generan las lecturas (Getafe = `28065014`); si no, construir el id igual que en `long_readings`. Añadir en el paso 4 la prueba `slow` **toda `station_id` de las lecturas existe en `air_station`**.
 
-- [ ] **Paso 3: `ingest/normalize/aemet.py`** (estructura según CLAUDE.md §7.1; **ajustar a lo documentado en Task 4**)
+- [ ] **Paso 3: `normalize/aemet.py`** (estructura según CLAUDE.md §7.1; **ajustar a lo documentado en Task 4**)
 
 ```python
 import datetime as dt
@@ -2876,8 +3002,8 @@ import json
 
 import pandas as pd
 
-from ingest.common import CLEAN, RAW, to_float
-from ingest.normalize import normalizer
+from common import CLEAN, RAW, to_float
+from normalize import normalizer
 
 
 def _hourly(items, day):
@@ -2945,25 +3071,27 @@ def run():
     return written
 ```
 
-> `wind` queda vacío en el MVP (ninguna regla lo usa). Si `probPrecipitacion` viene **por hora** y no por franja, usar `_hourly` para ese campo (la prueba con la muestra real lo detecta).
+> `wind` queda vacío en el MVP (ninguna regla lo usa). Si `probPrecipitacion` viene **por hora**, usar `_hourly` para ese campo (la prueba con la muestra real lo detecta).
 
-- [ ] **Paso 4:** `head -16 data/raw/aire_dia/calidad_aire_datos_dia.csv > tests/data/aire_dia_sample.csv`; añadir la prueba de cobertura de estaciones; Run: `python -m ingest.normalize air_station air_reading forecast && pytest tests/ingest -v` → Esperado: PASS.
-- [ ] **Paso 5 (P-12):** ejecutar `python3 scripts/download_sources.py --only aire_dia` a las 09:00, 12:00 y 16:00 y apuntar en `docs/PENDIENTES.md` P-12 a qué hora el fichero regional pasa al día en curso.
-- [ ] **Paso 6: commit** — `git add ingest tests && git commit -m "Ingesta: aire en formato largo con fecha por fila y previsión horaria de AEMET"`
+- [ ] **Paso 4:** `head -16 ../data/raw/aire_dia/calidad_aire_datos_dia.csv > tests/data/aire_dia_sample.csv`; añadir la prueba de cobertura de estaciones; Run: `.venv/bin/python -m normalize air_station air_reading forecast && .venv/bin/pytest tests -v` → Esperado: PASS.
+- [ ] **Paso 5 (P-12):** ejecutar `python3 scripts/download_sources.py --only aire_dia` a las 09:00, 12:00 y 16:00 y apuntar en `../../docs/PENDIENTES.md` P-12 a qué hora el fichero regional pasa al día en curso.
+- [ ] **Paso 6: commit** — `git -C ../.. add app/ingest/normalize app/ingest/tests docs/PENDIENTES.md && git -C ../.. commit -m "Ingesta: aire en formato largo con fecha por fila y previsión horaria de AEMET"`
 
 **Terminado cuando:** las pruebas pasan con la muestra real de AEMET y todas las estaciones de las lecturas casan con `air_station`.
 
 ---
 
-### Task 19: J-D4 · `ingest/build.py`: `gomad.duckdb` y `realtime.duckdb` con sustitución atómica
+### Task 19: J-D4 · `build_db.py`: `gomad.duckdb` y `realtime.duckdb` con sustitución atómica
 
-**Rol:** Datos · **Depende de:** Tasks 17, 18 · **Duración:** 2,5 h
+**Rol:** Datos · **Servicio:** `app/ingest/` · **Depende de:** Tasks 17, 18 · **Duración:** 2,5 h
 
-**Ficheros:** Crear `ingest/build.py`, `tests/ingest/test_build.py`. Lee `config/activities.yaml` (DEC-08).
+**Ficheros:** Crear `build_db.py`, `tests/test_build_db.py`. Lee `../config/activities.yaml` (DEC-08).
 
-**Interfaces (produce; `repository` del viernes consume):**
+> Se llama `build_db.py` (no `build.py`) para no tapar el paquete `build` de PyPI que usa `pip`.
 
-`data/gomad.duckdb`:
+**Interfaces (produce; `repository` de la API, el viernes, consume):**
+
+`app/data/gomad.duckdb`:
 - `municipality(ine_code, name, population, in_eiel, in_vpla, geom GEOMETRY)`
 - `destination(id, source, name, type, covered, accessible, condition, owner, water, url, ine_code, lon, lat, green DOUBLE NULL, updated TIMESTAMP)` — `green` = fracción 0–1 del círculo de 300 m alrededor del destino cubierta por `green.parquet`; `NULL` en municipios sin VPLA. Radio = **criterio propio** (DEC-07).
 - `destination_activity(destination_id, activity, suitability)` — de `config/activities.yaml`
@@ -2971,12 +3099,12 @@ def run():
 - `route_poi(id, type, source, ine_code, lon, lat)`
 - `source_date(source, downloaded, modified)` (de `manifest.json`, RF-19)
 
-`data/realtime.duckdb`:
+`app/data/realtime.duckdb`:
 - `air_reading(station_id, magnitude, ts, value, flag)` (últimos 3 días)
 - `aqi_hourly(station_id, ts, pollutant, mean, n_hours)` — media móvil: NO2/SO2 1 h, O3 8 h, PM 24 h (`umbrales.md` §1.2)
 - `forecast(ine_code, ts, temp, feels_like, precip_prob, precip, wind, sky, issued)`
 
-Funciones: `build_main(target, rules=None) -> Path`, `build_realtime(target) -> Path`, `apply_activities(destinations, rules) -> DataFrame`, `create_aqi_hourly(con)`, `atomic(target, fill_fn) -> Path`; CLI `python -m ingest.build {main|realtime|all}`.
+Funciones: `build_main(target, rules=None) -> Path`, `build_realtime(target) -> Path`, `apply_activities(destinations, rules) -> DataFrame`, `create_aqi_hourly(con)`, `atomic(target, fill_fn) -> Path`; CLI `python -m build_db {main|realtime|all}`.
 
 **Formato de `config/activities.yaml`** (contrato; valores de DEC-08):
 
@@ -2993,14 +3121,14 @@ activities:
   # claves de una regla: source (obligatoria), field + in | contains, sport (columna EIEL en `sports`), type, suitability
 ```
 
-- [ ] **Paso 1: pruebas que fallan** — `tests/ingest/test_build.py`
+- [ ] **Paso 1: pruebas que fallan** — `tests/test_build_db.py`
 
 ```python
 import duckdb
 import pandas as pd
 import pytest
 
-from ingest import build
+import build_db
 
 TEST_RULES = {"activities": [
     {"id": "swim", "label": "Nadar", "icon": "pool", "outdoor": None, "rules": [
@@ -3022,7 +3150,7 @@ def sample_destinations():
 
 
 def test_apply_activities():
-    r = build.apply_activities(sample_destinations(), TEST_RULES)
+    r = build_db.apply_activities(sample_destinations(), TEST_RULES)
     assert set(zip(r.destination_id, r.activity)) == {
         ("eiel_deporte:1", "swim"), ("eiel_deporte:2", "padel"), ("nmc_deporte:3", "padel")}
 
@@ -3035,9 +3163,9 @@ def test_atomic_replace(tmp_path):
         raise RuntimeError("fuente rota")
 
     with pytest.raises(RuntimeError):
-        build.atomic(target, fails)
+        build_db.atomic(target, fails)
     assert target.read_bytes() == b"old version"                # el anterior se mantiene (arquitectura §3.3)
-    build.atomic(target, lambda con: con.execute("CREATE TABLE t AS SELECT 1 AS a"))
+    build_db.atomic(target, lambda con: con.execute("CREATE TABLE t AS SELECT 1 AS a"))
     assert duckdb.connect(str(target), read_only=True).execute("SELECT a FROM t").fetchone() == (1,)
 
 
@@ -3047,7 +3175,7 @@ def test_aqi_moving_averages():
                              "value": [float(i) for i in range(30)], "flag": "V"})
     con = duckdb.connect()
     con.register("air_reading", readings)
-    build.create_aqi_hourly(con)
+    build_db.create_aqi_hourly(con)
     row = con.execute("SELECT mean, n_hours FROM aqi_hourly WHERE pollutant='O3' AND ts = ?",
                       [hours[-1].to_pydatetime()]).fetchone()
     assert row == (sum(range(22, 30)) / 8, 8)                    # media de las 8 ultimas horas
@@ -3055,7 +3183,7 @@ def test_aqi_moving_averages():
 
 @pytest.mark.slow
 def test_build_main_real(tmp_path):
-    path = build.build_main(tmp_path / "gomad.duckdb", rules=TEST_RULES)
+    path = build_db.build_main(tmp_path / "gomad.duckdb", rules=TEST_RULES)
     con = duckdb.connect(str(path), read_only=True)
     assert con.execute("SELECT count(*) FROM municipality").fetchone()[0] == 179
     assert con.execute("SELECT count(*) FROM destination WHERE ine_code IS NULL").fetchone()[0] == 0
@@ -3067,13 +3195,13 @@ def test_build_main_real(tmp_path):
 
 Run → Esperado: FAIL.
 
-- [ ] **Paso 2: implementar** — `ingest/build.py`
+- [ ] **Paso 2: implementar** — `build_db.py`
 
 ```python
-"""GeoParquet -> data/gomad.duckdb y data/realtime.duckdb (arquitectura §3.3).
+"""GeoParquet -> app/data/gomad.duckdb y app/data/realtime.duckdb (arquitectura §3.3).
 
 Escribe un fichero nuevo y lo sustituye de golpe: la API (solo lectura) nunca ve un fichero a medias.
-Uso: python -m ingest.build main | realtime | all
+Uso: python -m build_db main | realtime | all
 """
 import datetime as dt
 import json
@@ -3086,9 +3214,8 @@ import geopandas as gpd
 import pandas as pd
 import yaml
 
-from ingest.common import CLEAN, RAW, ROOT
+from common import CLEAN, CONFIG_DIR, DATA_DIR, RAW
 
-DATA = ROOT / "data"
 GREEN_RADIUS_M = 300   # criterio propio (DEC-07)
 PERIODS = {1: ("SO2", 1), 8: ("NO2", 1), 14: ("O3", 8), 10: ("PM10", 24), 9: ("PM2_5", 24)}
 
@@ -3160,8 +3287,8 @@ def _source_dates():
                          for k, v in manifest.items()])
 
 
-def build_main(target=DATA / "gomad.duckdb", rules=None):
-    rules = rules or yaml.safe_load((ROOT / "config" / "activities.yaml").read_text(encoding="utf-8"))
+def build_main(target=DATA_DIR / "gomad.duckdb", rules=None):
+    rules = rules or yaml.safe_load((CONFIG_DIR / "activities.yaml").read_text(encoding="utf-8"))
     municipalities = gpd.read_parquet(CLEAN / "municipality.parquet")
     population = pd.read_parquet(CLEAN / "population.parquet")
     population = population[population.year == population.year.max()][["ine_code", "population"]]
@@ -3196,7 +3323,7 @@ def build_main(target=DATA / "gomad.duckdb", rules=None):
     return atomic(target, fill)
 
 
-def build_realtime(target=DATA / "realtime.duckdb"):
+def build_realtime(target=DATA_DIR / "realtime.duckdb"):
     since = dt.datetime.now() - dt.timedelta(days=3)
 
     def fill(con):
@@ -3215,11 +3342,11 @@ if __name__ == "__main__":
         print(build_realtime())
 ```
 
-> La extensión `spatial` se instala en el equipo de ingesta (red la primera vez). La API **no** la necesita: consulta `lon`/`lat`. Si `green_fraction` pasa de 5 min, limitar a polígonos del mismo municipio con un `sjoin` previo.
+> La extensión `spatial` solo la usa `ingest` (red la primera vez). La API **no** la necesita: consulta `lon`/`lat`. Si `green_fraction` pasa de 5 min, limitar a polígonos del mismo municipio con un `sjoin` previo.
 
-- [ ] **Paso 3:** Run: `pytest tests/ingest/test_build.py -v -m "not slow"` → Esperado: PASS.
-- [ ] **Paso 4 (tras DEC-08, jue 12:00):** el equipo deja `config/activities.yaml` con la tabla decidida. Run: `python -m ingest.build all && pytest tests/ingest -v` → Esperado: PASS (incluidas `slow`). Comprobación: `python -c "import duckdb;print(duckdb.connect('data/gomad.duckdb',read_only=True).sql('SELECT activity, count(*) FROM destination_activity GROUP BY 1 ORDER BY 2 DESC'))"` → cifras coherentes con D-08.
-- [ ] **Paso 5: commit** — `git add ingest tests config/activities.yaml && git commit -m "Ingesta: construcción atómica de gomad.duckdb y realtime.duckdb con medias móviles del ICA"`
+- [ ] **Paso 3:** Run: `.venv/bin/pytest tests/test_build_db.py -v -m "not slow"` → Esperado: PASS.
+- [ ] **Paso 4 (tras DEC-08, jue 12:00):** el equipo deja `../config/activities.yaml` con la tabla decidida. Run: `.venv/bin/python -m build_db all && .venv/bin/pytest tests -v` → Esperado: PASS (incluidas `slow`). Comprobación: `.venv/bin/python -c "import duckdb;print(duckdb.connect('../data/gomad.duckdb',read_only=True).sql('SELECT activity, count(*) FROM destination_activity GROUP BY 1 ORDER BY 2 DESC'))"` → cifras coherentes con D-08.
+- [ ] **Paso 5: commit** — `git -C ../.. add app/ingest/build_db.py app/ingest/tests/test_build_db.py app/config/activities.yaml && git -C ../.. commit -m "Ingesta: construcción atómica de gomad.duckdb y realtime.duckdb con medias móviles del ICA"`
 
 **Terminado cuando:** los dos `.duckdb` se generan desde cero, un fallo a mitad conserva el anterior, `aqi_hourly` calcula las medias del BOE y `green` es `NULL` (no 0) donde no hay VPLA.
 
@@ -3227,17 +3354,17 @@ if __name__ == "__main__":
 
 ### Task 20: J-R1 · Grafo peatonal de Getafe con factores por tramo
 
-**Rol:** Rutas · **Depende de:** Tasks 8, 17 · **Duración:** 3 h
+**Rol:** Rutas · **Servicio:** `app/ingest/` · **Depende de:** Tasks 8, 17 · **Duración:** 3 h
 
-**Ficheros:** Crear `ingest/graph.py`, `tests/ingest/test_graph.py`, `config/routing.yaml` (provisional hasta DEC-07).
+**Ficheros:** Crear `graph.py`, `tests/test_graph.py`, `../config/routing.yaml` (provisional hasta DEC-07).
 
-**Interfaces (produce; Task 21 consume):**
-- `data/graph/<zona>/nodes.parquet`: `node` (int, 0…n−1), `osm_id`, `lon`, `lat`
-- `data/graph/<zona>/edges.parquet`: `u`, `v` (índices de nodo), `length_m`, `highway`, `traffic` (0–1, `config/routing.yaml`), `green_pct` (0–1 o NaN sin dato), `near_fountain`, `near_bench`, `near_aed` (bool), `geom` (WKB LineString 4326)
+**Interfaces (produce; Task 21 en `api` consume los ficheros, no el código):**
+- `app/data/graph/<zona>/nodes.parquet`: `node` (int, 0…n−1), `osm_id`, `lon`, `lat`
+- `app/data/graph/<zona>/edges.parquet`: `u`, `v` (índices de nodo), `length_m`, `highway`, `traffic` (0–1, `config/routing.yaml`), `green_pct` (0–1 o NaN sin dato), `near_fountain`, `near_bench`, `near_aed` (bool), `geom` (WKB LineString 4326)
 - `build_graph(pbf: Path, bbox: list[float] | None, out_dir: Path, config: dict) -> dict`; `index_nodes(nodes, edges)`; `edge_factors(edges, green, poi, config, has_green) -> GeoDataFrame`; `osm_pois(osm) -> GeoDataFrame`
-- Añade a `data/clean/poi.parquet` el mobiliario de OSM (`amenity=bench` → `bench`, `amenity=drinking_water` → `fountain`, `amenity=waste_basket` → `bin`, `leisure=dog_park` → `dog_area`, `leisure=playground` → `playground`; `source="osm"`). Claves OSM de `requisitos_fuentes.json`.
+- Añade a `clean/poi.parquet` el mobiliario de OSM (`amenity=bench` → `bench`, `amenity=drinking_water` → `fountain`, `amenity=waste_basket` → `bin`, `leisure=dog_park` → `dog_area`, `leisure=playground` → `playground`; `source="osm"`). Claves OSM de `requisitos_fuentes.json`.
 
-**Formato de `config/routing.yaml`** (contrato; valores de DEC-07):
+**Formato de `config/routing.yaml`** (contrato; valores de DEC-07; lo leen `ingest` y `api`):
 
 ```yaml
 # PROVISIONAL hasta DEC-07
@@ -3252,7 +3379,7 @@ default_route_weights: {traffic: 0.5, green: 0.5, fountains: 0.2}
 own_criterion: true
 ```
 
-- [ ] **Paso 1: pruebas que fallan** — `tests/ingest/test_graph.py`
+- [ ] **Paso 1: pruebas que fallan** — `tests/test_graph.py`
 
 ```python
 import geopandas as gpd
@@ -3260,8 +3387,8 @@ import pandas as pd
 import pytest
 from shapely.geometry import LineString, Point, Polygon
 
-from ingest.common import ROOT
-from ingest.graph import edge_factors, index_nodes
+from common import DATA_DIR
+from graph import edge_factors, index_nodes
 
 CONFIG = {"traffic_by_highway": {"primary": 1.0, "footway": 0.0}, "default_traffic": 0.3, "poi_radius_m": 25}
 
@@ -3299,8 +3426,8 @@ def test_without_vpla_green_is_nan():
 
 @pytest.mark.slow
 def test_getafe_graph_exists():
-    e = pd.read_parquet(ROOT / "data" / "graph" / "getafe" / "edges.parquet")
-    n = pd.read_parquet(ROOT / "data" / "graph" / "getafe" / "nodes.parquet")
+    e = pd.read_parquet(DATA_DIR / "graph" / "getafe" / "edges.parquet")
+    n = pd.read_parquet(DATA_DIR / "graph" / "getafe" / "nodes.parquet")
     assert len(e) > 1000 and (e["length_m"] > 0).all()
     assert e[["u", "v"]].max().max() < len(n)
     assert e["green_pct"].notna().mean() > 0.9          # Getafe esta en VPLA
@@ -3308,13 +3435,13 @@ def test_getafe_graph_exists():
 
 Run → Esperado: FAIL.
 
-- [ ] **Paso 2: implementar** — `ingest/graph.py`
+- [ ] **Paso 2: implementar** — `graph.py`
 
 ```python
-"""OSM -> data/graph/<zona>/{nodes,edges}.parquet con factores por tramo (arquitectura §3.4).
+"""OSM -> app/data/graph/<zona>/{nodes,edges}.parquet con factores por tramo (arquitectura §3.4).
 
-Uso: python -m ingest.graph 28065            # Getafe -> data/graph/getafe/
-     python -m ingest.graph all              # toda la Comunidad -> data/graph/region/ (sabado)
+Uso: python -m graph 28065            # Getafe -> data/graph/getafe/
+     python -m graph all              # toda la Comunidad -> data/graph/region/ (sabado)
 """
 import sys
 import time
@@ -3324,7 +3451,7 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from ingest.common import CLEAN, RAW, ROOT, municipalities, write
+from common import CLEAN, CONFIG_DIR, DATA_DIR, RAW, municipalities, write
 
 PBF = RAW / "osm" / "madrid-latest.osm.pbf"
 OSM_POI = {("amenity", "bench"): "bench", ("amenity", "drinking_water"): "fountain",
@@ -3413,31 +3540,31 @@ def build_graph(pbf, bbox, out_dir, config):
 
 if __name__ == "__main__":
     target = sys.argv[1] if len(sys.argv) > 1 else "28065"
-    config = yaml.safe_load((ROOT / "config" / "routing.yaml").read_text(encoding="utf-8"))
+    config = yaml.safe_load((CONFIG_DIR / "routing.yaml").read_text(encoding="utf-8"))
     if target == "all":
-        print(build_graph(PBF, None, ROOT / "data" / "graph" / "region", config))
+        print(build_graph(PBF, None, DATA_DIR / "graph" / "region", config))
     else:
         row = municipalities()[municipalities()["ine_code"] == target]
-        out = ROOT / "data" / "graph" / ZONE_NAMES.get(target, target)
+        out = DATA_DIR / "graph" / ZONE_NAMES.get(target, target)
         print(build_graph(PBF, [float(v) for v in row.total_bounds], out, config))
 ```
 
-> **Limitación (Getafe):** `green_pct` usa solo VPLA; en los 13 municipios sin VPLA queda `NaN` y se completa el sábado (S-R1) con parques de OSM o cubierta terrestre. Si `highway` trae listas (`"['footway', 'path']"`) en cantidad, quedarse con el primer valor.
+> **Limitación (Getafe):** `green_pct` usa solo VPLA; en los 13 municipios sin VPLA queda `NaN` y se completa el sábado (S-R1). Si `highway` trae listas (`"['footway', 'path']"`) en cantidad, quedarse con el primer valor.
 
-- [ ] **Paso 3:** crear `config/routing.yaml` provisional (bloque de arriba, con un valor por cada `highway` visto en Task 8). Run: `python -m ingest.graph 28065` → Esperado: imprime nodos, tramos y segundos.
+- [ ] **Paso 3:** crear `../config/routing.yaml` provisional (bloque de arriba, con un valor por cada `highway` visto en Task 8). Run: `.venv/bin/python -m graph 28065` → Esperado: imprime nodos, tramos y segundos.
 - [ ] **Paso 3b (respaldo si pyrosm no instala, Task 8):** sustituir `OSM(...).get_network` por un `osmium.SimpleHandler` con `locations=True` que recorra `ways` con `highway` peatonal (`footway`, `path`, `pedestrian`, `living_street`, `residential`, `service`, `steps`, `track`, `unclassified`, `tertiary`, `secondary`, `primary`, `cycleway` sin `foot=no`…) y genere un tramo por par de nodos consecutivos con `u`, `v`, `highway`, `LineString`. Mismas columnas de salida. Anotar la lista exacta en el commit.
-- [ ] **Paso 4:** Run: `pytest tests/ingest/test_graph.py -v` → Esperado: PASS.
-- [ ] **Paso 5: commit** — `git add ingest/graph.py tests/ingest/test_graph.py config/routing.yaml && git commit -m "Rutas: grafo peatonal de Getafe con tráfico por vía, verde y mobiliario por tramo"`
+- [ ] **Paso 4:** Run: `.venv/bin/pytest tests/test_graph.py -v` → Esperado: PASS.
+- [ ] **Paso 5: commit** — `git -C ../.. add app/ingest/graph.py app/ingest/tests/test_graph.py app/config/routing.yaml && git -C ../.. commit -m "Rutas: grafo peatonal de Getafe con tráfico por vía, verde y mobiliario por tramo"`
 
-**Terminado cuando:** existe `data/graph/getafe/` con nodos y tramos válidos, las pruebas pasan y `poi.parquet` incluye el mobiliario de OSM.
+**Terminado cuando:** existe `app/data/graph/getafe/` con nodos y tramos válidos, las pruebas pasan y `poi.parquet` incluye el mobiliario de OSM.
 
 ---
 
 ### Task 21: J-R2 · Motor de rutas: KD-tree, costes por petición, A\*/Dijkstra y Dijkstra con límite
 
-**Rol:** Rutas · **Depende de:** Task 20 · **Duración:** 3 h
+**Rol:** Rutas · **Servicio:** `app/api/` · **Depende de:** Task 20 · **Duración:** 3 h
 
-**Ficheros:** Crear `api/routing/graph.py`, `tests/routing/__init__.py`, `tests/routing/test_routing.py`.
+**Ficheros:** Crear `routing/__init__.py`, `routing/graph.py`, `tests/routing/test_routing.py`.
 
 **Interfaces (produce; viernes V-R1 y V-M1 consumen):**
 
@@ -3474,8 +3601,8 @@ import pandas as pd
 import pytest
 from shapely.geometry import LineString
 
-from api.routing.graph import (RouteNotFound, bounded_distances, edge_costs, load_graph, nearest_node,
-                               shortest_path, summarize)
+from routing.graph import (RouteNotFound, bounded_distances, edge_costs, load_graph, nearest_node,
+                           shortest_path, summarize)
 
 
 @pytest.fixture
@@ -3550,7 +3677,7 @@ def test_green_without_data_is_none(graph):
 
 Run → Esperado: FAIL.
 
-- [ ] **Paso 2: implementar** — `api/routing/graph.py`
+- [ ] **Paso 2: implementar** — `routing/graph.py`
 
 ```python
 """Grafo peatonal en memoria (arquitectura §4.4). Coste por peticion, vectorizado; nunca <= 0."""
@@ -3666,8 +3793,8 @@ def summarize(g, edges, traffic_threshold=0.5):
 
 > `get_shortest_path_astar` existe en python-igraph ≥ 0.10.2; la heurística en Python se llama por nodo y puede ser **más lenta** que el Dijkstra en C: Task 22 lo mide y elige (por defecto `dijkstra`). `traffic_threshold` viene de `config/routing.yaml` (`traffic_display_threshold`).
 
-- [ ] **Paso 3:** Run: `pytest tests/routing/test_routing.py -v` → Esperado: PASS.
-- [ ] **Paso 4: commit** — `git add api/routing tests/routing && git commit -m "Rutas: grafo en memoria, coste con suelo, A*/Dijkstra y Dijkstra con límite"`
+- [ ] **Paso 3:** Run: `.venv/bin/pytest tests/routing/test_routing.py -v` → Esperado: PASS.
+- [ ] **Paso 4: commit** — `git -C ../.. add app/api/routing app/api/tests/routing && git -C ../.. commit -m "Rutas: grafo en memoria, coste con suelo, A*/Dijkstra y Dijkstra con límite"`
 
 **Terminado cuando:** pasan las pruebas, incluidas coste > 0, saludable ≥ directa, inalcanzable y nodo lejano.
 
@@ -3675,9 +3802,9 @@ def summarize(g, edges, traffic_threshold=0.5):
 
 ### Task 22: J-R3 · Prueba de latencia en Getafe (y capital si hay grafo)
 
-**Rol:** Rutas · **Depende de:** Task 21 · **Duración:** 1 h
+**Rol:** Rutas · **Servicio:** `app/api/` · **Depende de:** Task 21 · **Duración:** 1 h
 
-**Ficheros:** Crear `tests/routing/test_latency.py`. Modificar `docs/arquitectura.md` §4.4.
+**Ficheros:** Crear `tests/routing/test_latency.py`. Modificar `../../docs/arquitectura.md` §4.4.
 
 - [ ] **Paso 1:** `tests/routing/test_latency.py`
 
@@ -3688,8 +3815,8 @@ import time
 import numpy as np
 import pytest
 
-from api.routing.graph import bounded_distances, edge_costs, load_graph, shortest_path
-from ingest.common import ROOT
+from routing.graph import bounded_distances, edge_costs, load_graph, shortest_path
+from settings import DATA_DIR
 
 pytestmark = pytest.mark.slow
 WEIGHTS = {"traffic": 1.0, "green": 0.5, "fountains": 0.2}
@@ -3697,7 +3824,7 @@ WEIGHTS = {"traffic": 1.0, "green": 0.5, "fountains": 0.2}
 
 @pytest.fixture(scope="module", params=["getafe", "madrid"])
 def g(request):
-    d = ROOT / "data" / "graph" / request.param
+    d = DATA_DIR / "graph" / request.param
     if not (d / "edges.parquet").exists():
         pytest.skip(f"sin grafo de {request.param}")
     t0 = time.perf_counter()
@@ -3730,9 +3857,9 @@ def test_bounded_dijkstra_under_1s(g):
     assert time.perf_counter() - t0 < 1.0
 ```
 
-- [ ] **Paso 2:** Run: `pytest tests/routing/test_latency.py -v -s` → Esperado: PASS; apuntar p50/máx por algoritmo, tiempo de carga y memoria (`/usr/bin/time -v python -c "from api.routing.graph import load_graph; import pathlib; load_graph(pathlib.Path('data/graph/getafe'))"` → «Maximum resident set size»).
-- [ ] **Paso 3:** si da tiempo, `python -m ingest.graph 28079` y repetir para la capital (entrada de DEC-A11).
-- [ ] **Paso 4:** escribir en `docs/arquitectura.md` §4.4 las cifras medidas (sustituyen a «Latencia estimada (sin verificar)») y el algoritmo elegido. Commit.
+- [ ] **Paso 2:** Run: `.venv/bin/pytest tests/routing/test_latency.py -v -s` → Esperado: PASS; apuntar p50/máx por algoritmo, tiempo de carga y memoria (`/usr/bin/time -v .venv/bin/python -c "import pathlib; from routing.graph import load_graph; load_graph(pathlib.Path('../data/graph/getafe'))"` → «Maximum resident set size»).
+- [ ] **Paso 3:** si da tiempo, `(cd ../ingest && .venv/bin/python -m graph 28079)` y repetir para la capital (entrada de DEC-A11).
+- [ ] **Paso 4:** escribir en `../../docs/arquitectura.md` §4.4 las cifras medidas y el algoritmo elegido. `git -C ../.. add app/api/tests/routing/test_latency.py docs/arquitectura.md && git -C ../.. commit -m "Rutas: latencia medida en Getafe"`.
 
 **Terminado cuando:** hay cifras reales de latencia y memoria en `arquitectura.md` y la prueba pasa en Getafe.
 
@@ -3740,14 +3867,14 @@ def test_bounded_dijkstra_under_1s(g):
 
 ### Task 23: J-F1 · Tipos generados del OpenAPI y MSW
 
-**Rol:** Front · **Depende de:** Tasks 11, 10 · **Duración:** 1,5 h
+**Rol:** Front · **Servicio:** `app/frontend/` · **Depende de:** Tasks 11, 10 · **Duración:** 1,5 h
 
-**Ficheros:** Crear `web/src/api/types.ts` (generado), `web/src/api/client.ts`, `web/src/mocks/handlers.ts`, `web/src/mocks/browser.ts`, `web/src/mocks/data/*.json`, `web/src/mocks/data.test.ts`. Modificar `web/package.json`, `web/src/main.tsx`.
+**Ficheros:** Crear `src/api/types.ts` (generado), `src/api/client.ts`, `src/mocks/handlers.ts`, `src/mocks/browser.ts`, `src/mocks/data/*.json`, `src/mocks/data.test.ts`. Modificar `package.json`, `src/main.tsx`.
 
 **Interfaces (produce):** `Schemas["RecommendResponse"]`, etc.; `client.recommend(body: Schemas["RecommendRequest"]): Promise<Schemas["RecommendResponse"]>` y uno por endpoint, contra `/api`.
 
-- [ ] **Paso 1:** en `web/package.json`: `"types": "openapi-typescript src/api/openapi.json -o src/api/types.ts"` y `"contract": "npm run types && tsc --noEmit"`. Run: `npm run types`.
-- [ ] **Paso 2: `client.ts`**
+- [ ] **Paso 1:** en `package.json`: `"types": "openapi-typescript src/api/openapi.json -o src/api/types.ts"` y `"contract": "npm run types && tsc --noEmit"`. Run: `npm run types`.
+- [ ] **Paso 2: `src/api/client.ts`**
 
 ```ts
 import type { components } from "./types";
@@ -3774,9 +3901,9 @@ export const client = {
 };
 ```
 
-- [ ] **Paso 3: datos simulados tipados** en `web/src/mocks/data/` (uno por endpoint). Para `recommend`, tres resultados de Getafe con nombres **ficticios marcados «(ejemplo)»** — nada que parezca un dato oficial —, uno con factor `green` a `null` («sin datos») y otro con `indoor_alternative: true`. `handlers.ts` con `http.get("/api/activities", …)`, `http.post("/api/recommend", …)`, etc. (MSW 2). En `main.tsx`, arrancar el *worker* solo si `import.meta.env.VITE_MOCK === "1"`.
-- [ ] **Paso 4: prueba** `web/src/mocks/data.test.ts`: importa cada JSON con `satisfies Schemas["…"]` (si el contrato cambia, `tsc` falla). Run: `npm run contract && npx vitest run` → Esperado: PASS.
-- [ ] **Paso 5: commit** — «Front: tipos del contrato, cliente y respuestas simuladas».
+- [ ] **Paso 3: datos simulados tipados** en `src/mocks/data/` (uno por endpoint). Para `recommend`, tres resultados de Getafe con nombres **ficticios marcados «(ejemplo)»** — nada que parezca un dato oficial —, uno con factor `green` a `null` («sin datos») y otro con `indoor_alternative: true`. `handlers.ts` con `http.get("/api/activities", …)`, `http.post("/api/recommend", …)`, etc. (MSW 2). En `main.tsx`, arrancar el *worker* solo si `import.meta.env.VITE_MOCK === "1"`.
+- [ ] **Paso 4: prueba** `src/mocks/data.test.ts`: importa cada JSON con `satisfies Schemas["…"]` (si el contrato cambia, `tsc` falla). Run: `npm run contract && npx vitest run` → Esperado: PASS.
+- [ ] **Paso 5: commit** — `git -C ../.. add app/frontend && git -C ../.. commit -m "Front: tipos del contrato, cliente y respuestas simuladas"`.
 
 **Terminado cuando:** `npm run contract` pasa y la app arranca con `VITE_MOCK=1 npm run dev` sin API.
 
@@ -3784,15 +3911,15 @@ export const client = {
 
 ### Task 24: J-F2 · Pantalla Inicio «¿Qué te apetece hacer?»
 
-**Rol:** Front · **Depende de:** Tasks 23, 9 · **Duración:** 3 h
+**Rol:** Front · **Servicio:** `app/frontend/` · **Depende de:** Tasks 23, 9 · **Duración:** 3 h
 
-**Ficheros:** Crear `web/src/screens/Home.tsx`, `web/src/components/LocationPicker.tsx`, `web/src/state/preferences.tsx` (contexto + `localStorage`), `web/src/screens/Home.test.tsx`.
+**Ficheros:** Crear `src/screens/Home.tsx`, `src/components/LocationPicker.tsx`, `src/state/preferences.tsx` (contexto + `localStorage`), `src/screens/Home.test.tsx`.
 
 - Actividades de `GET /activities`; botón «Sorpréndeme» (RF-03); ubicación por GPS (`navigator.geolocation`, solo tras un gesto) o texto (`/location`, lista de candidatos accesible); resumen de preferencias; primera recomendación en ≤ 3 interacciones.
 - `preferences.tsx`: perfil, acompañantes, pesos, tiempo y distancia en `localStorage` con `try/catch` (si falla, en memoria). **La ubicación no se guarda en `localStorage`.**
 
 - [ ] **Paso 1: pruebas que fallan** (`Home.test.tsx`, MSW de nodo): `it("renders activities as buttons")`, `it("has one h1")`, `it("navigates to /results after activity + location")`, `it("has no axe violations")`, `it("never stores lat/lon in localStorage")`.
-- [ ] **Paso 2:** implementar hasta verde. **Paso 3:** `npm run build`. **Paso 4:** commit.
+- [ ] **Paso 2:** implementar hasta verde. **Paso 3:** `npm run build`. **Paso 4:** `git -C ../.. add app/frontend && git -C ../.. commit -m "Front: pantalla de inicio"`.
 
 **Terminado cuando:** pruebas y axe en verde; Inicio → Resultados en 3 toques con datos simulados.
 
@@ -3800,14 +3927,14 @@ export const client = {
 
 ### Task 25: J-F3 · Pantalla Resultados (lista, sin mapa todavía)
 
-**Rol:** Front · **Depende de:** Task 24 · **Duración:** 3 h
+**Rol:** Front · **Servicio:** `app/frontend/` · **Depende de:** Task 24 · **Duración:** 3 h
 
-**Ficheros:** Crear `web/src/screens/Results.tsx`, `web/src/components/ResultCard.tsx`, `web/src/components/Indicator.tsx` (icono + color + texto, nunca solo color), `web/src/screens/Results.test.tsx`.
+**Ficheros:** Crear `src/screens/Results.tsx`, `src/components/ResultCard.tsx`, `src/components/Indicator.tsx` (icono + color + texto, nunca solo color), `src/screens/Results.test.tsx`.
 
 - `useQuery(["recommend", request], …)` (TanStack Query descarta respuestas viejas al cambiar la petición); lista `ul/li` con nombre, distancia, tiempo, «Nota 8,2 sobre 10», mejor hora; «Ver más» con `offset`; `warnings` y `medical_disclaimer` visibles; anuncio `aria-live="polite"` («3 resultados actualizados»).
 
 - [ ] **Paso 1: pruebas que fallan:** `it("renders 3 list items")`, `it("shows 'Verde: sin datos' when green is null")`, `it("'Ver más' requests offset=3")`, `it("updates the aria-live region")`, `it("has no axe violations")`, `it("Indicator always has visible text")`.
-- [ ] **Paso 2:** implementar. **Paso 3:** `npm run build`. **Paso 4:** commit.
+- [ ] **Paso 2:** implementar. **Paso 3:** `npm run build`. **Paso 4:** `git -C ../.. add app/frontend && git -C ../.. commit -m "Front: pantalla de resultados"`.
 
 **Terminado cuando:** pruebas y axe en verde con datos simulados.
 
@@ -3815,50 +3942,50 @@ export const client = {
 
 ## Cierre del jueves (20:00, 15 min, todo el equipo)
 
-- [ ] `pytest` completo en `main` en verde (con datos reales en el equipo de Datos).
+- [ ] `pytest` en verde en `app/api` y `app/ingest` (con datos reales en el equipo de Datos); `npx vitest run` en `app/frontend`.
 - [ ] Estado de DEC-05, DEC-07, DEC-07b, DEC-08 (cerradas), DEC-03 (proveedor elegido), DEC-11, DEC-12.
 - [ ] Actualizar `docs/PENDIENTES.md`; lo no terminado pasa al viernes **por delante** de lo nuevo.
 - [ ] **Detallar el viernes:** `superpowers:writing-plans` convierte la tabla del viernes en Task 26 en adelante en este fichero.
 
 ---
 
-# VIERNES 16/10 — tareas (se detallan el jueves por la tarde)
+# VIERNES 16/10 — tareas (se detallan el jueves por la tarde; rutas relativas a `app/`)
 
 | ID | Rol | Tarea | Ficheros | Terminado cuando | Prueba |
 |---|---|---|---|---|---|
-| V-D1 | Datos | Normalizador de servicios (`sanitarios` contando `centro_nro_registro` distintos, tipos «Centro de salud»/«Consultorio de atención primaria»; `farmacias` con coma decimal; `educativos` con `SITUACIÓN`=ALTA; `atencion_social` sin «RESERVADO»; EIEL `cultural`/`nucleos`) → `service.parquet`; tabla `municipality_indicator(ine_code, category, key, value NULL=sin datos, unit, year, source)` según **DEC-09** (`config/indicators.yaml`) en `build_main` | `ingest/normalize/services.py`, `ingest/build.py`, `config/indicators.yaml` | 179 municipios con todas sus filas de indicador (valor o NULL), coberturas iguales a D-09 | `tests/ingest/test_services.py`: 429 centros de salud + consultorios; educativos ALTA 3.906; 177 RESERVADO excluidos; Patones `sport` NULL (no 0) |
-| V-D2 | Datos | `/location`: `addresses.py` (CSV cp1252 → Parquet con vial, número, coordenadas reproyectadas, `ine_code`; **comprobar antes los nombres reales de columnas del CSV**); cliente del buscador de Nomecalles (sin clave) con `httpx` y caché de 1 h en memoria; respaldo «centro del municipio» | `ingest/normalize/addresses.py`, `api/geocoding.py`, `api/main.py` | «calle madrid 10 getafe» → x 437838,98 / y 4461942,01 reproyectado (D-04); sin resultado → municipio por nombre; buscador caído → municipio | `tests/api/test_location.py` con buscador simulado + 1 prueba `slow` real |
-| V-D3 | Datos | Patrón horario del aire para horas futuras (CLAUDE.md §6.2): `--only aire_historico --include-heavy`, mediana por estación × magnitud × mes × hora → tabla `air_pattern` en `gomad.duckdb`. Hasta que exista, el motor usa la última categoría medida y lo dice | `ingest/normalize/air.py`, `ingest/build.py` | `air_pattern` con las estaciones con histórico | 24 horas × 12 meses por estación-magnitud con datos |
-| V-M1 | Motor | `/activities` y `/recommend` reales: `repository.py` (candidatos por caja + haversine en DuckDB solo lectura, reabriendo `realtime.duckdb` por petición), `bounded_distances` (Task 21) donde hay grafo y haversine × factor de rodeo (criterio propio, marcado) donde no, estación más cercana o de la zona, `HourContext` por hora, `slots`, `scoring`; «Sorpréndeme» = 3 actividades distintas; middleware de log **sin ubicación** (ruta, código y ms) | `api/repository.py`, `api/services/recommend.py`, `api/main.py` | < 3 s en Getafe y capital; `warnings` cuando falta un factor | `tests/api/test_endpoints.py`: `test_recommend_getafe`, `test_recommend_capital_without_vpla`, `test_surprise_me_three_distinct_activities`, `test_logs_without_location` |
-| V-M2 | Motor | `explanation.py`: plantillas en lenguaje llano con factores dominantes y mejor hora; cita fuente y fecha; marca criterio propio | `api/engine/explanation.py` | Explicación sin datos que no estén en la respuesta | `tests/engine/test_explanation.py`: cifras de la frase = cifras del objeto; Carmen recibe «Ahora no: mejor a las …» |
+| V-D1 | Datos | Normalizador de servicios (`sanitarios` contando `centro_nro_registro` distintos, tipos «Centro de salud»/«Consultorio de atención primaria»; `farmacias` con coma decimal; `educativos` con `SITUACIÓN`=ALTA; `atencion_social` sin «RESERVADO»; EIEL `cultural`/`nucleos`) → `service.parquet`; tabla `municipality_indicator(ine_code, category, key, value NULL=sin datos, unit, year, source)` según **DEC-09** (`config/indicators.yaml`) en `build_main` | `ingest/normalize/services.py`, `ingest/build_db.py`, `config/indicators.yaml` | 179 municipios con todas sus filas de indicador (valor o NULL), coberturas iguales a D-09 | `ingest/tests/test_services.py`: 429 centros de salud + consultorios; educativos ALTA 3.906; 177 RESERVADO excluidos; Patones `sport` NULL (no 0) |
+| V-D2 | Datos | `/location`: `ingest/normalize/addresses.py` (CSV cp1252 → `clean/addresses.parquet` con vial, número, coordenadas reproyectadas, `ine_code`; **comprobar antes los nombres reales de columnas del CSV**); en la API, cliente del buscador de Nomecalles (sin clave) con `httpx`, caché de 1 h en memoria y respaldo «centro del municipio» | `ingest/normalize/addresses.py`, `api/geocoding.py`, `api/main.py` | «calle madrid 10 getafe» → x 437838,98 / y 4461942,01 reproyectado (D-04); sin resultado → municipio por nombre; buscador caído → municipio | `api/tests/test_location.py` con buscador simulado + 1 prueba `slow` real |
+| V-D3 | Datos | Patrón horario del aire para horas futuras (CLAUDE.md §6.2): `--only aire_historico --include-heavy`, mediana por estación × magnitud × mes × hora → tabla `air_pattern` en `gomad.duckdb`. Hasta que exista, el motor usa la última categoría medida y lo dice | `ingest/normalize/air.py`, `ingest/build_db.py` | `air_pattern` con las estaciones con histórico | 24 horas × 12 meses por estación-magnitud con datos |
+| V-M1 | Motor | `/activities` y `/recommend` reales: `repository.py` (candidatos por caja + haversine en DuckDB solo lectura, reabriendo `realtime.duckdb` por petición), `bounded_distances` (Task 21) donde hay grafo y haversine × factor de rodeo (criterio propio, marcado) donde no, estación más cercana o de la zona, `HourContext` por hora, `slots`, `scoring`; «Sorpréndeme» = 3 actividades distintas; middleware de log **sin ubicación** (ruta, código y ms) | `api/repository.py`, `api/services/recommend.py`, `api/main.py` | < 3 s en Getafe y capital; `warnings` cuando falta un factor | `api/tests/test_endpoints.py`: `test_recommend_getafe`, `test_recommend_capital_without_vpla`, `test_surprise_me_three_distinct_activities`, `test_logs_without_location` |
+| V-M2 | Motor | `explanation.py`: plantillas en lenguaje llano con factores dominantes y mejor hora; cita fuente y fecha; marca criterio propio | `api/engine/explanation.py` | Explicación sin datos que no estén en la respuesta | `api/tests/engine/test_explanation.py`: cifras de la frase = cifras del objeto; Carmen recibe «Ahora no: mejor a las …» |
 | V-R1 | Rutas | `/route` en Getafe: grafo cargado al arrancar (`lifespan`), directa y saludable en paralelo (`ThreadPoolExecutor`), GeoJSON, `description`, POIs de `route_poi` a ≤ 25 m; fuera del grafo o desconectado → línea recta `approximate=True` + aviso; tiempo con la velocidad de DEC-07 | `api/services/route.py`, `api/main.py` | < 5 s; nunca 500 por ruta imposible | `test_route_getafe`, `test_route_outside_graph_is_approximate` |
-| V-F1 | Front | Mapa MapLibre sincronizado con la lista (RF-11); la lista es el equivalente completo; OpenFreeMap en desarrollo | `web/src/components/Map.tsx` | Selección sincronizada | Vitest: seleccionar tarjeta cambia el marcador activo |
-| V-F2 | Front | Detalle «¿Por qué?»: nota por factor, línea horaria con mejor franja, aire y tiempo con icono+color+texto (colores ICA de `umbrales.md` §1.3 como pastilla con contraste), fuente y fecha | `web/src/screens/Detail.tsx` | Contraste ≥ 4,5:1 | Vitest + axe |
-| V-F3 | Front | Panel «Ajustar» (hoja inferior Radix): pesos con recálculo al soltar (RF-16), perfil, «Salgo con…», tiempo y distancia | `web/src/components/SettingsSheet.tsx` | Mover un peso cambia el orden sin recargar | Vitest: soltar lanza una sola petición |
-| V-F4 | Front + Motor **[manual en parte]** | **Primer despliegue HTTPS**: dominio (DEC-10) o subdominio gratuito; `DOMAIN=` en `.env` de la VM; `web/dist` con `VITE_MOCK=0`; `data/` en la VM | `deploy/*`, `docs/arquitectura.md` §6 | `https://<dominio>/` abre en un móvil y pide la ubicación | `curl -I https://…/api/health` → 200 con certificado válido |
+| V-F1 | Front | Mapa MapLibre sincronizado con la lista (RF-11); la lista es el equivalente completo; OpenFreeMap en desarrollo | `frontend/src/components/Map.tsx` | Selección sincronizada | Vitest: seleccionar tarjeta cambia el marcador activo |
+| V-F2 | Front | Detalle «¿Por qué?»: nota por factor, línea horaria con mejor franja, aire y tiempo con icono+color+texto (colores ICA de `umbrales.md` §1.3 como pastilla con contraste), fuente y fecha | `frontend/src/screens/Detail.tsx` | Contraste ≥ 4,5:1 | Vitest + axe |
+| V-F3 | Front | Panel «Ajustar» (hoja inferior Radix): pesos con recálculo al soltar (RF-16), perfil, «Salgo con…», tiempo y distancia | `frontend/src/components/SettingsSheet.tsx` | Mover un peso cambia el orden sin recargar | Vitest: soltar lanza una sola petición |
+| V-F4 | Front + Motor **[manual en parte]** | **Primer despliegue HTTPS**: dominio (DEC-10) o subdominio gratuito; `DOMAIN=` en `app/.env` de la VM; imagen `frontend` multi-stage; `app/data/` en la VM | `deploy/*`, `docs/arquitectura.md` §6 | `https://<dominio>/` abre en un móvil y pide la ubicación | `curl -I https://…/api/health` → 200 con certificado válido |
 
-# SÁBADO 17/10 — tareas
+# SÁBADO 17/10 — tareas (rutas relativas a `app/`)
 
 | ID | Rol | Tarea | Ficheros | Terminado cuando | Prueba |
 |---|---|---|---|---|---|
 | S-D1 | Datos | `/sources`: atribución, licencia (CKAN CC BY 4.0, OSM ODbL, AEMET aviso legal, Nomecalles…), URL, última recarga y último fallo desde `source_date`/`manifest.json`; fecha de cada dato en las respuestas (RF-19) | `api/main.py`, `config/sources.yaml` | Todas las fuentes usadas listadas | `test_sources_all_have_license` |
-| S-D2 | Datos | Guiones `deploy/ingest_hourly.sh` (descarga `--refresh hourly` → `normalize air_reading forecast` → `build realtime`), `_daily.sh`, `_weekly.sh` (OSM + grafo), `_reference.sh`; no reconstruyen si `changed` es falso | `deploy/*.sh` | Dos ejecuciones seguidas: la segunda no reconstruye | Manual + log |
-| S-D3 | Datos (baja prioridad) | Traducir identificadores internos de `scripts/profile_sources.py` (solo nombres; mismo resultado) | `scripts/profile_sources.py` | `data/perfil/perfil.json` idéntico antes y después | `diff` de la salida |
+| S-D2 | Datos | Guiones `ingest/jobs/hourly.sh` (descarga `--refresh hourly` → `python -m normalize air_reading forecast` → `python -m build_db realtime`), `daily.sh`, `weekly.sh` (OSM + grafo), `reference.sh`; no reconstruyen si `changed` es falso | `ingest/jobs/*.sh` | Dos ejecuciones seguidas: la segunda no reconstruye | Manual + log |
+| S-D3 | Datos (baja prioridad) | Traducir identificadores internos de `ingest/scripts/profile_sources.py` (solo nombres; mismo resultado) | `ingest/scripts/profile_sources.py` | `data/perfil/perfil.json` idéntico antes y después | `diff` de la salida |
 | S-M1 | Motor | `/municipality/{ine_code}`: indicadores por categoría con «sin datos» explícito y encaje con preferencias, **sin ranking** (RF-17, RF-18); código inexistente → 404 legible | `api/services/municipality.py` | 179 códigos responden | `test_municipality_179_respond`, `test_municipality_missing_is_null`, `test_municipality_unknown_404` |
-| S-R1 | Rutas | **Grafo de toda la Comunidad** (`python -m ingest.graph all`; si se queda sin memoria, `osmium extract` por caja); `green_pct` en los 13 sin VPLA con parques OSM o cubierta terrestre por `bbox`; validación: capital, San Lorenzo (28131) y uno sin mobiliario; memoria y latencia → **DEC-A11 antes de las 14:00** | `ingest/graph.py`, `docs/arquitectura.md` §4.4 | Rutas válidas en las 3 muestras < 5 s, o recorte apuntado | `test_latency.py` con el grafo regional |
-| S-F1 | Front | Pantalla Ruta: directa vs. saludable en mapa y en texto, métricas, fuentes/bancos/DEA, aviso si `approximate` | `web/src/screens/Route.tsx` | Descripción en texto completa sin mirar el mapa | Vitest + axe |
-| S-F2 | Front | Pantalla Municipio: indicadores por categoría, «sin datos» visible, encaje, sin rankings | `web/src/screens/Municipality.tsx` | Getafe, capital y Patones | Vitest + axe |
+| S-R1 | Rutas | **Grafo de toda la Comunidad** (`python -m graph all` en `ingest`; si se queda sin memoria, `osmium extract` por caja); `green_pct` en los 13 sin VPLA con parques OSM o cubierta terrestre por `bbox`; validación: capital, San Lorenzo (28131) y uno sin mobiliario; memoria y latencia → **DEC-A11 antes de las 14:00** | `ingest/graph.py`, `docs/arquitectura.md` §4.4 | Rutas válidas en las 3 muestras < 5 s, o recorte apuntado | `api/tests/routing/test_latency.py` con el grafo regional |
+| S-F1 | Front | Pantalla Ruta: directa vs. saludable en mapa y en texto, métricas, fuentes/bancos/DEA, aviso si `approximate` | `frontend/src/screens/Route.tsx` | Descripción en texto completa sin mirar el mapa | Vitest + axe |
+| S-F2 | Front | Pantalla Municipio: indicadores por categoría, «sin datos» visible, encaje, sin rankings | `frontend/src/screens/Municipality.tsx` | Getafe, capital y Patones | Vitest + axe |
 
-# DOMINGO 18/10 — tareas (fin del día: congelación)
+# DOMINGO 18/10 — tareas (fin del día: congelación; rutas relativas a `app/`)
 
 | ID | Rol | Tarea | Ficheros | Terminado cuando | Prueba |
 |---|---|---|---|---|---|
-| D-D1 | Datos | Caché ante caídas: si `realtime.duckdb` tiene más de 2 h, la API sigue y avisa con la hora real; tráfico de la capital en memoria 5–15 min con respaldo por tipo de vía; **cron en la VM** (horario, 04:00, semanal, mensual) | `api/repository.py`, `deploy/crontab`, `deploy/docker-compose.yml` (servicio `ingest`) | Sin red 1 h: la app sigue y avisa | `test_stale_data_warns` |
-| D-M1 | Motor | **F6** (primer recorte): `/assistant/interpret` con el proveedor de DEC-03 validando contra `AssistantParams` (rechazo de consejo médico y fuera de catálogo, aclaración si ambiguo; **sin ubicación** en el prompt); `/assistant/route` comprueba cada condición con datos del motor y luego `write_up`; si la IA falla → plantillas y `written_by_ai=False`; respuestas grabadas en `api/ai/recorded.py` | `api/ai/*.py`, `api/main.py` | Funciona con y sin LLM | `tests/api/test_assistant.py`: JSON inválido del LLM → aclaración, no 500; el prompt no contiene coordenadas; condiciones salen del motor |
-| D-R1 | Rutas | Ruta circular por distancia objetivo (RF-22): puntos de paso a ≈ objetivo/3 con la saludable, ±10 %; si no, la más cercana con aviso | `api/routing/loop.py` | 5 km en Getafe entre 4,5 y 5,5 km | `tests/routing/test_loop.py` (`slow`) |
-| D-F1 | Front | Asistente (F6): texto → chips editables → ruta + condiciones; usable solo con formulario | `web/src/screens/Assistant.tsx` | Funciona sin IA | Vitest + axe |
-| D-F2 | Front | Fuentes y aviso: licencias, fechas, «no es consejo médico», privacidad | `web/src/screens/Sources.tsx` | Enlazada desde todas las pantallas | Vitest + axe |
-| **D-X** | Todos | **23:59 — congelación de alcance.** Solo correcciones. Lo que no esté en `main` con pruebas en verde **no entra**. Aplicar el orden de recorte si hace falta y anotarlo en `docs/arquitectura.md` §9 | — | `git tag congelacion-18oct` | `pytest` y `npx vitest run` en verde en la etiqueta |
+| D-D1 | Datos | **Servicio `ingest` en Compose:** `ingest/Dockerfile` (Python 3.12 + su `pyproject.toml` + cron con los guiones de S-D2: horario, 04:00, semanal, mensual), volúmenes `../data:/data` (lectura y escritura) y `../config:/config:ro`. Caché ante caídas en la API: si `realtime.duckdb` tiene más de 2 h, la API sigue y avisa con la hora real; tráfico de la capital en memoria 5–15 min con respaldo por tipo de vía | `ingest/Dockerfile`, `deploy/docker-compose.yml`, `api/repository.py` | Sin red 1 h: la app sigue y avisa; el cron recarga sola la ingesta horaria | `test_stale_data_warns`; `docker compose logs ingest` tras una hora |
+| D-M1 | Motor | **F6** (primer recorte): `/assistant/interpret` con el proveedor de DEC-03 validando contra `AssistantParams` (rechazo de consejo médico y fuera de catálogo, aclaración si ambiguo; **sin ubicación** en el prompt); `/assistant/route` comprueba cada condición con datos del motor y luego `write_up`; si la IA falla → plantillas y `written_by_ai=False`; respuestas grabadas en `api/ai/recorded.py` | `api/ai/*.py`, `api/main.py` | Funciona con y sin LLM | `api/tests/test_assistant.py`: JSON inválido del LLM → aclaración, no 500; el prompt no contiene coordenadas; condiciones salen del motor |
+| D-R1 | Rutas | Ruta circular por distancia objetivo (RF-22): puntos de paso a ≈ objetivo/3 con la saludable, ±10 %; si no, la más cercana con aviso | `api/routing/loop.py` | 5 km en Getafe entre 4,5 y 5,5 km | `api/tests/routing/test_loop.py` (`slow`) |
+| D-F1 | Front | Asistente (F6): texto → chips editables → ruta + condiciones; usable solo con formulario | `frontend/src/screens/Assistant.tsx` | Funciona sin IA | Vitest + axe |
+| D-F2 | Front | Fuentes y aviso: licencias, fechas, «no es consejo médico», privacidad | `frontend/src/screens/Sources.tsx` | Enlazada desde todas las pantallas | Vitest + axe |
+| **D-X** | Todos | **23:59 — congelación de alcance.** Solo correcciones. Lo que no esté en `main` con pruebas en verde **no entra**. Aplicar el orden de recorte si hace falta y anotarlo en `docs/arquitectura.md` §9 | — | `git tag congelacion-18oct` | `pytest` (api e ingest) y `npx vitest run` en verde en la etiqueta |
 
 **Oracle/APEX (arquitectura §3.5):** solo si F1–F5 están terminados el domingo a mediodía (recorte n.º 3).
 
@@ -3869,7 +3996,7 @@ export const client = {
 | L-1 | Todos | Ensayo con las personas de la demo (CLAUDE.md §5.2) y el guion **«dos personas, mismo sitio, distinta respuesta»** | Cada persona recorre su flujo en el móvil sin ayuda |
 | L-2 | Todos | Corrección de errores del ensayo (nada nuevo) | Lista cerrada o aceptada |
 | L-3 | Todos | Guion de 10 min mapeado a los criterios (1.1, 1.2, 2.1, 2.2) | Ensayado dos veces dentro de tiempo |
-| L-4 | Motor + Datos | **Demo sin red**: mismo Compose en un portátil con `data/` congelado, PMTiles local y respuestas de IA grabadas | La demo completa funciona con el wifi apagado |
+| L-4 | Motor + Datos | **Demo sin red**: mismo Compose en un portátil con `app/data/` congelado, PMTiles local y respuestas de IA grabadas | La demo completa funciona con el wifi apagado |
 | L-5 | Front | Accesibilidad: `a11y-architect`, teclado completo y lector de pantalla en el flujo principal; contraste de las pastillas del ICA | Sin bloqueantes AA abiertos |
 
 **Martes 20/10:** demo. Antes de salir: `curl -I https://<dominio>/api/health`, ingesta horaria al día, portátil de respaldo cargado.
@@ -3878,8 +4005,9 @@ export const client = {
 
 ## Autorrevisión del plan
 
-1. **Cobertura de la spec:** §3.1 → Tasks 2–3; §3.2 → Tasks 16–18, V-D1, V-D2; §3.3 → Task 19; §3.4 → Task 20, S-R1; §3.5 → condicionado; §4.1 → Task 11 (contrato) y V-M1, V-R1, V-D2, S-D1, S-M1, D-M1; §4.2 → V-M1; §4.3 → Tasks 12–14, 21, 15, V-M2, D-M1; §4.4 → Tasks 21–22, D-R1, DEC-A11; §5 → Tasks 9, 10, 23–25, V-F1–V-F3, S-F1, S-F2, D-F1, D-F2, L-5; §6 → Tasks 5, 6, V-F4, D-D1, L-4; §7 → D-D1, V-R1, V-M1; §8 → pruebas en cada tarea; §9 → calendario y D-X; §10 → tabla de decisiones.
-2. **Sin marcadores vacíos:** los valores pendientes viven en `config/` con su DEC y fecha; código y pruebas no dependen de ellos.
-3. **Consistencia de nombres:** `HourContext`, `evaluate_outdoor`, `compute_score`, `evaluate_hours`, `best_hour`, `needs_indoor`, `load_graph`, `edge_costs`, `shortest_path`, `bounded_distances`, `summarize`, `RouteNotFound`, `build_main`, `build_realtime`, `apply_activities`, `create_aqi_hourly`, `atomic` se usan igual en todas las tareas; endpoints y modelos según Task 11.
+1. **Cobertura de la spec:** §3.1 → Tasks 2–3; §3.2 → Tasks 16–18, V-D1, V-D2; §3.3 → Task 19; §3.4 → Task 20, S-R1; §3.5 → condicionado; §4.1 → Task 11 (contrato) y V-M1, V-R1, V-D2, S-D1, S-M1, D-M1; §4.2 → V-M1; §4.3 → Tasks 12–14, 21, 15, V-M2, D-M1; §4.4 → Tasks 21–22, D-R1, DEC-A11; §5 → Tasks 9, 10, 23–25, V-F1–V-F3, S-F1, S-F2, D-F1, D-F2, L-5; §6 → Tasks 5, 6, 10 (imagen del front), V-F4, D-D1, L-4; §7 → D-D1, V-R1, V-M1; §8 → pruebas en cada tarea; §9 → calendario y D-X; §10 → tabla de decisiones.
+2. **Sin marcadores vacíos:** los valores pendientes viven en `app/config/` con su DEC y fecha; código y pruebas no dependen de ellos.
+3. **Consistencia de nombres:** `HourContext`, `evaluate_outdoor`, `compute_score`, `evaluate_hours`, `best_hour`, `needs_indoor`, `load_graph`, `edge_costs`, `shortest_path`, `bounded_distances`, `summarize`, `RouteNotFound`, `build_main`, `build_realtime`, `apply_activities`, `create_aqi_hourly`, `atomic`, `DATA_DIR`, `CONFIG_DIR` se usan igual en todas las tareas; endpoints y modelos según Task 11.
 4. **Foco de revisión:** las cinco situaciones tienen prueba en su tarea.
 5. **Idioma:** código en inglés; comentarios y docstrings en español sin tildes; textos para la persona usuaria y salida de scripts en español con tildes; ids de datasets y campos de origen sin traducir.
+6. **Servicios:** ningún import entre `api` e `ingest` (la latencia usa `settings.DATA_DIR`, no `common`); lo compartido va por `app/data`, `app/config`, `app/.env` y `openapi.json`; versión de DuckDB fijada igual y comprobada (`test_shared_versions.py`).
