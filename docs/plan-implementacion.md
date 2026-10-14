@@ -1593,6 +1593,8 @@ class SourcesResponse(Strict):
 
 > **Dependencia de decisiones:** `Profile` y `Companion` pueden cambiar con DEC-05/DEC-08; `activity` es `str` (validado contra `config/activities.yaml` en tiempo de ejecución) para que el catálogo no obligue a regenerar tipos. Si cambian los `Literal`, se regenera (Task 23 paso 1).
 
+> **Cambio tras la revisión (commit b5b3cdf):** `RecommendRequest` tiene un `field_validator` que convierte `window_start`/`window_end` con zona a hora local de Madrid sin zona; `window_*`, `HourEvaluation.hour` y `Recommendation.best_hour` llevan `description` con esa convención. Pruebas añadidas: `test_aware_window_is_converted_to_madrid_local_time` y `test_mixed_timezone_inverted_window_is_422_not_500`. El código de `app/api/schemas.py` prevalece sobre este bloque.
+
 - [ ] **Paso 1: prueba que falla** — `tests/test_contract.py`
 
 ```python
