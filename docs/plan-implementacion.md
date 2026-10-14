@@ -8,7 +8,7 @@
 
 **Stack:** Python 3.12, DuckDB (+ `spatial` solo en ingest), GeoPandas/pyogrio/pyproj/shapely 2, pyrosm (o pyosmium de respaldo), python-igraph, SciPy, FastAPI + Pydantic v2, pytest · Node 20 LTS, React 18, Vite 5, TypeScript, react-map-gl (MapLibre), React Router, TanStack Query, Radix UI, MSW, Vitest + axe · Docker Compose, Caddy, OCI.
 
-**Spec:** `docs/arquitectura.md` (manda sobre CLAUDE.md §6 donde difieran). Contexto: `CLAUDE.md`, `docs/PENDIENTES.md`, `docs/decisiones-pendientes.md`, `docs/informe-datos.md`, `docs/referencia/umbrales.md`, `docs/referencia/requisitos_fuentes.json`.
+**Spec:** `docs/arquitectura.md` (manda sobre CLAUDE.md §6 donde difieran). Contexto: `CLAUDE.md`, `docs/PENDIENTES.md`, `docs/decisiones-pendientes.md`, `docs/informe-datos.md`, `docs/assets/umbrales.md`, `docs/assets/requisitos_fuentes.json`.
 
 **Fecha del plan:** miércoles 14/10/2026 (revisión: código en inglés y un directorio por servicio).
 
@@ -88,7 +88,7 @@ Cada tarea las incluye implícitamente.
 - **Decisiones pendientes** (arquitectura §10): el código **lee** pesos, regla de aire, calor, lluvia, velocidades, actividades e indicadores **de `config/*.yaml`**; las pruebas usan valores propios. Ninguna tarea de código fija esos valores.
 - **Coordenadas:** todo en EPSG:4326; reproyección desde EPSG:25830 con `pyproj` y `always_xy=True`, **ignorando los `.prj` de Nomecalles**.
 - **Código INE** siempre de 5 dígitos (`28` + 3).
-- **Si cambian requisitos o fuentes:** actualizar `docs/referencia/requisitos_fuentes.json` y `CLAUDE.md` (§2.13).
+- **Si cambian requisitos o fuentes:** actualizar `docs/assets/requisitos_fuentes.json` y `CLAUDE.md` (§2.13).
 - **Rendimiento:** recomendación < 3 s, ruta < 5 s.
 - **Nombres respecto a la spec** (Task 1 actualiza `docs/arquitectura.md` y CLAUDE.md §6.1 con esta tabla):
 
@@ -926,7 +926,7 @@ AEMET_PAUSE_S=1.5
 
 **Ficheros:**
 - Crear: `scripts/verify_aemet.py`, `tests/data/aemet_28065.json` (muestra real **sin clave**)
-- Modificar: `../../CLAUDE.md` §7.1, `../../docs/referencia/umbrales.md` §3, `../../docs/PENDIENTES.md` (P-01 ✅)
+- Modificar: `../../CLAUDE.md` §7.1, `../../docs/assets/umbrales.md` §3, `../../docs/PENDIENTES.md` (P-01 ✅)
 
 - [ ] **Paso 1 [manual]:** `cp ../.env.example ../.env` y pegar la clave en `AEMET_API_KEY` (la persona; la clave no se pega en el chat). Comprobar: `git check-ignore ../.env` → imprime la ruta.
 
@@ -1137,10 +1137,10 @@ Esperado: lo indicado en los comentarios. `frontend/dist/` no se sube (`dist/` e
 **Rol:** Motor · **Servicio:** raíz del repositorio (solo documentación) · **Duración:** 45 min · El paso 1 es **[manual]**.
 
 - [ ] **Paso 1 [manual]:** `sudo apt install -y poppler-utils`.
-- [ ] **Paso 2:** descargar el PDF de la URL de `docs/referencia/umbrales.md` §2 a `app/data/raw/calor/plan2026.pdf` y `pdftotext -layout app/data/raw/calor/plan2026.pdf app/data/raw/calor/plan2026.txt`.
+- [ ] **Paso 2:** descargar el PDF de la URL de `docs/assets/umbrales.md` §2 a `app/data/raw/calor/plan2026.pdf` y `pdftotext -layout app/data/raw/calor/plan2026.pdf app/data/raw/calor/plan2026.txt`.
 - [ ] **Paso 3:** localizar la tabla de umbrales por zona meteosalud de la Comunidad de Madrid y copiarla **literalmente** a `umbrales.md` §2 (valores, unidad, zona, página del PDF, regla de niveles). Sin interpretar ni redondear.
 - [ ] **Paso 4:** con el esquema real de AEMET (Task 4), escribir en `umbrales.md` §2 la **propuesta** para DEC-06 (qué dato horario se compara y con qué). No es decisión.
-- [ ] **Paso 5:** `git add docs/referencia/umbrales.md docs/PENDIENTES.md && git commit -m "Umbrales de calor del plan de Sanidad 2026"` (P-03 ✅).
+- [ ] **Paso 5:** `git add docs/assets/umbrales.md docs/PENDIENTES.md && git commit -m "Umbrales de calor del plan de Sanidad 2026"` (P-03 ✅).
 
 **Terminado cuando:** `umbrales.md` §2 tiene los umbrales oficiales de Madrid con página citada y una propuesta para DEC-06.
 

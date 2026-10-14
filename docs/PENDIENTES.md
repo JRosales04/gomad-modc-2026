@@ -26,7 +26,7 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
 - **Qué:** esta noche se trabajó en la rama local `preparacion`, **sin subirla a GitHub**. Contiene:
   - `scripts/perfilar_fuentes.py`: perfilador de `data/raw/` (solo stdlib, ~5 s).
   - `docs/informe-datos.md`: resultado del perfil, 12 trampas nuevas y cifras comprobadas.
-  - `docs/referencia/umbrales.md`: ICA oficial (BOE) completo; calor pendiente.
+  - `docs/assets/umbrales.md`: ICA oficial (BOE) completo; calor pendiente.
   - `docs/decisiones-pendientes.md` y este fichero.
 - **Cómo:**
   ```bash
@@ -59,7 +59,7 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
   ```bash
   ! sudo apt install -y poppler-utils
   ```
-  Después, pedid a Claude: «lee el plan de calor 2026 y completa `docs/referencia/umbrales.md` §2». El PDF está en `/tmp/claude-1000/…/scratchpad/calor/plan2026.pdf` (puede haberse borrado; si no, se vuelve a bajar de la URL que figura en `umbrales.md` §2).
+  Después, pedid a Claude: «lee el plan de calor 2026 y completa `docs/assets/umbrales.md` §2». El PDF está en `/tmp/claude-1000/…/scratchpad/calor/plan2026.pdf` (puede haberse borrado; si no, se vuelve a bajar de la URL que figura en `umbrales.md` §2).
 - **Hay que buscar también:** la tabla de umbrales de Meteoalerta (AEMET) por zona de Madrid y el plan de calor de la Comunidad de Madrid.
 - **Desbloquea:** D-06.
 
@@ -132,7 +132,7 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
 ## Hecho esta noche (14/10/2026)
 
 - ✅ Perfil completo de las 46 fuentes descargadas → `docs/informe-datos.md`.
-- ✅ ICA oficial verificado contra el BOE: bandas, periodos, colores y recomendaciones literales → `docs/referencia/umbrales.md` §1.
+- ✅ ICA oficial verificado contra el BOE: bandas, periodos, colores y recomendaciones literales → `docs/assets/umbrales.md` §1.
 - ✅ Códigos de magnitud y bandera `T`/`V`/`N` verificados contra la descripción oficial del fichero de la Comunidad.
 - ✅ Geocodificación de direcciones resuelta (falta decidir si se usa) → D-04.
 - ✅ Ficha de decisiones → `docs/decisiones-pendientes.md`.

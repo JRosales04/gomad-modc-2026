@@ -1,6 +1,6 @@
 # Decisiones pendientes — para cerrar el miércoles 14/10/2026
 
-Preparado de madrugada el 14/10/2026. **No se ha decidido nada**: cada ficha da contexto, opciones, una recomendación razonada y qué desbloquea. Cuando decidáis, apuntad la decisión en el CLAUDE.md §11 (y en `docs/referencia/requisitos_fuentes.json` si toca fuentes o requisitos).
+Preparado de madrugada el 14/10/2026. **No se ha decidido nada**: cada ficha da contexto, opciones, una recomendación razonada y qué desbloquea. Cuando decidáis, apuntad la decisión en el CLAUDE.md §11 (y en `docs/assets/requisitos_fuentes.json` si toca fuentes o requisitos).
 
 Orden propuesto: primero las **bloqueantes** (D-01 a D-04), que impiden empezar a programar; el resto puede decidirse a lo largo del día.
 
@@ -78,7 +78,7 @@ Orden propuesto: primero las **bloqueantes** (D-01 a D-04), que impiden empezar 
 
 ## D-05 · Regla de aire según el perfil
 
-**Contexto:** el ICA tiene **una sola tabla de bandas** (no hay bandas distintas para personas sensibles, contra lo que dice el CLAUDE.md §6.2). Lo que cambia por población es la **recomendación**. Ver `docs/referencia/umbrales.md` §1.4–1.5.
+**Contexto:** el ICA tiene **una sola tabla de bandas** (no hay bandas distintas para personas sensibles, contra lo que dice el CLAUDE.md §6.2). Lo que cambia por población es la **recomendación**. Ver `docs/assets/umbrales.md` §1.4–1.5.
 
 **Propuesta derivada del texto oficial** (para validar):
 

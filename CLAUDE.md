@@ -24,7 +24,7 @@ Este archivo es el contexto completo del proyecto para Claude Code. Se escribió
 2. **Ámbito: toda la Comunidad de Madrid, los 179 municipios, sin ningún filtro por población.** La idea inicial de «municipios de menos de 50.000 habitantes» está **descartada**; no la reintroduzcas.
 3. **Ayuntamiento de Madrid (datos.madrid.es) solo como complemento para Madrid capital**, que falta en varias fuentes regionales. Las fuentes base son de la Comunidad (lo exigen las bases).
 4. **La IA interpreta y explica; el motor de reglas decide.** Nunca uses un LLM para elegir destinos, calcular rutas ni puntuar. El LLM solo convierte texto libre en parámetros estructurados y redacta explicaciones con resultados del motor, sin añadir datos.
-5. **No inventes identificadores de datasets ni campos.** Usa los de este archivo y de `docs/referencia/requisitos_fuentes.json`; si necesitas uno nuevo, compruébalo contra la API real antes de usarlo.
+5. **No inventes identificadores de datasets ni campos.** Usa los de este archivo y de `docs/assets/requisitos_fuentes.json`; si necesitas uno nuevo, compruébalo contra la API real antes de usarlo.
 6. **Consumo automatizado por API**, no cargas manuales (lo exigen las bases y RNF-06). La ingesta parte de `scripts/descargar_fuentes.py`.
 7. **Nomecalles: usa solo la descarga pública sin clave** (sección 7). Su web lleva credenciales OAuth incrustadas en el JavaScript: **no las uses**, no son nuestras.
 8. **Privacidad:** sin registro, sin datos de salud, la ubicación solo se usa en la consulta. Al proveedor de IA no se envía ubicación exacta ni datos personales.
@@ -32,7 +32,7 @@ Este archivo es el contexto completo del proyecto para Claude Code. Se escribió
 10. **Accesibilidad:** móvil primero, WCAG 2.1 AA, cada indicador con icono + color de semáforo + texto (nunca solo color).
 11. **Licencias:** atribución de cada fuente en la app (CKAN Comunidad y Ayuntamiento: CC BY 4.0; OSM: ODbL; AEMET: su aviso legal). Los datasets que publiquemos: CC BY.
 12. **Alcance:** priorizar F1–F5 sobre los pilotos. No añadir funcionalidades ni fuentes nuevas sin preguntar; el plazo es muy corto.
-13. Si cambias requisitos o fuentes, **actualiza `docs/referencia/requisitos_fuentes.json` y este archivo**.
+13. Si cambias requisitos o fuentes, **actualiza `docs/assets/requisitos_fuentes.json` y este archivo**.
 
 ## 3. Estructura del repositorio
 
@@ -49,11 +49,13 @@ app/                              ← TODO el código (desde el 14/10). Un direc
   deploy/                         ← docker-compose.yml
   data/raw/<fuente>/              ← volumen compartido: datos descargados + manifest.json (URL, fecha, tamaño)
 docs/contexto-muevete-cerca.md    ← documento largo: matriz requisito→fuente con enlaces, esquemas, tabla de 25 municipios
-docs/referencia/requisitos_fuentes.json   ← matriz de trazabilidad en JSON (24 requisitos), fuente de verdad
-docs/referencia/municipios_candidatos.json← 25 municipios con más datos y sus 23 indicadores
-docs/referencia/matriz-datos.html ← página de trabajo (copia local del artifact)
-docs/idea/                        ← documento de idea .docx (DESACTUALIZADO, ver §4.3), prototipo visual .png y .html, notas ChatGPT
-docs/presentaciones/              ← 8 PDF de la jornada del 6/10
+docs/assets/requisitos_fuentes.json    ← matriz de trazabilidad en JSON (24 requisitos), fuente de verdad
+docs/assets/municipios_candidatos.json ← 25 municipios con más datos y sus 23 indicadores
+docs/assets/umbrales.md                ← umbrales oficiales (ICA del BOE; calor pendiente)
+docs/assets/matriz-datos.html          ← página de trabajo (copia local del artifact)
+docs/idea/                        ← documento de idea .docx (DESACTUALIZADO, ver §4.3), prototipo visual .png y .html, logo_gomad.png, notas ChatGPT
+docs/idea/pdf/                    ← GoMAD: aproximación técnica, fuentes de datos e interfaz de usuario (PDF)
+docs/bases/                       ← bases del reto (Bases-MAD-Open-Data-Challenge-2026.pdf) + 8 PDF de la jornada del 6/10
 ```
 
 **Arranque en un equipo nuevo:**
@@ -265,7 +267,7 @@ No hacer: recomendador que aprende del usuario (exige guardar historial), IA que
 
 **Ayuntamiento (capital):** aire `212531-0-calidad-aire-tiempo-real` (mismo formato H/V), estaciones `212629-0-estaciones-control-aire` (24), meteo `300392-0-meteorologia-tiempo-real`, tráfico `202087-0-trafico-intensidad` (pm.xml), fuentes `300051-0-fuentes`, polideportivos `200186-0-polideportivos`, básicas `200215-0-instalaciones-deportivas`, piscinas `210227-0-piscinas-publicas`, parques `200761-0-parques-jardines`, panel de barrios `300087-0-indicadores-distritos`, bancos `300095-0-mobiliario-bancos`, papeleras `300096-0-mobiliario-papeleras`, áreas caninas `300094-0-areas-caninas`, aseos `300103-0-aseos-publicos-operativos`, áreas infantiles `200652-0-areas-infantiles`, censo de locales `200085-0-censo-locales`.
 
-La **matriz completa requisito → fuente con enlaces** está en `docs/referencia/requisitos_fuentes.json` y en la sección 6 de `docs/contexto-muevete-cerca.md`.
+La **matriz completa requisito → fuente con enlaces** está en `docs/assets/requisitos_fuentes.json` y en la sección 6 de `docs/contexto-muevete-cerca.md`.
 
 ### 7.3 Estrategia de cobertura (179 municipios)
 | Capa | Principal | Complementos |
