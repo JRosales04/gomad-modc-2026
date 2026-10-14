@@ -6,7 +6,7 @@
 
 **Arquitectura:** tres servicios de Docker Compose, cada uno en su directorio de `app/` con sus propias dependencias: **`ingest`** (descarga por niveles de recarga → normalizadores → GeoParquet → `gomad.duckdb` + `realtime.duckdb` + grafo), **`api`** (FastAPI sin estado con el grafo peatonal en memoria: igraph + `scipy.sparse.csgraph`) y **`frontend`** (SPA React + Vite + TypeScript con MapLibre, compilada y servida por Caddy con HTTPS). Comparten `app/data/` (volumen) y `app/config/` (solo lectura). Despliegue en una VM de OCI.
 
-**Stack:** Python 3.12, DuckDB (+ `spatial` solo en ingest), GeoPandas/pyogrio/pyproj/shapely 2, pyrosm (o pyosmium de respaldo), python-igraph, SciPy, FastAPI + Pydantic v2, pytest · Node 20 LTS, React 18, Vite 5, TypeScript, react-map-gl (MapLibre), React Router, TanStack Query, Radix UI, MSW, Vitest + axe · Docker Compose, Caddy, OCI.
+**Stack:** Python 3.12, DuckDB (+ `spatial` solo en ingest), GeoPandas/pyogrio/pyproj/shapely 2, pyrosm (o pyosmium de respaldo), python-igraph, SciPy, FastAPI + Pydantic v2, pytest · Node 20 LTS, React 18, Vite 5, TypeScript (**front real desde el 14/10: Node ≥ 20.19, React 19, Vite 8, TypeScript 6**, ver `app/frontend/docs/guia.md` §2.1), react-map-gl (MapLibre), React Router, TanStack Query, Radix UI, MSW, Vitest + axe · Docker Compose, Caddy, OCI.
 
 **Spec:** `docs/arquitectura.md` (manda sobre CLAUDE.md §6 donde difieran). Contexto: `CLAUDE.md`, `docs/PENDIENTES.md`, `docs/decisiones-pendientes.md`, `docs/informe-datos.md`, `docs/assets/umbrales.md`, `docs/assets/requisitos_fuentes.json`.
 
@@ -55,14 +55,15 @@ Ejecuta SOLO las tareas 2, 3 y 4 (rol Datos, miércoles). Salta lo marcado [manu
 - **Registro de progreso:** la skill guarda un *ledger* en `.superpowers/sdd/plan-implementacion/progress.md` (ignorado por git, uno por copia del repo). Las tareas con `Task N: complete` no se repiten. La verdad compartida es `git log` en `main`.
 - **Rama:** la skill no trabaja en `main`. Cada rol abre su rama (`datos/mie14`, `motor/jue15`…) o *worktree* y fusiona a `main` con las pruebas en verde.
 - **Revisión final:** al acabar su rango, la skill pide una revisión de toda la rama.
+- **Frontend [manual guiado] (desde el 14/10):** la SPA de `app/frontend/` la construye **a mano** la persona del front, que ya está trabajando en ella. Las tareas marcadas **[manual guiado]** (Task 10, Tasks 23–25 y las filas de Front de viernes a domingo) **no las ejecuta el agente**: las salta y lo anota en el registro. La persona las hace siguiendo `app/frontend/docs/guia.md` (estado, desajustes, plan por días, contrato, checklist) y `app/frontend/docs/pantallas.md` (especificación de cada pantalla). El contenido original de esas tareas se conserva como referencia (archivos, pruebas y criterios de «terminado»), salvo las versiones de la Task 10, que ya no aplican (ver la guía §2.1). Un agente **sí** puede documentar, revisar o verificar ese trabajo, pero no escribir en `app/frontend/` sin que la persona lo pida.
 - **Días 16–19:** están como tablas, **no** como `### Task N:`. Cada tarde, quien coordine pide `superpowers:writing-plans` para convertir las tablas del día siguiente en tareas detalladas (Task 26 en adelante) en este mismo fichero.
 
 ### Rangos por día y rol
 
 | Día | Datos (`ingest`) | Motor (`api`, `deploy`) | Rutas (`ingest` + `api`) | Front (`frontend`) |
 |---|---|---|---|---|
-| Mié 14 | 2, 3, 4 | 1 (primero), 5, 6 [manual], 7 | 8 | 9 [manual], 10 |
-| Jue 15 | 16, 17, 18, 19 | 11 (9:00), 12, 13, 14, 15 | 20, 21, 22 | 23, 24, 25 |
+| Mié 14 | 2, 3, 4 | 1 (primero), 5, 6 [manual], 7 | 8 | 9 ✅ (`app/frontend/docs/pantallas.md`), 10 [manual guiado] |
+| Jue 15 | 16, 17, 18, 19 | 11 (9:00), 12, 13, 14, 15 | 20, 21, 22 | 23, 24, 25 [manual guiado] |
 
 **Orden obligatorio:** Task 1 antes que cualquier otra tarea Python; Task 11 (contrato) antes que 23–25 y antes que las tareas del viernes.
 
@@ -174,7 +175,7 @@ Cada decisión se apunta en `CLAUDE.md` §11 y `docs/arquitectura.md` §10 y se 
 | DEC-09 | Indicadores de F5 (D-09, A-08) | Datos | Equipo | **vie 16, 12:00** | `config/indicators.yaml` | Bloquea `/municipality` real |
 | DEC-A10 | Forma de la VM de OCI (A-10) | Motor | Motor | **mié 14, al crearla** | `docs/arquitectura.md` §6 | — |
 | DEC-A11 | Tamaño del grafo regional y latencia en la capital (A-11) | Rutas | Rutas + equipo | **sáb 17, 14:00** | `docs/arquitectura.md` §4.4 | Solo Getafe (recorte n.º 2) |
-| DEC-A02 | Detalle de cada pantalla (A-02) | Front | Front + maquetadora | Antes de maquetar cada una | `docs/pantallas.md` | — |
+| DEC-A02 | Detalle de cada pantalla (A-02) | Front | Front + maquetadora | Antes de maquetar cada una | `app/frontend/docs/pantallas.md` | — |
 
 **Reunión de decisiones del jueves a las 11:00 (45 min):** DEC-05, DEC-07, DEC-07b, DEC-08. Lo que no tenga fuente oficial queda en el YAML con `own_criterion: true`.
 
@@ -1246,19 +1247,23 @@ if __name__ == "__main__":
 
 ### Task 9: M-F1 · Bocetos con la maquetadora (DEC-A02, primera ronda) [manual]
 
+> **✅ Hecha el 14/10 como documentación (pendiente de validar con la maquetadora):** `app/frontend/docs/pantallas.md` especifica las 8 pantallas (Inicio y Resultados incluidas) con los campos del contrato de la Task 11, estados, accesibilidad, estado actual del código del compañero y preguntas abiertas (§10). Falta la ronda con la maquetadora: cada sección acaba con «Validar con la maquetadora». Los pasos de abajo se conservan como referencia.
+
 **Rol:** Front · **Duración:** 2–3 h · **Tarea manual** (trabajo con la maquetadora).
 
-**Ficheros:** Crear `docs/pantallas.md`.
+**Ficheros:** Crear `app/frontend/docs/pantallas.md`.
 
 - [ ] **Paso 1:** recorrer `docs/idea/muevete-cerca-prototipo.html` y la tabla de arquitectura §5.2. Para **Inicio** y **Resultados**, cerrar: elementos, textos, orden de foco, estados (cargando, error, vacío, «sin datos») y cómo se ve cada indicador (icono + color + texto).
-- [ ] **Paso 2:** `docs/pantallas.md` con una sección por pantalla: propósito, endpoint que usa (nombres de Task 11), componentes, estados y accesibilidad. Las no cerradas: «se cierra el <día> antes de maquetar».
+- [ ] **Paso 2:** `app/frontend/docs/pantallas.md` con una sección por pantalla: propósito, endpoint que usa (nombres de Task 11), componentes, estados y accesibilidad. Las no cerradas: «se cierra el <día> antes de maquetar».
 - [ ] **Paso 3:** commit.
 
-**Terminado cuando:** Inicio y Resultados están cerrados en `docs/pantallas.md` (bloquean Tasks 24 y 25).
+**Terminado cuando:** Inicio y Resultados están cerrados en `app/frontend/docs/pantallas.md` (bloquean Tasks 24 y 25).
 
 ---
 
-### Task 10: M-F2 · Proyecto Vite + React + TypeScript con estilos y fuentes propias
+### Task 10: M-F2 · Proyecto Vite + React + TypeScript con estilos y fuentes propias [manual guiado]
+
+> **[manual guiado] (14/10):** el proyecto Vite ya existe, creado a mano por la persona del front (React 19.3, Vite 8.3, TypeScript 6.0; no React 18/Vite 5). **No ejecutar los pasos de abajo** (no `npm create vite`, no los `npm install` con estas versiones, que son para Vite 5). Lo que falta de esta tarea (stack, pruebas con axe, fuentes propias, iconos, router, Dockerfile multi-stage, `.dockerignore`) está en **`app/frontend/docs/guia.md` §3, paso 0**, con versiones comprobadas. El criterio «Terminado cuando» de abajo sigue valiendo.
 
 **Rol:** Front · **Servicio:** `app/frontend/` · **Duración:** 2 h · El paso 1 es **[manual]**.
 
@@ -3896,7 +3901,9 @@ def test_bounded_dijkstra_under_1s(g):
 
 ---
 
-### Task 23: J-F1 · Tipos generados del OpenAPI y MSW
+### Task 23: J-F1 · Tipos generados del OpenAPI y MSW [manual guiado]
+
+> **[manual guiado] (14/10):** la hace a mano la persona del front siguiendo **`app/frontend/docs/guia.md` §3, paso 1** y **`app/frontend/docs/pantallas.md` (campos por pantalla)**. El agente no la ejecuta. Ficheros, pruebas y criterio de «Terminado cuando» de abajo siguen siendo la referencia.
 
 **Rol:** Front · **Servicio:** `app/frontend/` · **Depende de:** Tasks 11, 10 · **Duración:** 1,5 h
 
@@ -3940,7 +3947,9 @@ export const client = {
 
 ---
 
-### Task 24: J-F2 · Pantalla Inicio «¿Qué te apetece hacer?»
+### Task 24: J-F2 · Pantalla Inicio «¿Qué te apetece hacer?» [manual guiado]
+
+> **[manual guiado] (14/10):** la hace a mano la persona del front siguiendo **`app/frontend/docs/guia.md` §3, paso 2** y **`app/frontend/docs/pantallas.md` §1**. El agente no la ejecuta. Ficheros, pruebas y criterio de «Terminado cuando» de abajo siguen siendo la referencia.
 
 **Rol:** Front · **Servicio:** `app/frontend/` · **Depende de:** Tasks 23, 9 · **Duración:** 3 h
 
@@ -3956,7 +3965,9 @@ export const client = {
 
 ---
 
-### Task 25: J-F3 · Pantalla Resultados (lista, sin mapa todavía)
+### Task 25: J-F3 · Pantalla Resultados (lista, sin mapa todavía) [manual guiado]
+
+> **[manual guiado] (14/10):** la hace a mano la persona del front siguiendo **`app/frontend/docs/guia.md` §3, paso 3** y **`app/frontend/docs/pantallas.md` §2**. El agente no la ejecuta. Ficheros, pruebas y criterio de «Terminado cuando» de abajo siguen siendo la referencia.
 
 **Rol:** Front · **Servicio:** `app/frontend/` · **Depende de:** Task 24 · **Duración:** 3 h
 
@@ -3982,6 +3993,8 @@ export const client = {
 
 # VIERNES 16/10 — tareas (se detallan el jueves por la tarde; rutas relativas a `app/`)
 
+> Filas de Front: **[manual guiado]**, se hacen a mano con `app/frontend/docs/guia.md` §3 (paso 4 y 5) y `app/frontend/docs/pantallas.md`; al detallar el día con `writing-plans` no se convierten en `### Task N:` ejecutables por el agente.
+
 | ID | Rol | Tarea | Ficheros | Terminado cuando | Prueba |
 |---|---|---|---|---|---|
 | V-D1 | Datos | Normalizador de servicios (`sanitarios` contando `centro_nro_registro` distintos, tipos «Centro de salud»/«Consultorio de atención primaria»; `farmacias` con coma decimal; `educativos` con `SITUACIÓN`=ALTA; `atencion_social` sin «RESERVADO»; EIEL `cultural`/`nucleos`) → `service.parquet`; tabla `municipality_indicator(ine_code, category, key, value NULL=sin datos, unit, year, source)` según **DEC-09** (`config/indicators.yaml`) en `build_main` | `ingest/normalize/services.py`, `ingest/build_db.py`, `config/indicators.yaml` | 179 municipios con todas sus filas de indicador (valor o NULL), coberturas iguales a D-09 | `ingest/tests/test_services.py`: 429 centros de salud + consultorios; educativos ALTA 3.906; 177 RESERVADO excluidos; Patones `sport` NULL (no 0) |
@@ -3990,12 +4003,14 @@ export const client = {
 | V-M1 | Motor | `/activities` y `/recommend` reales: `repository.py` (candidatos por caja + haversine en DuckDB solo lectura, reabriendo `realtime.duckdb` por petición), `bounded_distances` (Task 21) donde hay grafo y haversine × factor de rodeo (criterio propio, marcado) donde no, estación más cercana o de la zona, `HourContext` por hora, `slots`, `scoring`; «Sorpréndeme» = 3 actividades distintas; middleware de log **sin ubicación** (ruta, código y ms) | `api/repository.py`, `api/services/recommend.py`, `api/main.py` | < 3 s en Getafe y capital; `warnings` cuando falta un factor | `api/tests/test_endpoints.py`: `test_recommend_getafe`, `test_recommend_capital_without_vpla`, `test_surprise_me_three_distinct_activities`, `test_logs_without_location` |
 | V-M2 | Motor | `explanation.py`: plantillas en lenguaje llano con factores dominantes y mejor hora; cita fuente y fecha; marca criterio propio | `api/engine/explanation.py` | Explicación sin datos que no estén en la respuesta | `api/tests/engine/test_explanation.py`: cifras de la frase = cifras del objeto; Carmen recibe «Ahora no: mejor a las …» |
 | V-R1 | Rutas | `/route` en Getafe: grafo cargado al arrancar (`lifespan`), directa y saludable en paralelo (`ThreadPoolExecutor`), GeoJSON, `description`, POIs de `route_poi` a ≤ 25 m; fuera del grafo o desconectado → línea recta `approximate=True` + aviso; tiempo con la velocidad de DEC-07 | `api/services/route.py`, `api/main.py` | < 5 s; nunca 500 por ruta imposible | `test_route_getafe`, `test_route_outside_graph_is_approximate` |
-| V-F1 | Front | Mapa MapLibre sincronizado con la lista (RF-11); la lista es el equivalente completo; OpenFreeMap en desarrollo | `frontend/src/components/Map.tsx` | Selección sincronizada | Vitest: seleccionar tarjeta cambia el marcador activo |
-| V-F2 | Front | Detalle «¿Por qué?»: nota por factor, línea horaria con mejor franja, aire y tiempo con icono+color+texto (colores ICA de `umbrales.md` §1.3 como pastilla con contraste), fuente y fecha | `frontend/src/screens/Detail.tsx` | Contraste ≥ 4,5:1 | Vitest + axe |
-| V-F3 | Front | Panel «Ajustar» (hoja inferior Radix): pesos con recálculo al soltar (RF-16), perfil, «Salgo con…», tiempo y distancia | `frontend/src/components/SettingsSheet.tsx` | Mover un peso cambia el orden sin recargar | Vitest: soltar lanza una sola petición |
-| V-F4 | Front + Motor **[manual en parte]** | **Primer despliegue HTTPS**: dominio (DEC-10) o subdominio gratuito; `DOMAIN=<dominio>` en `app/deploy/.env` de la VM (no en `app/.env`); imagen `frontend` multi-stage; `app/data/` en la VM | `deploy/*`, `docs/arquitectura.md` §6 | `https://<dominio>/` abre en un móvil y pide la ubicación | `curl -I https://…/api/health` → 200 con certificado válido |
+| V-F1 | Front **[manual guiado]** | Mapa MapLibre sincronizado con la lista (RF-11); la lista es el equivalente completo; OpenFreeMap en desarrollo | `frontend/src/components/Map.tsx` | Selección sincronizada | Vitest: seleccionar tarjeta cambia el marcador activo |
+| V-F2 | Front **[manual guiado]** | Detalle «¿Por qué?»: nota por factor, línea horaria con mejor franja, aire y tiempo con icono+color+texto (colores ICA de `umbrales.md` §1.3 como pastilla con contraste), fuente y fecha | `frontend/src/screens/Detail.tsx` | Contraste ≥ 4,5:1 | Vitest + axe |
+| V-F3 | Front **[manual guiado]** | Panel «Ajustar» (hoja inferior Radix): pesos con recálculo al soltar (RF-16), perfil, «Salgo con…», tiempo y distancia | `frontend/src/components/SettingsSheet.tsx` | Mover un peso cambia el orden sin recargar | Vitest: soltar lanza una sola petición |
+| V-F4 | Front + Motor **[manual en parte]**; parte del front **[manual guiado]** | **Primer despliegue HTTPS**: dominio (DEC-10) o subdominio gratuito; `DOMAIN=<dominio>` en `app/deploy/.env` de la VM (no en `app/.env`); imagen `frontend` multi-stage; `app/data/` en la VM | `deploy/*`, `docs/arquitectura.md` §6 | `https://<dominio>/` abre en un móvil y pide la ubicación | `curl -I https://…/api/health` → 200 con certificado válido |
 
 # SÁBADO 17/10 — tareas (rutas relativas a `app/`)
+
+> Filas de Front: **[manual guiado]**, se hacen a mano con `app/frontend/docs/guia.md` §3 (paso 6) y `app/frontend/docs/pantallas.md`; al detallar el día con `writing-plans` no se convierten en `### Task N:` ejecutables por el agente.
 
 | ID | Rol | Tarea | Ficheros | Terminado cuando | Prueba |
 |---|---|---|---|---|---|
@@ -4004,18 +4019,20 @@ export const client = {
 | S-D3 | Datos (baja prioridad) | Traducir identificadores internos de `ingest/scripts/profile_sources.py` (solo nombres; mismo resultado) | `ingest/scripts/profile_sources.py` | `data/perfil/perfil.json` idéntico antes y después | `diff` de la salida |
 | S-M1 | Motor | `/municipality/{ine_code}`: indicadores por categoría con «sin datos» explícito y encaje con preferencias, **sin ranking** (RF-17, RF-18); código inexistente → 404 legible | `api/services/municipality.py` | 179 códigos responden | `test_municipality_179_respond`, `test_municipality_missing_is_null`, `test_municipality_unknown_404` |
 | S-R1 | Rutas | **Grafo de toda la Comunidad** (`python -m graph all` en `ingest`; si se queda sin memoria, `osmium extract` por caja); `green_pct` en los 13 sin VPLA con parques OSM o cubierta terrestre por `bbox`; validación: capital, San Lorenzo (28131) y uno sin mobiliario; memoria y latencia → **DEC-A11 antes de las 14:00** | `ingest/graph.py`, `docs/arquitectura.md` §4.4 | Rutas válidas en las 3 muestras < 5 s, o recorte apuntado | `api/tests/routing/test_latency.py` con el grafo regional |
-| S-F1 | Front | Pantalla Ruta: directa vs. saludable en mapa y en texto, métricas, fuentes/bancos/DEA, aviso si `approximate` | `frontend/src/screens/Route.tsx` | Descripción en texto completa sin mirar el mapa | Vitest + axe |
-| S-F2 | Front | Pantalla Municipio: indicadores por categoría, «sin datos» visible, encaje, sin rankings | `frontend/src/screens/Municipality.tsx` | Getafe, capital y Patones | Vitest + axe |
+| S-F1 | Front **[manual guiado]** | Pantalla Ruta: directa vs. saludable en mapa y en texto, métricas, fuentes/bancos/DEA, aviso si `approximate` | `frontend/src/screens/Route.tsx` | Descripción en texto completa sin mirar el mapa | Vitest + axe |
+| S-F2 | Front **[manual guiado]** | Pantalla Municipio: indicadores por categoría, «sin datos» visible, encaje, sin rankings | `frontend/src/screens/Municipality.tsx` | Getafe, capital y Patones | Vitest + axe |
 
 # DOMINGO 18/10 — tareas (fin del día: congelación; rutas relativas a `app/`)
+
+> Filas de Front: **[manual guiado]**, se hacen a mano con `app/frontend/docs/guia.md` §3 (paso 7) y `app/frontend/docs/pantallas.md`; al detallar el día con `writing-plans` no se convierten en `### Task N:` ejecutables por el agente.
 
 | ID | Rol | Tarea | Ficheros | Terminado cuando | Prueba |
 |---|---|---|---|---|---|
 | D-D1 | Datos | **Servicio `ingest` en Compose:** `ingest/Dockerfile` (Python 3.12 + su `pyproject.toml` + cron con los guiones de S-D2: horario, 04:00, semanal, mensual), volúmenes `../data:/data` (lectura y escritura) y `../config:/config:ro`. Caché ante caídas en la API: si `realtime.duckdb` tiene más de 2 h, la API sigue y avisa con la hora real; tráfico de la capital en memoria 5–15 min con respaldo por tipo de vía | `ingest/Dockerfile`, `deploy/docker-compose.yml`, `api/repository.py` | Sin red 1 h: la app sigue y avisa; el cron recarga sola la ingesta horaria | `test_stale_data_warns`; `docker compose logs ingest` tras una hora |
 | D-M1 | Motor | **F6** (primer recorte): `/assistant/interpret` con el proveedor de DEC-03 validando contra `AssistantParams` (rechazo de consejo médico y fuera de catálogo, aclaración si ambiguo; **sin ubicación** en el prompt); `/assistant/route` comprueba cada condición con datos del motor y luego `write_up`; si la IA falla → plantillas y `written_by_ai=False`; respuestas grabadas en `api/ai/recorded.py` | `api/ai/*.py`, `api/main.py` | Funciona con y sin LLM | `api/tests/test_assistant.py`: JSON inválido del LLM → aclaración, no 500; el prompt no contiene coordenadas; condiciones salen del motor |
 | D-R1 | Rutas | Ruta circular por distancia objetivo (RF-22): puntos de paso a ≈ objetivo/3 con la saludable, ±10 %; si no, la más cercana con aviso | `api/routing/loop.py` | 5 km en Getafe entre 4,5 y 5,5 km | `api/tests/routing/test_loop.py` (`slow`) |
-| D-F1 | Front | Asistente (F6): texto → chips editables → ruta + condiciones; usable solo con formulario | `frontend/src/screens/Assistant.tsx` | Funciona sin IA | Vitest + axe |
-| D-F2 | Front | Fuentes y aviso: licencias, fechas, «no es consejo médico», privacidad | `frontend/src/screens/Sources.tsx` | Enlazada desde todas las pantallas | Vitest + axe |
+| D-F1 | Front **[manual guiado]** | Asistente (F6): texto → chips editables → ruta + condiciones; usable solo con formulario | `frontend/src/screens/Assistant.tsx` | Funciona sin IA | Vitest + axe |
+| D-F2 | Front **[manual guiado]** | Fuentes y aviso: licencias, fechas, «no es consejo médico», privacidad | `frontend/src/screens/Sources.tsx` | Enlazada desde todas las pantallas | Vitest + axe |
 | **D-X** | Todos | **23:59 — congelación de alcance.** Solo correcciones. Lo que no esté en `main` con pruebas en verde **no entra**. Aplicar el orden de recorte si hace falta y anotarlo en `docs/arquitectura.md` §9 | — | `git tag congelacion-18oct` | `pytest` (api e ingest) y `npx vitest run` en verde en la etiqueta |
 
 **Oracle/APEX (arquitectura §3.5):** solo si F1–F5 están terminados el domingo a mediodía (recorte n.º 3).
