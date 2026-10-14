@@ -6,7 +6,7 @@
 
 **Arquitectura:** tres servicios de Docker Compose, cada uno en su directorio de `app/` con sus propias dependencias: **`ingest`** (descarga por niveles de recarga → normalizadores → GeoParquet → `gomad.duckdb` + `realtime.duckdb` + grafo), **`api`** (FastAPI sin estado con el grafo peatonal en memoria: igraph + `scipy.sparse.csgraph`) y **`frontend`** (SPA React + Vite + TypeScript con MapLibre, compilada y servida por Caddy con HTTPS). Comparten `app/data/` (volumen) y `app/config/` (solo lectura). Despliegue en una VM de OCI.
 
-**Stack:** Python 3.12, DuckDB (+ `spatial` solo en ingest), GeoPandas/pyogrio/pyproj/shapely 2, pyrosm (o pyosmium de respaldo), python-igraph, SciPy, FastAPI + Pydantic v2, pytest · Node 20 LTS, React 18, Vite 5, TypeScript, react-map-gl (MapLibre), React Router, TanStack Query, Radix UI, MSW, Vitest + axe · Docker Compose, Caddy, OCI.
+**Stack:** Python 3.12, DuckDB (+ `spatial` solo en ingest), GeoPandas/pyogrio/pyproj/shapely 2, pyrosm (o pyosmium de respaldo), python-igraph, SciPy, FastAPI + Pydantic v2, pytest · Node 20 LTS, React 18, Vite 5, TypeScript (**front real desde el 14/10: Node ≥ 20.19, React 19, Vite 8, TypeScript 6**, ver `app/frontend/docs/guia.md` §2.1), react-map-gl (MapLibre), React Router, TanStack Query, Radix UI, MSW, Vitest + axe · Docker Compose, Caddy, OCI.
 
 **Spec:** `docs/arquitectura.md` (manda sobre CLAUDE.md §6 donde difieran). Contexto: `CLAUDE.md`, `docs/PENDIENTES.md`, `docs/decisiones-pendientes.md`, `docs/informe-datos.md`, `docs/assets/umbrales.md`, `docs/assets/requisitos_fuentes.json`.
 
@@ -55,14 +55,14 @@ Ejecuta SOLO las tareas 2, 3 y 4 (rol Datos, miércoles). Salta lo marcado [manu
 - **Registro de progreso:** la skill guarda un *ledger* en `.superpowers/sdd/plan-implementacion/progress.md` (ignorado por git, uno por copia del repo). Las tareas con `Task N: complete` no se repiten. La verdad compartida es `git log` en `main`.
 - **Rama:** la skill no trabaja en `main`. Cada rol abre su rama (`datos/mie14`, `motor/jue15`…) o *worktree* y fusiona a `main` con las pruebas en verde.
 - **Revisión final:** al acabar su rango, la skill pide una revisión de toda la rama.
-- **Frontend [manual guiado] (desde el 14/10):** la SPA de `app/frontend/` la construye **a mano** la persona del front, que ya está trabajando en ella. Las tareas marcadas **[manual guiado]** (Task 10, Tasks 23–25 y las filas de Front de viernes a domingo) **no las ejecuta el agente**: las salta y lo anota en el registro. La persona las hace siguiendo `docs/frontend-guia.md` (estado, desajustes, plan por días, contrato, checklist) y `docs/pantallas.md` (especificación de cada pantalla). El contenido original de esas tareas se conserva como referencia (archivos, pruebas y criterios de «terminado»), salvo las versiones de la Task 10, que ya no aplican (ver la guía §2.1). Un agente **sí** puede documentar, revisar o verificar ese trabajo, pero no escribir en `app/frontend/` sin que la persona lo pida.
+- **Frontend [manual guiado] (desde el 14/10):** la SPA de `app/frontend/` la construye **a mano** la persona del front, que ya está trabajando en ella. Las tareas marcadas **[manual guiado]** (Task 10, Tasks 23–25 y las filas de Front de viernes a domingo) **no las ejecuta el agente**: las salta y lo anota en el registro. La persona las hace siguiendo `app/frontend/docs/guia.md` (estado, desajustes, plan por días, contrato, checklist) y `app/frontend/docs/pantallas.md` (especificación de cada pantalla). El contenido original de esas tareas se conserva como referencia (archivos, pruebas y criterios de «terminado»), salvo las versiones de la Task 10, que ya no aplican (ver la guía §2.1). Un agente **sí** puede documentar, revisar o verificar ese trabajo, pero no escribir en `app/frontend/` sin que la persona lo pida.
 - **Días 16–19:** están como tablas, **no** como `### Task N:`. Cada tarde, quien coordine pide `superpowers:writing-plans` para convertir las tablas del día siguiente en tareas detalladas (Task 26 en adelante) en este mismo fichero.
 
 ### Rangos por día y rol
 
 | Día | Datos (`ingest`) | Motor (`api`, `deploy`) | Rutas (`ingest` + `api`) | Front (`frontend`) |
 |---|---|---|---|---|
-| Mié 14 | 2, 3, 4 | 1 (primero), 5, 6 [manual], 7 | 8 | 9 ✅ (`docs/pantallas.md`), 10 [manual guiado] |
+| Mié 14 | 2, 3, 4 | 1 (primero), 5, 6 [manual], 7 | 8 | 9 ✅ (`app/frontend/docs/pantallas.md`), 10 [manual guiado] |
 | Jue 15 | 16, 17, 18, 19 | 11 (9:00), 12, 13, 14, 15 | 20, 21, 22 | 23, 24, 25 [manual guiado] |
 
 **Orden obligatorio:** Task 1 antes que cualquier otra tarea Python; Task 11 (contrato) antes que 23–25 y antes que las tareas del viernes.
@@ -175,7 +175,7 @@ Cada decisión se apunta en `CLAUDE.md` §11 y `docs/arquitectura.md` §10 y se 
 | DEC-09 | Indicadores de F5 (D-09, A-08) | Datos | Equipo | **vie 16, 12:00** | `config/indicators.yaml` | Bloquea `/municipality` real |
 | DEC-A10 | Forma de la VM de OCI (A-10) | Motor | Motor | **mié 14, al crearla** | `docs/arquitectura.md` §6 | — |
 | DEC-A11 | Tamaño del grafo regional y latencia en la capital (A-11) | Rutas | Rutas + equipo | **sáb 17, 14:00** | `docs/arquitectura.md` §4.4 | Solo Getafe (recorte n.º 2) |
-| DEC-A02 | Detalle de cada pantalla (A-02) | Front | Front + maquetadora | Antes de maquetar cada una | `docs/pantallas.md` | — |
+| DEC-A02 | Detalle de cada pantalla (A-02) | Front | Front + maquetadora | Antes de maquetar cada una | `app/frontend/docs/pantallas.md` | — |
 
 **Reunión de decisiones del jueves a las 11:00 (45 min):** DEC-05, DEC-07, DEC-07b, DEC-08. Lo que no tenga fuente oficial queda en el YAML con `own_criterion: true`.
 
@@ -1247,23 +1247,23 @@ if __name__ == "__main__":
 
 ### Task 9: M-F1 · Bocetos con la maquetadora (DEC-A02, primera ronda) [manual]
 
-> **✅ Hecha el 14/10 como documentación (pendiente de validar con la maquetadora):** `docs/pantallas.md` especifica las 8 pantallas (Inicio y Resultados incluidas) con los campos del contrato de la Task 11, estados, accesibilidad, estado actual del código del compañero y preguntas abiertas (§10). Falta la ronda con la maquetadora: cada sección acaba con «Validar con la maquetadora». Los pasos de abajo se conservan como referencia.
+> **✅ Hecha el 14/10 como documentación (pendiente de validar con la maquetadora):** `app/frontend/docs/pantallas.md` especifica las 8 pantallas (Inicio y Resultados incluidas) con los campos del contrato de la Task 11, estados, accesibilidad, estado actual del código del compañero y preguntas abiertas (§10). Falta la ronda con la maquetadora: cada sección acaba con «Validar con la maquetadora». Los pasos de abajo se conservan como referencia.
 
 **Rol:** Front · **Duración:** 2–3 h · **Tarea manual** (trabajo con la maquetadora).
 
-**Ficheros:** Crear `docs/pantallas.md`.
+**Ficheros:** Crear `app/frontend/docs/pantallas.md`.
 
 - [ ] **Paso 1:** recorrer `docs/idea/muevete-cerca-prototipo.html` y la tabla de arquitectura §5.2. Para **Inicio** y **Resultados**, cerrar: elementos, textos, orden de foco, estados (cargando, error, vacío, «sin datos») y cómo se ve cada indicador (icono + color + texto).
-- [ ] **Paso 2:** `docs/pantallas.md` con una sección por pantalla: propósito, endpoint que usa (nombres de Task 11), componentes, estados y accesibilidad. Las no cerradas: «se cierra el <día> antes de maquetar».
+- [ ] **Paso 2:** `app/frontend/docs/pantallas.md` con una sección por pantalla: propósito, endpoint que usa (nombres de Task 11), componentes, estados y accesibilidad. Las no cerradas: «se cierra el <día> antes de maquetar».
 - [ ] **Paso 3:** commit.
 
-**Terminado cuando:** Inicio y Resultados están cerrados en `docs/pantallas.md` (bloquean Tasks 24 y 25).
+**Terminado cuando:** Inicio y Resultados están cerrados en `app/frontend/docs/pantallas.md` (bloquean Tasks 24 y 25).
 
 ---
 
 ### Task 10: M-F2 · Proyecto Vite + React + TypeScript con estilos y fuentes propias [manual guiado]
 
-> **[manual guiado] (14/10):** el proyecto Vite ya existe, creado a mano por la persona del front (React 19.3, Vite 8.3, TypeScript 6.0; no React 18/Vite 5). **No ejecutar los pasos de abajo** (no `npm create vite`, no los `npm install` con estas versiones, que son para Vite 5). Lo que falta de esta tarea (stack, pruebas con axe, fuentes propias, iconos, router, Dockerfile multi-stage, `.dockerignore`) está en **`docs/frontend-guia.md` §3, paso 0**, con versiones comprobadas. El criterio «Terminado cuando» de abajo sigue valiendo.
+> **[manual guiado] (14/10):** el proyecto Vite ya existe, creado a mano por la persona del front (React 19.3, Vite 8.3, TypeScript 6.0; no React 18/Vite 5). **No ejecutar los pasos de abajo** (no `npm create vite`, no los `npm install` con estas versiones, que son para Vite 5). Lo que falta de esta tarea (stack, pruebas con axe, fuentes propias, iconos, router, Dockerfile multi-stage, `.dockerignore`) está en **`app/frontend/docs/guia.md` §3, paso 0**, con versiones comprobadas. El criterio «Terminado cuando» de abajo sigue valiendo.
 
 **Rol:** Front · **Servicio:** `app/frontend/` · **Duración:** 2 h · El paso 1 es **[manual]**.
 
@@ -3903,7 +3903,7 @@ def test_bounded_dijkstra_under_1s(g):
 
 ### Task 23: J-F1 · Tipos generados del OpenAPI y MSW [manual guiado]
 
-> **[manual guiado] (14/10):** la hace a mano la persona del front siguiendo **`docs/frontend-guia.md` §3, paso 1** y **`docs/pantallas.md` (campos por pantalla)**. El agente no la ejecuta. Ficheros, pruebas y criterio de «Terminado cuando» de abajo siguen siendo la referencia.
+> **[manual guiado] (14/10):** la hace a mano la persona del front siguiendo **`app/frontend/docs/guia.md` §3, paso 1** y **`app/frontend/docs/pantallas.md` (campos por pantalla)**. El agente no la ejecuta. Ficheros, pruebas y criterio de «Terminado cuando» de abajo siguen siendo la referencia.
 
 **Rol:** Front · **Servicio:** `app/frontend/` · **Depende de:** Tasks 11, 10 · **Duración:** 1,5 h
 
@@ -3949,7 +3949,7 @@ export const client = {
 
 ### Task 24: J-F2 · Pantalla Inicio «¿Qué te apetece hacer?» [manual guiado]
 
-> **[manual guiado] (14/10):** la hace a mano la persona del front siguiendo **`docs/frontend-guia.md` §3, paso 2** y **`docs/pantallas.md` §1**. El agente no la ejecuta. Ficheros, pruebas y criterio de «Terminado cuando» de abajo siguen siendo la referencia.
+> **[manual guiado] (14/10):** la hace a mano la persona del front siguiendo **`app/frontend/docs/guia.md` §3, paso 2** y **`app/frontend/docs/pantallas.md` §1**. El agente no la ejecuta. Ficheros, pruebas y criterio de «Terminado cuando» de abajo siguen siendo la referencia.
 
 **Rol:** Front · **Servicio:** `app/frontend/` · **Depende de:** Tasks 23, 9 · **Duración:** 3 h
 
@@ -3967,7 +3967,7 @@ export const client = {
 
 ### Task 25: J-F3 · Pantalla Resultados (lista, sin mapa todavía) [manual guiado]
 
-> **[manual guiado] (14/10):** la hace a mano la persona del front siguiendo **`docs/frontend-guia.md` §3, paso 3** y **`docs/pantallas.md` §2**. El agente no la ejecuta. Ficheros, pruebas y criterio de «Terminado cuando» de abajo siguen siendo la referencia.
+> **[manual guiado] (14/10):** la hace a mano la persona del front siguiendo **`app/frontend/docs/guia.md` §3, paso 3** y **`app/frontend/docs/pantallas.md` §2**. El agente no la ejecuta. Ficheros, pruebas y criterio de «Terminado cuando» de abajo siguen siendo la referencia.
 
 **Rol:** Front · **Servicio:** `app/frontend/` · **Depende de:** Task 24 · **Duración:** 3 h
 
@@ -3993,7 +3993,7 @@ export const client = {
 
 # VIERNES 16/10 — tareas (se detallan el jueves por la tarde; rutas relativas a `app/`)
 
-> Filas de Front: **[manual guiado]**, se hacen a mano con `docs/frontend-guia.md` §3 (paso 4 y 5) y `docs/pantallas.md`; al detallar el día con `writing-plans` no se convierten en `### Task N:` ejecutables por el agente.
+> Filas de Front: **[manual guiado]**, se hacen a mano con `app/frontend/docs/guia.md` §3 (paso 4 y 5) y `app/frontend/docs/pantallas.md`; al detallar el día con `writing-plans` no se convierten en `### Task N:` ejecutables por el agente.
 
 | ID | Rol | Tarea | Ficheros | Terminado cuando | Prueba |
 |---|---|---|---|---|---|
@@ -4010,7 +4010,7 @@ export const client = {
 
 # SÁBADO 17/10 — tareas (rutas relativas a `app/`)
 
-> Filas de Front: **[manual guiado]**, se hacen a mano con `docs/frontend-guia.md` §3 (paso 6) y `docs/pantallas.md`; al detallar el día con `writing-plans` no se convierten en `### Task N:` ejecutables por el agente.
+> Filas de Front: **[manual guiado]**, se hacen a mano con `app/frontend/docs/guia.md` §3 (paso 6) y `app/frontend/docs/pantallas.md`; al detallar el día con `writing-plans` no se convierten en `### Task N:` ejecutables por el agente.
 
 | ID | Rol | Tarea | Ficheros | Terminado cuando | Prueba |
 |---|---|---|---|---|---|
@@ -4024,7 +4024,7 @@ export const client = {
 
 # DOMINGO 18/10 — tareas (fin del día: congelación; rutas relativas a `app/`)
 
-> Filas de Front: **[manual guiado]**, se hacen a mano con `docs/frontend-guia.md` §3 (paso 7) y `docs/pantallas.md`; al detallar el día con `writing-plans` no se convierten en `### Task N:` ejecutables por el agente.
+> Filas de Front: **[manual guiado]**, se hacen a mano con `app/frontend/docs/guia.md` §3 (paso 7) y `app/frontend/docs/pantallas.md`; al detallar el día con `writing-plans` no se convierten en `### Task N:` ejecutables por el agente.
 
 | ID | Rol | Tarea | Ficheros | Terminado cuando | Prueba |
 |---|---|---|---|---|---|
