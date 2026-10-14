@@ -11,7 +11,7 @@ Este archivo es el contexto completo del proyecto para Claude Code. Se escribió
 - **Objetivo del equipo:** no solo una demo, sino una **app web usable que se pueda ofrecer directamente** a la ciudadanía (desplegada, con HTTPS, rápida en móvil).
 - **El equipo ya tiene clave de AEMET OpenData.** Va en `.env` como `AEMET_API_KEY`, nunca en el repositorio. El esquema de su API aún no se ha comprobado con la clave: es una de las primeras tareas (§7.1).
 - **El equipo ya tiene cuenta de Oracle** (acceso de Oracle Academy/OCI para el reto). Las credenciales **nunca** van en el repositorio ni en este archivo: solo en `.env` (ver `.env.example`).
-- **Todavía no hay código de la app.** Sí hay: análisis completo de datos, matriz de trazabilidad requisito → fuente y un script probado que descarga todas las fuentes (`scripts/descargar_fuentes.py`).
+- **Todavía no hay código de la app.** Sí hay: análisis completo de datos, matriz de trazabilidad requisito → fuente y un script probado que descarga todas las fuentes (`scripts/download_sources.py`).
 - **Nombre del proyecto: pendiente de decidir.** Nombre de trabajo: *Muévete Cerca*. Candidatos favoritos (acrónimo en inglés con significado en español):
   - **GOATS** — *Guía de Ocio, Actividad y Trayectos Saludables* (recomendado; logo: cabra montés, que vive en Guadarrama y La Pedriza; lema posible «Sé el GOAT de tu barrio»).
   - **MAD GOAT** — *Madrid Activo y Deportivo: Guía de Ocio, Aire y Trayectos*.
@@ -25,7 +25,7 @@ Este archivo es el contexto completo del proyecto para Claude Code. Se escribió
 3. **Ayuntamiento de Madrid (datos.madrid.es) solo como complemento para Madrid capital**, que falta en varias fuentes regionales. Las fuentes base son de la Comunidad (lo exigen las bases).
 4. **La IA interpreta y explica; el motor de reglas decide.** Nunca uses un LLM para elegir destinos, calcular rutas ni puntuar. El LLM solo convierte texto libre en parámetros estructurados y redacta explicaciones con resultados del motor, sin añadir datos.
 5. **No inventes identificadores de datasets ni campos.** Usa los de este archivo y de `docs/assets/requisitos_fuentes.json`; si necesitas uno nuevo, compruébalo contra la API real antes de usarlo.
-6. **Consumo automatizado por API**, no cargas manuales (lo exigen las bases y RNF-06). La ingesta parte de `scripts/descargar_fuentes.py`.
+6. **Consumo automatizado por API**, no cargas manuales (lo exigen las bases y RNF-06). La ingesta parte de `app/ingest/scripts/download_sources.py`.
 7. **Nomecalles: usa solo la descarga pública sin clave** (sección 7). Su web lleva credenciales OAuth incrustadas en el JavaScript: **no las uses**, no son nuestras.
 8. **Privacidad:** sin registro, sin datos de salud, la ubicación solo se usa en la consulta. Al proveedor de IA no se envía ubicación exacta ni datos personales.
 9. **Explicabilidad y trazabilidad:** cada recomendación lleva su motivo; cada dato mostrado, su fuente y fecha (RF-19); umbrales tomados de fuentes oficiales y citados. **No es consejo médico** (aviso visible).
@@ -41,13 +41,19 @@ CLAUDE.md                         ← este archivo
 .gitignore                        ← app/data/, app/.env y app/*/.venv no se suben
 app/                              ← TODO el código (desde el 14/10). Un directorio por servicio de Docker Compose
   .env.example                    ← copiar a app/.env (compartido por los servicios); claves solo ahí
-  api/                            ← servicio API (FastAPI): engine, routing, ai, services, scripts, tests; .venv propio
-  ingest/                         ← servicio de ingesta: scripts, normalize, tests; .venv propio
-    scripts/descargar_fuentes.py  ← descarga todas las fuentes a app/data/raw/ (solo stdlib, probado)
+  api/                            ← servicio API (FastAPI): pyproject.toml, main.py, engine, routing, ai, services, scripts, tests; .venv propio
+  ingest/                         ← servicio de ingesta: pyproject.toml, scripts, normalize, tests; .venv propio
+    scripts/download_sources.py   ← descarga todas las fuentes a app/data/raw/ (solo stdlib, probado)
+    scripts/profile_sources.py    ← perfil de los datos descargados (app/data/perfil/)
   frontend/                       ← servicio web (React + Vite, compilado y servido con Caddy)
-  config/                         ← YAML compartidos (montado en solo lectura en api e ingest)
+  config/                         ← YAML compartidos (montado en solo lectura en api e ingest); README.md dice qué decisión rellena cada uno
   deploy/                         ← docker-compose.yml
   data/raw/<fuente>/              ← volumen compartido: datos descargados + manifest.json (URL, fecha, tamaño)
+```
+
+Nombres en inglés y un directorio por servicio desde el 14/10 (§2.1 y §3). Cada servicio Python es su propia raíz de importación y **ningún servicio importa código de otro**: lo compartido va por `app/data/`, `app/config/`, `app/.env` y el `openapi.json`. La tabla de equivalencias spec (español) → código está en `docs/arquitectura.md` §9b. Pruebas: `cd app/api && .venv/bin/pytest` y `cd app/ingest && .venv/bin/pytest` (las marcadas `slow` se saltan si falta `app/data/raw`).
+
+```
 docs/contexto-muevete-cerca.md    ← documento largo: matriz requisito→fuente con enlaces, esquemas, tabla de 25 municipios
 docs/assets/requisitos_fuentes.json    ← matriz de trazabilidad en JSON (24 requisitos), fuente de verdad
 docs/assets/municipios_candidatos.json ← 25 municipios con más datos y sus 23 indicadores
@@ -61,9 +67,10 @@ docs/bases/                       ← bases del reto (Bases-MAD-Open-Data-Challe
 **Arranque en un equipo nuevo:**
 ```bash
 cd app/ingest && python3 -m venv .venv && . .venv/bin/activate    # cada servicio Python tiene su venv
-python3 scripts/descargar_fuentes.py --listar
-python3 scripts/descargar_fuentes.py --grupo completo          # ~15 s, ~100 MB, 44 fuentes (probado el 14/10)
-python3 scripts/descargar_fuentes.py --solo vpla_redes         # planeamiento: 107 MB, imprescindible para % verde
+pip install -e ".[dev]"                                        # igual en app/api
+python3 scripts/download_sources.py --listar
+python3 scripts/download_sources.py --grupo completo          # ~15 s, ~100 MB, 44 fuentes (probado el 14/10)
+python3 scripts/download_sources.py --solo vpla_redes         # planeamiento: 107 MB, imprescindible para % verde
 cp ../.env.example ../.env                                     # (app/.env) y poner la clave de AEMET del equipo en AEMET_API_KEY
 ```
 Capas marcadas PESADAS (no se bajan por defecto): `vpla_redes`, `viales`, `cubierta_terrestre` (~137.000 polígonos: mejor pedirla filtrada por `bbox` del piloto), `aire_historico`, `ay_bancos`.
@@ -168,23 +175,24 @@ Soporte: Discord https://discord.gg/ZfNFQvrRb · Web: https://datathon-mad.sel.i
 
 > Diseño técnico aprobado el 14/10: **`docs/arquitectura.md`** (prevalece sobre esta sección donde difieran).
 
-- **Ingesta (Python):** a partir de `scripts/descargar_fuentes.py`; normalizar a **EPSG:4326** y **UTF-8**; programada por niveles de recarga (§6.4); caché del último dato válido.
+- **Ingesta (Python, `app/ingest/`):** a partir de `scripts/download_sources.py`; normalizar a **EPSG:4326** y **UTF-8**; programada por niveles de recarga (§6.4); caché del último dato válido.
 - **Almacén:** DuckDB + Parquet/GeoParquet **o** Oracle Autonomous Database (ya hay cuenta de Oracle). **Decisión pendiente** (ver §11). Oracle facilita Select AI/APEX para la pantalla de administración y OCI Generative AI para F6, y suma con el patrocinador; DuckDB es más simple de montar y desplegar.
-- **API (FastAPI):** `/recomendar`, `/ruta`, `/municipio/{cod_ine}`, `/asistente` (F6), `/fuentes` (atribución y fechas).
+- **API (FastAPI, `app/api/`):** `/recommend`, `/route`, `/municipality/{ine_code}`, `/assistant/*` (F6), `/sources` (atribución y fechas), `/activities`, `/location`.
 - **Rutas:** grafo peatonal de OSM (extracto Geofabrik + OSMnx o similar) precalculado por municipio piloto; coste por tramo = longitud × penalización por tráfico/tipo de vía − bonificación por verde, sombra y fuentes.
 - **Frontend:** SPA móvil con MapLibre GL; navegación inferior «Mi entorno · Municipios · Perfil»; 5 pantallas (inicio «¿Qué quieres hacer?», resultados mapa+lista, detalle con «¿Por qué?» y mejor franja, ruta saludable, vista de municipio) + asistente F6.
 - **Despliegue:** HTTPS obligatorio (la geolocalización del navegador lo exige); claves solo en `.env`; página de fuentes y licencias; aviso legal y de privacidad.
 
 ### 6.1 Modelo de datos destino
-- `municipio(cod_ine PK, nombre, geom, poblacion, densidad, renta_media, zona_aire, en_eiel, en_vpla, piloto_ruta)`
-- `destino(id PK '{fuente}:{id_origen}', fuente, nombre, tipo [instalacion|parque|area_recreativa|senda|zona_bano], actividades[], cubierta, exterior, accesible, estado, titular, agua, url, cod_ine FK, geom, actualizado)`
-- `estacion_aire(id PK, red [CM|AY], nombre, tipo_area, magnitudes[], cod_ine, geom)`
-- `lectura_aire(estacion_id, magnitud, ts, valor, validado)` — formato largo (H01…H24 → filas)
-- `prevision(cod_ine, ts, temp, sens_termica, prob_precip, precip, viento, cielo)`
-- `tramo(id, u, v, geom, longitud_m, tipo_via, pct_verde, trafico, fuente_cerca)`
-- `poi_ruta(id, tipo [fuente|banco|papelera|aseo|area_canina|juegos|dea|biosaludable|supermercado], fuente, geom)`
-- `servicio(id, categoria [salud|farmacia|educacion|social|cultura|transporte], subtipo, cod_ine, geom)`
-- `indicador_municipio(cod_ine, categoria, indicador, valor (NULL = sin datos), unidad, anio, fuente)`
+Tablas con nombre en inglés desde el 14/10 (`municipio` → `municipality`, `destino` → `destination`, `estacion_aire` → `air_station`, `lectura_aire` → `air_reading`, `prevision` → `forecast`, `tramo` → `edge`, `poi_ruta` → `route_poi`, `servicio` → `service`, `indicador_municipio` → `municipality_indicator`); los campos se fijan en el contrato y en `build_db.py`.
+- `municipality(cod_ine PK, nombre, geom, poblacion, densidad, renta_media, zona_aire, en_eiel, en_vpla, piloto_ruta)`
+- `destination(id PK '{fuente}:{id_origen}', fuente, nombre, tipo [instalacion|parque|area_recreativa|senda|zona_bano], actividades[], cubierta, exterior, accesible, estado, titular, agua, url, cod_ine FK, geom, actualizado)`
+- `air_station(id PK, red [CM|AY], nombre, tipo_area, magnitudes[], cod_ine, geom)`
+- `air_reading(estacion_id, magnitud, ts, valor, validado)` — formato largo (H01…H24 → filas)
+- `forecast(cod_ine, ts, temp, sens_termica, prob_precip, precip, viento, cielo)`
+- `edge(id, u, v, geom, longitud_m, tipo_via, pct_verde, trafico, fuente_cerca)`
+- `route_poi(id, tipo [fuente|banco|papelera|aseo|area_canina|juegos|dea|biosaludable|supermercado], fuente, geom)`
+- `service(id, categoria [salud|farmacia|educacion|social|cultura|transporte], subtipo, cod_ine, geom)`
+- `municipality_indicator(cod_ine, categoria, indicador, valor (NULL = sin datos), unidad, anio, fuente)`
 
 Código de municipio: INE de 5 dígitos `28` + 3 dígitos (`MUN` en EIEL, `CMUN` en Nomecalles, `CD_MUNICIPIO` en VPLA). Madrid = 28079, Getafe = 28065, San Lorenzo de El Escorial = 28131.
 
@@ -210,7 +218,7 @@ Riesgos: la ruta circular por distancia es la parte difícil; latencia de 1–2 
 ### 6.4 Política de recarga de datos (decidida 14/10, por implementar)
 Cada fuente se recarga según la frecuencia con que la publica su portal: ni más (gasta recursos y cuota), ni menos (datos viejos). Sustituye y afina el RNF «estáticos a diario, aire y previsión cada hora». Frecuencias declaradas en los metadatos de CKAN (6/10): sanitarios DIARIO, farmacias SEMANAL, centros educativos ANUAL, atención social MENSUAL, zonas de baño ANUAL, estaciones de aire MENSUAL, aire del día HORARIO; Ayuntamiento: aire y meteo continuo, equipamientos diario.
 
-| Nivel | Cuándo se recarga | Fuentes (ids de `scripts/descargar_fuentes.py`) |
+| Nivel | Cuándo se recarga | Fuentes (ids de `app/ingest/scripts/download_sources.py`) |
 |---|---|---|
 | **1. Referencia** | Al publicarse una versión nueva: comprobación mensual + botón «Recargar todas las fuentes» solo en administración | `eiel_*` (EIEL 2023), `vpla_redes` (planeamiento 2025), `sendas`, `vias_pecuarias`, `municipios`, `zonas_aire`, `areas_recreativas`, `cubierta_terrestre`, `viales`, `padron`, `densidad`, `renta`, `zonas_bano`, `educativos`, `aire_estaciones`, `estaciones_aire_idem`, `ay_aire_estaciones`, `aire_historico` |
 | **2. Diario** | Una vez al día, de madrugada (tarea programada) | `sanitarios`, `farmacias`, `desfibriladores`, `atencion_social`, `nmc_*` (Nomecalles), `ay_polideportivos`, `ay_idb`, `ay_piscinas`, `ay_parques`, `ay_fuentes`, `ay_bancos`, `ay_areas_caninas`; OSM **semanal** (rehacer el grafo de rutas es costoso) |
@@ -218,7 +226,7 @@ Cada fuente se recarga según la frecuencia con que la publica su portal: ni má
 | **4. Bajo demanda** | Al pedirlo el usuario, con caché corta (5–15 min) | `ay_trafico` (cambia cada 5 min); botón de usuario «Actualizar ahora», que **solo** refresca aire, tráfico y previsión, limitado a una vez cada pocos minutos |
 
 Implementación mínima (no sobredimensionar):
-- Añadir un campo `refresco` (`referencia|diario|horario|demanda`) a cada entrada de `FUENTES` en el script y una opción `--refresco <nivel>` para descargar solo ese nivel.
+- Añadir un campo `refresh` a cada entrada de `FUENTES` en el script y una opción `--refresh <nivel>` para descargar solo ese nivel. Valores en código: `reference` (nivel 1), `weekly` (OSM), `daily` (nivel 2), `hourly` (nivel 3), `on_demand` (nivel 4).
 - **Antes de descargar, comprobar si la fuente ha cambiado** (`metadata_modified` de CKAN o cabecera `Last-Modified`/`ETag`); si no ha cambiado, no se descarga ni se reprocesa.
 - Una tarea programada (cron o el planificador del despliegue) por nivel; tras cada descarga, reprocesar solo las tablas afectadas.
 - Guardar en `data/raw/manifest.json` la fecha de cada recarga y mostrarla en la app («Aire actualizado hace 12 min», RF-19).
