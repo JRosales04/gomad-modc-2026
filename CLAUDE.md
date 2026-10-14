@@ -69,14 +69,15 @@ docs/bases/                       ← bases del reto (Bases-MAD-Open-Data-Challe
 # solo la primera vez (cada servicio Python tiene su venv; igual en app/api):
 #   cd app/ingest && python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 cd app/ingest && . .venv/bin/activate
+cp ../.env.example ../.env                                                # y poner la clave de AEMET
 python3 scripts/download_sources.py --list
 python3 scripts/download_sources.py --group full
 python3 scripts/download_sources.py --refresh reference --include-heavy   # mensual
 python3 scripts/download_sources.py --refresh daily                       # 04:00
 python3 scripts/download_sources.py --refresh hourly                      # cada hora
 python3 scripts/download_sources.py --refresh weekly --include-heavy      # OSM (y despues el grafo)
-cp ../.env.example ../.env                                                # y poner la clave de AEMET
 ```
+`aemet` está en el grupo `minimal` y en el nivel `hourly`: sin `AEMET_API_KEY` en `app/.env` falla (las demás fuentes siguen) y con `AEMET_MUNICIPALITIES=todos` son 179 × 2 peticiones por ejecución, que gastan cuota.
 Capas marcadas PESADAS (no se bajan por defecto; `--include-heavy`): `vpla_redes`, `viales`, `cubierta_terrestre` (~137.000 polígonos: mejor pedirla filtrada por `bbox` del piloto), `aire_historico`, `ay_bancos`, `osm` (~85 MB), `callejero` (~33 MB zip). `--force` descarga aunque la fuente no haya cambiado.
 
 Página de trabajo publicada (privada): https://claude.ai/artifact/MT3co6p1UKtJypQwBGqZpK
