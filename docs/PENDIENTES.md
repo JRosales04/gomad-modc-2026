@@ -14,7 +14,7 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
 | P-00 | ⬜ | Revisar lo que se hizo de noche y fusionar la rama `preparacion` | 15 min |
 | P-01 | ✅ | Crear `.env` con la clave de AEMET y verificar su API (hecho el 14/10, CLAUDE.md §7.1) | 30 min |
 | — | ⬜ | Reunión de decisiones D-01 a D-04 (`docs/decisiones-pendientes.md`) | 45 min |
-| P-03 | ⬜ | Instalar `poppler-utils` y completar los umbrales de calor | 30 min |
+| P-03 | ✅ | Instalar `poppler-utils` y completar los umbrales de calor (hecho el 14/10, `umbrales.md` §2) | 30 min |
 | P-04 | ⬜ | Aplicar las correcciones al CLAUDE.md | 20 min |
 
 ---
@@ -53,15 +53,12 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
 - **Qué:** el repo https://github.com/100495715/GoMad es privado y solo tiene un usuario.
 - **Cómo:** pasad los usuarios de GitHub a Claude (lo hace con `gh api`) o usad Settings → Collaborators.
 
-### P-03 · 🔶 Umbrales de calor (bloqueado: falta herramienta)
-- **Apuntado:** 14/10/2026 · **Para:** mié 14, antes del motor del jueves.
-- **Qué:** el plan de Sanidad 2026 (55 páginas) tiene los umbrales por zona, pero en el equipo **no hay `pdftotext`/`pdftoppm`** y no se pudo leer. No se ha inventado ningún valor.
-- **Cómo:**
-  ```bash
-  ! sudo apt install -y poppler-utils
-  ```
-  Después, pedid a Claude: «lee el plan de calor 2026 y completa `docs/assets/umbrales.md` §2». El PDF está en `/tmp/claude-1000/…/scratchpad/calor/plan2026.pdf` (puede haberse borrado; si no, se vuelve a bajar de la URL que figura en `umbrales.md` §2).
-- **Hay que buscar también:** la tabla de umbrales de Meteoalerta (AEMET) por zona de Madrid y el plan de calor de la Comunidad de Madrid.
+### P-03 · ✅ Umbrales de calor
+- **Apuntado:** 14/10/2026 · **Hecho:** 14/10/2026 (Task 7).
+- **Qué se hizo:** leído el plan de Sanidad 2026 (`app/data/raw/calor/plan2026.pdf`, no versionado). Umbrales de las 3 zonas meteosalud de Madrid (Anexo I, pág. 41), regla de niveles (págs. 22–24) e interpretación (Anexo V) copiados en `docs/assets/umbrales.md` §2, con propuesta para DEC-06 (§2.3).
+- **Queda abierto:**
+  - Tabla municipio → zona meteosalud de los 179 municipios: el plan solo trae un mapa; comprobados Madrid y Getafe (722802) y San Lorenzo de El Escorial (722801). Buscar la fuente en datos (zonas de aviso de AEMET) o transcribir el mapa con doble comprobación.
+  - Tabla de umbrales de Meteoalerta (AEMET) por zona de Madrid y plan de calor de la Comunidad de Madrid: no localizados (no hacen falta si DEC-06 adopta el plan de Sanidad).
 - **Desbloquea:** D-06.
 
 ### P-04 · Correcciones al CLAUDE.md (no aplicadas: requieren vuestro visto bueno)
