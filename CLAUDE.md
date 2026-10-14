@@ -183,16 +183,16 @@ Soporte: Discord https://discord.gg/ZfNFQvrRb · Web: https://datathon-mad.sel.i
 - **Despliegue:** HTTPS obligatorio (la geolocalización del navegador lo exige); claves solo en `.env`; página de fuentes y licencias; aviso legal y de privacidad.
 
 ### 6.1 Modelo de datos destino
-Tablas con nombre en inglés desde el 14/10 (`municipio` → `municipality`, `destino` → `destination`, `estacion_aire` → `air_station`, `lectura_aire` → `air_reading`, `prevision` → `forecast`, `tramo` → `edge`, `poi_ruta` → `route_poi`, `servicio` → `service`, `indicador_municipio` → `municipality_indicator`); los campos se fijan en el contrato y en `build_db.py`.
-- `municipality(cod_ine PK, nombre, geom, poblacion, densidad, renta_media, zona_aire, en_eiel, en_vpla, piloto_ruta)`
-- `destination(id PK '{fuente}:{id_origen}', fuente, nombre, tipo [instalacion|parque|area_recreativa|senda|zona_bano], actividades[], cubierta, exterior, accesible, estado, titular, agua, url, cod_ine FK, geom, actualizado)`
-- `air_station(id PK, red [CM|AY], nombre, tipo_area, magnitudes[], cod_ine, geom)`
-- `air_reading(estacion_id, magnitud, ts, valor, validado)` — formato largo (H01…H24 → filas)
-- `forecast(cod_ine, ts, temp, sens_termica, prob_precip, precip, viento, cielo)`
+Tablas con nombre en inglés desde el 14/10 (`municipio` → `municipality`, `destino` → `destination`, `estacion_aire` → `air_station`, `lectura_aire` → `air_reading`, `prevision` → `forecast`, `tramo` → `edge`, `poi_ruta` → `route_poi`, `servicio` → `service`, `indicador_municipio` → `municipality_indicator`); columnas en inglés según `build_db.py` (Task 19 del plan); las que Task 19 no define siguen en español y los campos se fijan en el contrato y en `build_db.py`.
+- `municipality(ine_code PK, name, geom, population, densidad, renta_media, zona_aire, in_eiel, in_vpla, piloto_ruta)`
+- `destination(id PK '{source}:{id_origen}', source, name, type [instalacion|parque|area_recreativa|senda|zona_bano], actividades[], covered, exterior, accessible, condition, owner, water, url, ine_code FK, geom, updated)`
+- `air_station(id PK, network [CM|AY], name, area_type, magnitudes[], ine_code, geom)`
+- `air_reading(station_id, magnitude, ts, value, flag)` — formato largo (H01…H24 → filas)
+- `forecast(ine_code, ts, temp, feels_like, precip_prob, precip, wind, sky)`
 - `edge(id, u, v, geom, longitud_m, tipo_via, pct_verde, trafico, fuente_cerca)`
-- `route_poi(id, tipo [fuente|banco|papelera|aseo|area_canina|juegos|dea|biosaludable|supermercado], fuente, geom)`
-- `service(id, categoria [salud|farmacia|educacion|social|cultura|transporte], subtipo, cod_ine, geom)`
-- `municipality_indicator(cod_ine, categoria, indicador, valor (NULL = sin datos), unidad, anio, fuente)`
+- `route_poi(id, type [fuente|banco|papelera|aseo|area_canina|juegos|dea|biosaludable|supermercado], source, geom)`
+- `service(id, categoria [salud|farmacia|educacion|social|cultura|transporte], subtipo, ine_code, geom)`
+- `municipality_indicator(ine_code, categoria, indicador, valor (NULL = sin datos), unidad, anio, source)`
 
 Código de municipio: INE de 5 dígitos `28` + 3 dígitos (`MUN` en EIEL, `CMUN` en Nomecalles, `CD_MUNICIPIO` en VPLA). Madrid = 28079, Getafe = 28065, San Lorenzo de El Escorial = 28131.
 
