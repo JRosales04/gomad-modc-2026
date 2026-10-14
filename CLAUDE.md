@@ -62,6 +62,8 @@ docs/assets/matriz-datos.html          ← página de trabajo (copia local del a
 docs/idea/                        ← documento de idea .docx (DESACTUALIZADO, ver §4.3), prototipo visual .png y .html, logo_gomad.png, notas ChatGPT
 docs/idea/pdf/                    ← GoMAD: aproximación técnica, fuentes de datos e interfaz de usuario (PDF)
 docs/bases/                       ← bases del reto (Bases-MAD-Open-Data-Challenge-2026.pdf) + 8 PDF de la jornada del 6/10
+docs/plan-implementacion.md       ← plan por tareas (Task N) hasta la demo; docs/guia-ejecucion.md ← orden de ejecución por días y roles
+docs/prompt_task_executer.md      ← plantilla para ejecutar tareas (executing-plans); docs/prompt_task_checker.md ← plantilla del verificador
 ```
 
 **Arranque en un equipo nuevo:**
