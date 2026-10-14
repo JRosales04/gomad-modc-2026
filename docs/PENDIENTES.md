@@ -11,7 +11,7 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
 
 | # | Estado | Tarea | Tiempo |
 |---|---|---|---|
-| P-00 | ⬜ | Revisar lo que se hizo de noche y fusionar la rama `preparacion` | 15 min |
+| P-00 | ✅ | Revisar lo que se hizo de noche y fusionar la rama `preparacion` (ya estaba en `main`; comprobado el 15/10) | 15 min |
 | P-01 | ✅ | Crear `.env` con la clave de AEMET y verificar su API (hecho el 14/10, CLAUDE.md §7.1) | 30 min |
 | — | ⬜ | Reunión de decisiones D-01 a D-04 (`docs/decisiones-pendientes.md`) | 45 min |
 | P-03 | ✅ | Instalar `poppler-utils` y completar los umbrales de calor y la tabla municipio → zona (hecho el 14/10, `umbrales.md` §2, `heat_zones.csv`) | 30 min |
@@ -21,7 +21,7 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
 
 ## Detalle
 
-### P-00 · Revisar y fusionar la rama `preparacion`
+### P-00 · ✅ Revisar y fusionar la rama `preparacion`
 - **Apuntado:** 14/10/2026 · **Para:** mié 14, a primera hora.
 - **Qué:** esta noche se trabajó en la rama local `preparacion`, **sin subirla a GitHub**. Contiene:
   - `scripts/profile_sources.py`: perfilador de `data/raw/` (solo stdlib, ~5 s).
