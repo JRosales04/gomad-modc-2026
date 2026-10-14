@@ -20,7 +20,7 @@ Este archivo es el contexto completo del proyecto para Claude Code. Se escribió
 
 ## 2. Instrucciones para Claude en este proyecto
 
-1. **Idioma:** español en conversación, interfaz, textos y documentación. Código e identificadores pueden ir en español o inglés, pero coherentes.
+1. **Idioma:** español en conversación, interfaz, textos y documentación. **Código en inglés** (identificadores, nombres de ficheros y módulos, endpoints, tablas, columnas propias, claves de configuración, nombres de pruebas). **Comentarios y docstrings en español sin tildes.** Los textos que ve la persona usuaria (interfaz, mensajes, explicaciones) en español con tildes. Los identificadores de datasets y campos de origen (`eiel_deporte`, `CDMUNICIPIO`…) no se traducen. (Decidido el 14/10.)
 2. **Ámbito: toda la Comunidad de Madrid, los 179 municipios, sin ningún filtro por población.** La idea inicial de «municipios de menos de 50.000 habitantes» está **descartada**; no la reintroduzcas.
 3. **Ayuntamiento de Madrid (datos.madrid.es) solo como complemento para Madrid capital**, que falta en varias fuentes regionales. Las fuentes base son de la Comunidad (lo exigen las bases).
 4. **La IA interpreta y explica; el motor de reglas decide.** Nunca uses un LLM para elegir destinos, calcular rutas ni puntuar. El LLM solo convierte texto libre en parámetros estructurados y redacta explicaciones con resultados del motor, sin añadir datos.
