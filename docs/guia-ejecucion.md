@@ -48,7 +48,7 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 
 ---
 
-## 2. Estado actual (14/10, tarde)
+## 2. Estado actual (14/10, noche)
 
 | Tarea | Estado | Dónde |
 |---|---|---|
@@ -58,8 +58,9 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 | Task 4 — AEMET verificado con la clave | ✅ fusionada | PR #2 |
 | Task 8 — red peatonal de OSM medida (pyosmium; pyrosm no compila en 3.12) | ✅ fusionada | PR #3 |
 | Task 5 — Docker Compose (api + frontend), Caddy sin claves ni ubicación en logs | ✅ fusionada | PR #4 |
-| Task 7 — umbrales de calor del plan de Sanidad y tabla municipio → zona (179) | ✅ verificada, **falta PR** | rama `motor/mie14-calor` |
-| Task 9 — especificación de pantallas + guía del frontend (Task 10 y front pasan a MANUAL GUIADO) | ✅ documentada, falta validar con la maquetadora | rama `docs/mie14-frontend` |
+| Task 7 — umbrales de calor del plan de Sanidad y tabla municipio → zona (179) | ✅ fusionada | PR #5, PR #6 |
+| Task 9 — especificación de pantallas + guía del frontend (Task 10 y front pasan a MANUAL GUIADO) | ✅ fusionada; falta validar con la maquetadora | PR #7 → `app/frontend/docs/` |
+| Task 10 — base técnica del front (paso 0 de la guía) | ⏳ en curso a mano (Front) | `app/frontend/docs/pendientes.md` §A |
 | **P-13** — cuota de AEMET (`AEMET_PAUSE_S` mal calculado) | ⚠️ pendiente de decisión | `docs/PENDIENTES.md` → DEC-13 abajo |
 
 ---
@@ -73,9 +74,9 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 | L1 | Mié | ✅ hecho | 5 | `motor/mie14-compose` | Motor | PR #4 |
 | L2 | Mié | ✅ hecho | 8 | `rutas/mie14-osm` | Rutas | PR #3 |
 | L3 | Mié | MANUAL GUIADO | 10 (paso 0 de `app/frontend/docs/guia.md`) | `front/mie14-base` | Front | Node ≥ 20.19 (mejor 22) y **L1 fusionado** ✅ |
-| L4 | Mié | ✅ verificado (falta PR) | 7 | `motor/mie14-calor` | Motor | — |
+| L4 | Mié | ✅ hecho | 7 | `motor/mie14-calor` | Motor | PR #5, PR #6 |
 | M2 | Mié | MANUAL | 6 (VM de OCI) | — | Motor | **L1 fusionado** |
-| M3 | Mié | ✅ documentado (falta validar) | 9 → `app/frontend/docs/pantallas.md` | `docs/mie14-frontend` | Front + maquetadora | — |
+| M3 | Mié | ✅ documentado (PR #7; falta validar) | 9 → `app/frontend/docs/pantallas.md` | — | Front + maquetadora | — |
 | D1 | Mié | DECISIÓN | DEC-P04, DEC-13 | — | Equipo | — |
 | L5 | Jue 9:00 | EJECUTAR + VERIFICAR | 11 | `motor/jue15-contrato` | Motor | — (**primero del jueves**) |
 | L6 | Jue | EJECUTAR + VERIFICAR | 15 | `motor/jue15-ia` | Motor | credenciales IA (M4), **L5 fusionado**; límite 12:00 |
@@ -101,7 +102,7 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
   ```bash
   sudo apt install -y poppler-utils                                   # para L4 (Task 7)
   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
-  source ~/.bashrc && nvm install 20 && nvm use 20 && node -v          # para L3 (Task 10): v20.x
+  source ~/.bashrc && nvm install 22 && nvm use 22 && node -v          # para L3 (Task 10): >= 20.19 (Vite 8); el Node 18 del sistema no vale
   ```
   Docker (para L1, Task 5): instalar **Docker Desktop** en Windows → Settings → Resources → WSL Integration → activar la distribución. Comprobar: `docker compose version`.
 - **Listo cuando:** `pdftotext -v`, `node -v` (v20) y `docker compose version` responden.
@@ -166,7 +167,7 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
   (cd ../deploy && docker compose build frontend)                       # compila sin dist/ local
   ```
 
-### L4 · ✅ VERIFICADO (falta PR) — Task 7: umbrales de calor del plan de Sanidad
+### L4 · ✅ HECHO (PR #5, PR #6) — Task 7: umbrales de calor del plan de Sanidad
 
 > **Resultado (14/10):** ejecutada, verificada, corregida en una ronda y verificada otra vez. Lo que queda en el repositorio:
 > - **Umbrales oficiales** (`docs/assets/umbrales.md` §2.1, Anexo I, pág. 41): Sierra de Madrid (722801) 35,8 °C · Metropolitana y Henares (722802) 37,4 °C · Sur, Vegas y Oeste (722803) 39,2 °C. Son de **temperatura máxima diaria**, no horaria ni de sensación térmica.
@@ -196,7 +197,9 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 - **Memoria:** con 4 GB la API y la construcción del grafo regional no caben a la vez (arquitectura §3.4: ~3,1 GB al construir, ~1–1,5 GB la API). Preferir A1.Flex con 12 GB o más.
 - **Listo cuando:** `curl -s http://<IP_PÚBLICA>/api/health` → `{"status":"ok"}`. Apuntar forma, región e IP en `docs/arquitectura.md` §6 (**sin** credenciales).
 
-### M3 · ✅ DOCUMENTADO (falta validar) — Task 9: especificación de pantallas
+### M3 · ✅ DOCUMENTADO (PR #7; falta validar) — Task 9: especificación de pantallas
+
+> **Decisiones del 14/10 (tras la auditoría del front):** se mantienen React 19 / Vite 8 / TypeScript 6 y se corrige lo que esté mal · **barra de navegación inferior** en móvil (`pantallas.md` §9.1) · iconos: Google Material Symbols desde un `.woff` propio, **aplazado** · la **parte de API del front, en la siguiente sesión** (hasta entonces, datos de ejemplo). Toda la documentación del front vive en `app/frontend/docs/` (índice en su `README.md`; empezar por `pendientes.md`).
 
 - **Qué hay:** `app/frontend/docs/pantallas.md` especifica las 8 pantallas (Inicio, Resultados, Detalle, Ruta, Municipio, Perfil/preferencias, Asistente, Fuentes y aviso) con los campos del contrato (Task 11), textos, estados, accesibilidad, estado del código actual (✅/🟡/⬜ con fichero:línea) y preguntas abiertas (§10).
 - **Qué falta:** la ronda con la maquetadora: cada pantalla acaba con «Validar con la maquetadora». Inicio y Resultados primero (bloquean L11).
