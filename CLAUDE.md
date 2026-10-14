@@ -80,6 +80,15 @@ python3 scripts/download_sources.py --refresh weekly --include-heavy      # OSM 
 `aemet` está en el grupo `minimal` y en el nivel `hourly`: sin `AEMET_API_KEY` en `app/.env` falla (las demás fuentes siguen) y con `AEMET_MUNICIPALITIES=todos` son 179 × 2 peticiones por ejecución, que gastan cuota.
 Capas marcadas PESADAS (no se bajan por defecto; `--include-heavy`): `vpla_redes`, `viales`, `cubierta_terrestre` (~137.000 polígonos: mejor pedirla filtrada por `bbox` del piloto), `aire_historico`, `ay_bancos`, `osm` (~85 MB), `callejero` (~33 MB zip). `--force` descarga aunque la fuente no haya cambiado.
 
+**Levantar la app con Docker Compose** (desde `app/`):
+```bash
+mkdir -p frontend/dist && echo '<!doctype html><title>GoMad</title>' > frontend/dist/index.html   # provisional hasta Task 10
+cp deploy/.env.example deploy/.env        # solo DOMAIN: ":80" en local, el dominio en la VM
+docker compose -f deploy/docker-compose.yml up -d --build
+curl -s localhost/api/health             # {"status":"ok"}
+```
+Las claves de `app/.env` solo llegan al contenedor `api`; Caddy (`frontend`) recibe solo `DOMAIN`. Si `docker` da «permission denied» en el socket tras añadirte al grupo `docker`, abre una terminal nueva (o `newgrp docker`).
+
 Página de trabajo publicada (privada): https://claude.ai/artifact/MT3co6p1UKtJypQwBGqZpK
 
 ## 4. El reto
