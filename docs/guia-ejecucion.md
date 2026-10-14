@@ -16,6 +16,7 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 | **EJECUTAR** | Claude, en una conversación nueva | Implementa una o varias tareas del plan con TDD, en su propia rama, y para | `docs/prompt_task_executer.md` → skill `superpowers:executing-plans` |
 | **VERIFICAR** | Claude, en **otra** conversación nueva | Revisa, solo lectura, que la ejecución cumple el plan; da veredicto ✅ / ⚠️ / ❌ | `docs/prompt_task_checker.md` |
 | **MANUAL** | Una persona | Lo que Claude no puede o no debe hacer: instalar con `sudo`, claves, nube, maquetadora | Terminal, consola de OCI, etc. |
+| **MANUAL GUIADO** | La persona del front | Tareas del frontend que se programan a mano (Task 10, 23–25 y filas de Front de vie–dom). Claude no las ejecuta; puede documentarlas o revisarlas | `docs/frontend-guia.md` (plan por pasos, configuración, checklist) y `docs/pantallas.md` (cada pantalla) |
 | **DECISIÓN** | El equipo | Valores que el código no decide (pesos, umbrales, actividades…) | Se apuntan en `CLAUDE.md` §11 y se vuelcan en `app/config/*.yaml` |
 | **FUSIONAR** | Una persona (o Claude si se lo pides) | PR de la rama a `main` en GitHub tras un ✅ | GitHub |
 
@@ -58,6 +59,7 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 | Task 8 — red peatonal de OSM medida (pyosmium; pyrosm no compila en 3.12) | ✅ fusionada | PR #3 |
 | Task 5 — Docker Compose (api + frontend), Caddy sin claves ni ubicación en logs | ✅ fusionada | PR #4 |
 | Task 7 — umbrales de calor del plan de Sanidad y tabla municipio → zona (179) | ✅ verificada, **falta PR** | rama `motor/mie14-calor` |
+| Task 9 — especificación de pantallas + guía del frontend (Task 10 y front pasan a MANUAL GUIADO) | ✅ documentada, falta validar con la maquetadora | rama `docs/mie14-frontend` |
 | **P-13** — cuota de AEMET (`AEMET_PAUSE_S` mal calculado) | ⚠️ pendiente de decisión | `docs/PENDIENTES.md` → DEC-13 abajo |
 
 ---
@@ -70,10 +72,10 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 | M1 | Mié | MANUAL | prerrequisitos | — | quien ejecute | — (Docker ✅, poppler ✅; falta Node 20 si no está) |
 | L1 | Mié | ✅ hecho | 5 | `motor/mie14-compose` | Motor | PR #4 |
 | L2 | Mié | ✅ hecho | 8 | `rutas/mie14-osm` | Rutas | PR #3 |
-| L3 | Mié | EJECUTAR + VERIFICAR | 10 | `front/mie14-vite` | Front | Node 20 (M1) y **L1 fusionado** |
+| L3 | Mié | MANUAL GUIADO | 10 (paso 0 de `docs/frontend-guia.md`) | `front/mie14-base` | Front | Node ≥ 20.19 (mejor 22) y **L1 fusionado** ✅ |
 | L4 | Mié | ✅ verificado (falta PR) | 7 | `motor/mie14-calor` | Motor | — |
 | M2 | Mié | MANUAL | 6 (VM de OCI) | — | Motor | **L1 fusionado** |
-| M3 | Mié | MANUAL | 9 (bocetos) | — | Front + maquetadora | — |
+| M3 | Mié | ✅ documentado (falta validar) | 9 → `docs/pantallas.md` | `docs/mie14-frontend` | Front + maquetadora | — |
 | D1 | Mié | DECISIÓN | DEC-P04, DEC-13 | — | Equipo | — |
 | L5 | Jue 9:00 | EJECUTAR + VERIFICAR | 11 | `motor/jue15-contrato` | Motor | — (**primero del jueves**) |
 | L6 | Jue | EJECUTAR + VERIFICAR | 15 | `motor/jue15-ia` | Motor | credenciales IA (M4), **L5 fusionado**; límite 12:00 |
@@ -81,7 +83,7 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 | L8 | Jue | EJECUTAR + VERIFICAR | 16, 17 | `datos/jue15-normalizar` | Datos | datos descargados |
 | L9 | Jue | EJECUTAR + VERIFICAR | 18, 19 | `datos/jue15-aire-build` | Datos | **L8 fusionado**; DEC-08 para el paso 4 de Task 19 |
 | L10 | Jue | EJECUTAR + VERIFICAR | 20, 21, 22 | `rutas/jue15-grafo` | Rutas | **L2 y L8 fusionados** |
-| L11 | Jue | EJECUTAR + VERIFICAR | 23, 24, 25 | `front/jue15-pantallas` | Front | **L3 y L5 fusionados**, M3 hecho |
+| L11 | Jue | MANUAL GUIADO | 23, 24, 25 (pasos 1–3 de `docs/frontend-guia.md`) | `front/jue15-pantallas` | Front | **L3 y L5 fusionados**, M3 hecho |
 | D2 | Jue 11:00 | DECISIÓN | DEC-05, 07, 07b, 08 | — | Equipo | propuestas de Motor y Datos |
 | P1 | Jue tarde | PLANIFICAR | detallar viernes | — | Coordinación | cierre del jueves |
 
@@ -145,19 +147,22 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 - **Prompt de verificación:** `TAREAS={8}   RAMA={rutas/mie14-osm}   BASE={main}`
 - **Comprobación rápida:** `docs/arquitectura.md` §3.4 tiene cifras **medidas** de Getafe y Madrid y dice si se usa pyrosm o el respaldo.
 
-### L3 · EJECUTAR + VERIFICAR — Task 10: proyecto Vite + React + TypeScript
+### L3 · MANUAL GUIADO — Task 10: base técnica del frontend (paso 0 de la guía)
 
-- **Qué hace:** crea la SPA en `app/frontend/` con los estilos del prototipo (`main.css`, `icons.css`), fuentes servidas por nosotros (Figtree y Material Symbols, sin Google), prueba con axe, y convierte el Dockerfile del front en multi-stage (compila con Node y sirve con Caddy).
-- **Por qué en este orden:** después de L1 porque **reescribe** su Dockerfile del front; el jueves las pantallas (L11) se construyen encima.
-- **Utiliza:** Node 20, npm, Vite 5, React 18, Vitest, axe, MSW; Docker para probar la imagen.
-- **Necesita:** Node 20 (M1), **L1 fusionado en main** ✅.
-- **Ojo:** el Dockerfile multi-stage conserva el `Caddyfile` actual (filtro de logs y `{$DOMAIN::80}`) y añade `app/frontend/.dockerignore` (`node_modules/`, `dist/`, `.env*`). `DOMAIN` sigue llegando solo por `app/deploy/.env`.
-- **Prompt de ejecución:** `TAREAS={10}   RAMA={front/mie14-vite}   BASE={main}   MANUALES_HECHOS={Task 10 paso 1: Node 20 instalado}`
-- **Prompt de verificación:** `TAREAS={10}   RAMA={front/mie14-vite}   BASE={main}`
+> **Cambio del 14/10:** el proyecto Vite ya existe (React 19.3, Vite 8.3, TypeScript 6.0), hecho a mano por la persona del front, que sigue trabajando en él. **No se lanza a Claude** sobre `app/frontend/`: ni `npm create vite` ni los `npm install` de la Task 10 (sus versiones son para Vite 5).
+
+- **Qué hace:** completa lo que faltaba de la Task 10 sobre el proyecto actual: dependencias del stack (versiones comprobadas), Vitest + axe, router, fuentes e iconos servidos por nosotros (sin Google), proxy de `/api` en desarrollo, Dockerfile multi-stage y `.dockerignore`.
+- **Cómo:** **`docs/frontend-guia.md` §3, paso 0** (qué hacer, ficheros, fragmentos de configuración y criterios de «terminado»). Desajustes y su gravedad en §2 de la guía.
+- **Por qué en este orden:** el Dockerfile provisional **no compila en limpio** (`"/dist": not found`, comprobado el 14/10) y bloquea el despliegue del viernes; el jueves las pantallas (L11) se construyen encima.
+- **Utiliza:** Node ≥ 20.19 (recomendado 22 LTS: Vite 8 no arranca con el Node 18 del sistema), npm, Vitest, axe, Docker para probar la imagen.
+- **Necesita:** **L1 fusionado en main** ✅. Avisar a Motor antes de fusionar (cambia el Dockerfile del Compose).
+- **Ojo:** el Dockerfile multi-stage conserva el `Caddyfile` actual (filtro de logs y `{$DOMAIN::80}`). `DOMAIN` sigue llegando solo por `app/deploy/.env`.
+- **Formato:** rama `front/mie14-base`, commits pequeños `Front: …`, PR a `main` tras pasar el checklist de la guía §5. Si se quiere una revisión, Claude puede **verificar** la rama en solo lectura con `docs/prompt_task_checker.md` usando como referencia la guía, no los pasos de la Task 10.
 - **Comprobación rápida:**
   ```bash
-  cd app/frontend && npx vitest run && npm run build      # pruebas en verde y dist/ generado
-  grep -r "googleapis" index.html src || echo "sin Google"
+  cd app/frontend && npm test && npm run lint && npm run build      # pruebas en verde y dist/ generado
+  grep -rn "googleapis\|gstatic" index.html src || echo "sin Google"
+  (cd ../deploy && docker compose build frontend)                       # compila sin dist/ local
   ```
 
 ### L4 · ✅ VERIFICADO (falta PR) — Task 7: umbrales de calor del plan de Sanidad
@@ -190,12 +195,11 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 - **Memoria:** con 4 GB la API y la construcción del grafo regional no caben a la vez (arquitectura §3.4: ~3,1 GB al construir, ~1–1,5 GB la API). Preferir A1.Flex con 12 GB o más.
 - **Listo cuando:** `curl -s http://<IP_PÚBLICA>/api/health` → `{"status":"ok"}`. Apuntar forma, región e IP en `docs/arquitectura.md` §6 (**sin** credenciales).
 
-### M3 · MANUAL — Task 9: bocetos con la maquetadora
+### M3 · ✅ DOCUMENTADO (falta validar) — Task 9: especificación de pantallas
 
-- **Qué hace:** cierra el detalle de las pantallas **Inicio** y **Resultados** en `docs/pantallas.md` (elementos, textos, estados, foco, accesibilidad).
-- **Por qué:** las pantallas del jueves (L11) se maquetan a partir de esto.
-- **Utiliza:** `docs/idea/muevete-cerca-prototipo.html`, `docs/idea/pdf/3_GoMAD_Interfaz_de_usuario.pdf`, arquitectura §5.2.
-- **Listo cuando:** `docs/pantallas.md` en `main` con Inicio y Resultados cerrados.
+- **Qué hay:** `docs/pantallas.md` especifica las 8 pantallas (Inicio, Resultados, Detalle, Ruta, Municipio, Perfil/preferencias, Asistente, Fuentes y aviso) con los campos del contrato (Task 11), textos, estados, accesibilidad, estado del código actual (✅/🟡/⬜ con fichero:línea) y preguntas abiertas (§10).
+- **Qué falta:** la ronda con la maquetadora: cada pantalla acaba con «Validar con la maquetadora». Inicio y Resultados primero (bloquean L11).
+- **Listo cuando:** las secciones de Inicio y Resultados están validadas y las preguntas P-01 a P-07 respondidas o aplazadas.
 
 ### D1 · DECISIÓN — Hoy
 
@@ -274,15 +278,15 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 - **Prompt de verificación:** `TAREAS={20,21,22}   RAMA={rutas/jue15-grafo}   BASE={main}`
 - **Comprobación rápida:** existe `app/data/graph/getafe/`; `cd app/api && .venv/bin/pytest tests/routing -q -s` muestra latencias < 5 s; cifras en `docs/arquitectura.md` §4.4.
 
-### L11 · EJECUTAR + VERIFICAR — Tasks 23, 24, 25: tipos, Inicio y Resultados
+### L11 · MANUAL GUIADO — Tasks 23, 24, 25: tipos, Inicio y Resultados
 
-- **Qué hace:** genera los tipos TypeScript desde el OpenAPI, el cliente y respuestas simuladas (MSW), y maqueta las pantallas Inicio («¿Qué te apetece hacer?») y Resultados (lista con nota, mejor hora, «sin datos», «Ver más»), accesibles (axe) y sin guardar la ubicación.
+- **Qué hace:** genera los tipos TypeScript desde el OpenAPI, el cliente y respuestas simuladas (MSW), y conecta Inicio («¿Qué te apetece hacer?») y Resultados (lista con nota, mejor hora, «sin datos», «Ver más») a ellos, accesibles (axe) y sin guardar la ubicación. Parte de las maquetas que ya existen (`Home.tsx`, `Results.tsx`).
+- **Cómo:** **`docs/frontend-guia.md` §3, pasos 1, 2 y 3** (y §4 para el contrato, los tipos y MSW); qué lleva cada pantalla en **`docs/pantallas.md` §1 y §2**. Las pruebas y criterios de «terminado» de las Tasks 23–25 del plan siguen valiendo.
 - **Por qué en este orden:** con el contrato (L5) el front avanza sin esperar a la API real; Inicio va antes que Resultados.
-- **Utiliza:** Node 20, `app/frontend`, `openapi-typescript`, MSW, TanStack Query, Vitest + axe, `docs/pantallas.md`.
-- **Necesita:** **L3 y L5 fusionados**, M3 (bocetos) hecho.
-- **Prompt de ejecución:** `TAREAS={23,24,25}   RAMA={front/jue15-pantallas}   BASE={main}   MANUALES_HECHOS={Task 9: docs/pantallas.md con Inicio y Resultados}`
-- **Prompt de verificación:** `TAREAS={23,24,25}   RAMA={front/jue15-pantallas}   BASE={main}`
-- **Comprobación rápida:** `cd app/frontend && npm run contract && npx vitest run`; `VITE_MOCK=1 npm run dev` muestra Inicio → Resultados en 3 toques.
+- **Utiliza:** Node ≥ 20.19, `openapi-typescript` (con `npx`, guía §4.2), MSW 2, TanStack Query 5, Vitest 4 + axe.
+- **Necesita:** **L3 y L5 fusionados** (`app/frontend/src/api/openapi.json` lo versiona Motor en L5: no crearlo a mano), M3 validado para Inicio y Resultados.
+- **Formato:** rama `front/jue15-pantallas`, un commit por paso (`Front: tipos del contrato, cliente y respuestas simuladas`, `Front: pantalla de inicio`, `Front: pantalla de resultados`), PR a `main` tras el checklist de la guía §5. Verificación opcional por Claude en solo lectura.
+- **Comprobación rápida:** `cd app/frontend && npm run contract && npm test`; `VITE_MOCK=1 npm run dev` muestra Inicio → Resultados en 3 toques.
 
 ### D2 · DECISIÓN — Jueves
 
@@ -309,6 +313,8 @@ Lo que no tenga fuente oficial se escribe en el YAML con `own_criterion: true`. 
 ## 6. Viernes 16 a lunes 19 — vista previa
 
 Están en el plan como tablas (V-…, S-…, D-…, L-…). **Se detallan cada tarde para el día siguiente** (paso P1) y se añaden a esta guía con el mismo formato.
+
+**Frontend (V-F1…V-F4, S-F1, S-F2, D-F1, D-F2): MANUAL GUIADO.** No se convierten en lotes de EJECUTAR: la persona del front los hace con `docs/frontend-guia.md` §3 (vie: pasos 4 y 5 — mapa, detalle, ajustes y despliegue; sáb: paso 6 — ruta y municipio; dom: paso 7 — asistente y fuentes; lun: paso 8 — accesibilidad) y `docs/pantallas.md`, en ramas `front/<día>-<tema>` con commits `Front: …` y PR a `main` tras el checklist de la guía §5. Claude puede verificar en solo lectura.
 
 | Día | Lo principal | Hito |
 |---|---|---|
