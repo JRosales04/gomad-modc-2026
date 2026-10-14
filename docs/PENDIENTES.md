@@ -128,6 +128,14 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
 - **Qué:** a las 02:08 del 14/10, `calidad_aire_datos_dia.csv` contenía **el día 13** (horas 1–23); el del Ayuntamiento ya traía el 14. Hay que ver a qué hora cambia de día el regional, para no mostrar «aire de hoy» con datos de ayer (RF-19).
 - **Cómo:** `python3 scripts/download_sources.py --solo aire_dia` a varias horas y mirar `ano/mes/dia`.
 
+### P-13 · Cuota de AEMET: `AEMET_PAUSE_S` mal calculado y propuesta sin presentar
+- **Apuntado:** 14/10/2026 (verificación de la Task 4) · **Para:** antes de programar la descarga horaria (sáb 17, S-D2).
+- **Qué:**
+  1. `app/.env.example` pone `AEMET_PAUSE_S=10` y dice «~6 peticiones/min», pero la pausa es **por municipio** y cada municipio son **2 peticiones** (`download_aemet`): salen **~12 peticiones/min**. El 14/10 dio 429 tras 6 peticiones en ~1 min, así que con 10 s la ejecución horaria fallará casi siempre (`download_aemet` es todo o nada).
+  2. CLAUDE.md §7.1 remite a una «propuesta en `app/.env.example`» que no existe: solo pone «provisional».
+- **Por qué:** sin previsión horaria no hay F2 (mejor franja) ni regla de calor.
+- **Cómo:** peticiones/min = 2 × 60 / pausa → pausa ≥ 20 s más margen (179 municipios ≈ 1 h: no cabe en el ciclo horario). Decidir en equipo entre: (a) subconjunto fijo en `AEMET_MUNICIPALITIES` (pilotos + capital); (b) solo municipios consultados recientemente; (c) recarga cada 3–6 h para el resto. Después corregir el comentario de `app/.env.example` y la referencia de CLAUDE.md §7.1.
+
 ---
 
 ## Hecho esta noche (14/10/2026)
