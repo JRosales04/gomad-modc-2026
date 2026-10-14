@@ -1,6 +1,6 @@
-# Decisiones pendientes — para cerrar el miércoles 15/10/2026
+# Decisiones pendientes — para cerrar el miércoles 14/10/2026
 
-Preparado la noche del 14/10/2026. **No se ha decidido nada**: cada ficha da contexto, opciones, una recomendación razonada y qué desbloquea. Cuando decidáis, apuntad la decisión en el CLAUDE.md §11 (y en `docs/referencia/requisitos_fuentes.json` si toca fuentes o requisitos).
+Preparado de madrugada el 14/10/2026. **No se ha decidido nada**: cada ficha da contexto, opciones, una recomendación razonada y qué desbloquea. Cuando decidáis, apuntad la decisión en el CLAUDE.md §11 (y en `docs/referencia/requisitos_fuentes.json` si toca fuentes o requisitos).
 
 Orden propuesto: primero las **bloqueantes** (D-01 a D-04), que impiden empezar a programar; el resto puede decidirse a lo largo del día.
 
@@ -45,7 +45,7 @@ Orden propuesto: primero las **bloqueantes** (D-01 a D-04), que impiden empezar 
 - **Madrid capital:** no está en VPLA (no hay % de verde por planeamiento), pero sí en los datos del Ayuntamiento (76.640 bancos, 2.270 fuentes, 112 áreas caninas, tráfico en tiempo real).
 - **San Lorenzo de El Escorial (alternativa):** EIEL + VPLA + OSM nivel A, sin estación de aire.
 
-**Recomendación:** **Getafe** como piloto único hasta el viernes; la capital solo si F1–F5 están verdes el sábado. Conviene que Getafe aparezca en el guion de la demo (§5.2).
+**Recomendación:** **Getafe** como piloto único hasta el viernes 16; la capital solo si F1–F5 están verdes el sábado. Conviene que Getafe aparezca en el guion de la demo (§5.2).
 **Desbloquea:** descarga del extracto de OSM y construcción del grafo (P-07).
 
 ## D-03 · Proveedor de IA para F6 — **bloqueante para F6**
@@ -144,7 +144,7 @@ Además: VPLA zonas verdes (166 municipios), sendas (224), vías pecuarias (1.69
 
 ## D-10 · Nombre
 
-GOATS (recomendado en el CLAUDE.md §1), MAD GOAT o GO MAD. El repositorio ya se llama GoMad. **Es cosa de cinco minutos**: mejor no dejarlo para después del jueves (logo, dominio, textos).
+GOATS (recomendado en el CLAUDE.md §1), MAD GOAT o GO MAD. El repositorio ya se llama GoMad. **Es cosa de cinco minutos**: mejor no dejarlo para después del jueves 15 (logo, dominio, textos).
 
 ## D-11 · Usos de IA del §6.5
 

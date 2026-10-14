@@ -7,7 +7,7 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
 
 ---
 
-## Lo primero del miércoles 15/10 (por orden)
+## Lo primero del miércoles 14/10 (por orden)
 
 | # | Estado | Tarea | Tiempo |
 |---|---|---|---|
@@ -22,7 +22,7 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
 ## Detalle
 
 ### P-00 · Revisar y fusionar la rama `preparacion`
-- **Apuntado:** 14/10/2026 · **Para:** mié 15, a primera hora.
+- **Apuntado:** 14/10/2026 · **Para:** mié 14, a primera hora.
 - **Qué:** esta noche se trabajó en la rama local `preparacion`, **sin subirla a GitHub**. Contiene:
   - `scripts/perfilar_fuentes.py`: perfilador de `data/raw/` (solo stdlib, ~5 s).
   - `docs/informe-datos.md`: resultado del perfil, 12 trampas nuevas y cifras comprobadas.
@@ -37,7 +37,7 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
 - **Datos generados (no se suben):** `data/perfil/perfil.json` (perfil por columna) y `data/perfil/municipios_referencia.json`.
 
 ### P-01 · Clave de AEMET y verificación de su API
-- **Apuntado:** 14/10/2026 · **Para:** mié 15 (CLAUDE.md §10).
+- **Apuntado:** 14/10/2026 · **Para:** mié 14 (CLAUDE.md §10).
 - **Qué:** `.env` todavía **no existe**. El esquema de AEMET está «sin verificar» (CLAUDE.md §7.1). Además, el script de descarga **no incluye AEMET**.
 - **Por qué:** sin la previsión horaria no hay F2 (mejor franja) ni regla de calor (D-06).
 - **Cómo:**
@@ -48,12 +48,12 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
 - **Dónde:** `.env.example`, CLAUDE.md §7.1, `scripts/descargar_fuentes.py`.
 
 ### P-02 · Invitar al equipo al repositorio
-- **Apuntado:** 14/10/2026 · **Para:** mié 15.
+- **Apuntado:** 14/10/2026 · **Para:** mié 14.
 - **Qué:** el repo https://github.com/100495715/GoMad es privado y solo tiene un usuario.
 - **Cómo:** pasad los usuarios de GitHub a Claude (lo hace con `gh api`) o usad Settings → Collaborators.
 
 ### P-03 · 🔶 Umbrales de calor (bloqueado: falta herramienta)
-- **Apuntado:** 14/10/2026 · **Para:** mié 15, antes del motor del jueves.
+- **Apuntado:** 14/10/2026 · **Para:** mié 14, antes del motor del jueves.
 - **Qué:** el plan de Sanidad 2026 (55 páginas) tiene los umbrales por zona, pero en el equipo **no hay `pdftotext`/`pdftoppm`** y no se pudo leer. No se ha inventado ningún valor.
 - **Cómo:**
   ```bash
@@ -64,7 +64,7 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
 - **Desbloquea:** D-06.
 
 ### P-04 · Correcciones al CLAUDE.md (no aplicadas: requieren vuestro visto bueno)
-- **Apuntado:** 14/10/2026 · **Para:** mié 15.
+- **Apuntado:** 14/10/2026 · **Para:** mié 14.
 - **Qué:** esta noche se encontraron datos del CLAUDE.md que no cuadran con la realidad. **No se ha tocado el CLAUDE.md.** Lista:
 
 | § CLAUDE.md | Dice | Realidad (fuente) |
@@ -83,17 +83,17 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
 - **Cómo:** pedid a Claude «aplica P-04 al CLAUDE.md y a `requisitos_fuentes.json`». La instrucción §2.13 del CLAUDE.md obliga a mantener los dos sincronizados.
 
 ### P-05 · Aligerar el CLAUDE.md (propuesta del 14/10)
-- **Apuntado:** 14/10/2026 · **Para:** mié 15, después de P-04.
+- **Apuntado:** 14/10/2026 · **Para:** mié 14, después de P-04.
 - **Qué:** el CLAUDE.md (~36 KB, unos 9.000 tokens) se carga en **cada** sesión. Propuesta: dejar §1–§6, §10 y §11 y pasar §7–§9 (fuentes, campos y trampas) a una skill `fuentes-madrid` en `.claude/skills/` que se cargue solo al trabajar con datos.
 - **Por qué:** es el mayor ahorro de tokens posible, más que caveman.
 
 ### P-06 · Instalar DuckDB (si D-01 = DuckDB)
-- **Apuntado:** 14/10/2026 · **Para:** mié 15.
+- **Apuntado:** 14/10/2026 · **Para:** mié 14.
 - **Qué:** el plugin `duckdb-skills` está instalado, pero el binario `duckdb` no. Python no tiene `duckdb` ni `pandas`.
 - **Cómo:** pedid a Claude «instala duckdb» (usa la skill `install-duckdb`). Para Python, un entorno `.venv` del proyecto (ya está en `.gitignore`).
 
 ### P-07 · Fuentes que faltan en el script de descarga
-- **Apuntado:** 14/10/2026 · **Para:** mié 15 – jue 16.
+- **Apuntado:** 14/10/2026 · **Para:** mié 14 – jue 15.
 - **Qué:** `scripts/descargar_fuentes.py` **no incluye**:
   1. **OSM** (extracto de Geofabrik de Madrid): imprescindible para el grafo de rutas (F3) y el mobiliario fuera de la capital.
   2. **AEMET** (P-01).
@@ -106,16 +106,16 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
 - **Dónde:** `scripts/descargar_fuentes.py`; especificación en CLAUDE.md §6.4.
 
 ### P-09 · Cruces espaciales pendientes en la ingesta
-- **Apuntado:** 14/10/2026 · **Para:** jue 16.
+- **Apuntado:** 14/10/2026 · **Para:** jue 15.
 - **Qué:** fuentes sin código de municipio que hay que asignar por geometría (punto o línea dentro del polígono del municipio): `sendas` (224), los `ay_*` (todo es capital, trivial), 48 tramos de `vias_pecuarias`, el 9,3 % de `desfibriladores` y `aire_zonas` (solo nombres; «Horcajo de la Sierra» ≠ «Horcajo de la Sierra-Aoslos»).
 - **Dónde:** `docs/informe-datos.md` §1 y §4.
 
 ### P-10 · Empezar F1 con superpowers
-- **Apuntado:** 14/10/2026 · **Para:** mié 15, después de las decisiones.
+- **Apuntado:** 14/10/2026 · **Para:** mié 14, después de las decisiones.
 - **Qué:** lanzar `brainstorming` para el primer flujo completo (Getafe, «correr», ubicación → top 3 → mapa), pidiéndole que respete el calendario del CLAUDE.md §10 y la congelación de funcionalidades del domingo. Para ejecutar el plan, `executing-plans` (más barato que `subagent-driven-development`).
 
 ### P-11 · Fuentes citables que faltan para el motor
-- **Apuntado:** 14/10/2026 · **Para:** jue 16 (motor).
+- **Apuntado:** 14/10/2026 · **Para:** jue 15 (motor).
 - **Qué:** valores que el motor necesita y para los que todavía no hay fuente oficial localizada:
   - velocidad media al caminar y al correr, para el «tiempo a pie» (RF-05);
   - umbral de lluvia (`probPrecipitacion`) para proponer cubierto (RF-09);
@@ -123,7 +123,7 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
 - **Regla:** si no hay fuente oficial, la app debe decir que es un criterio propio del proyecto (CLAUDE.md §2.9).
 
 ### P-12 · Comprobar el aire del día a otras horas
-- **Apuntado:** 14/10/2026 · **Para:** jue 16.
+- **Apuntado:** 14/10/2026 · **Para:** jue 15.
 - **Qué:** a las 02:08 del 14/10, `calidad_aire_datos_dia.csv` contenía **el día 13** (horas 1–23); el del Ayuntamiento ya traía el 14. Hay que ver a qué hora cambia de día el regional, para no mostrar «aire de hoy» con datos de ayer (RF-19).
 - **Cómo:** `python3 scripts/descargar_fuentes.py --solo aire_dia` a varias horas y mirar `ano/mes/dia`.
 
