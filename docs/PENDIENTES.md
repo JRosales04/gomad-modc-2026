@@ -12,7 +12,7 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
 | # | Estado | Tarea | Tiempo |
 |---|---|---|---|
 | P-00 | ⬜ | Revisar lo que se hizo de noche y fusionar la rama `preparacion` | 15 min |
-| P-01 | ⬜ | Crear `.env` con la clave de AEMET y verificar su API | 30 min |
+| P-01 | ✅ | Crear `.env` con la clave de AEMET y verificar su API (hecho el 14/10, CLAUDE.md §7.1) | 30 min |
 | — | ⬜ | Reunión de decisiones D-01 a D-04 (`docs/decisiones-pendientes.md`) | 45 min |
 | P-03 | ⬜ | Instalar `poppler-utils` y completar los umbrales de calor | 30 min |
 | P-04 | ⬜ | Aplicar las correcciones al CLAUDE.md | 20 min |
@@ -36,7 +36,8 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
   ```
 - **Datos generados (no se suben):** `data/perfil/perfil.json` (perfil por columna) y `data/perfil/municipios_referencia.json`.
 
-### P-01 · Clave de AEMET y verificación de su API
+### P-01 · ✅ Clave de AEMET y verificación de su API
+- **Hecho:** 14/10/2026. `app/.env` creado por el equipo; AEMET en el script de descarga (Task 3) y verificado con `app/ingest/scripts/verify_aemet.py` (Task 4). Esquema, codificación y cuota en CLAUDE.md §7.1. Muestra de Getafe en `app/ingest/tests/data/aemet_28065.json`.
 - **Apuntado:** 14/10/2026 · **Para:** mié 14 (CLAUDE.md §10).
 - **Qué:** `.env` todavía **no existe**. El esquema de AEMET está «sin verificar» (CLAUDE.md §7.1). Además, el script de descarga **no incluye AEMET**.
 - **Por qué:** sin la previsión horaria no hay F2 (mejor franja) ni regla de calor (D-06).
