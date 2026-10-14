@@ -24,7 +24,7 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
 ### P-00 · Revisar y fusionar la rama `preparacion`
 - **Apuntado:** 14/10/2026 · **Para:** mié 14, a primera hora.
 - **Qué:** esta noche se trabajó en la rama local `preparacion`, **sin subirla a GitHub**. Contiene:
-  - `scripts/perfilar_fuentes.py`: perfilador de `data/raw/` (solo stdlib, ~5 s).
+  - `scripts/profile_sources.py`: perfilador de `data/raw/` (solo stdlib, ~5 s).
   - `docs/informe-datos.md`: resultado del perfil, 12 trampas nuevas y cifras comprobadas.
   - `docs/assets/umbrales.md`: ICA oficial (BOE) completo; calor pendiente.
   - `docs/decisiones-pendientes.md` y este fichero.
@@ -45,7 +45,7 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
   cp .env.example .env    # y pegar la clave en AEMET_API_KEY
   ```
   Después pedid a Claude que compruebe `prediccion/especifica/municipio/horaria/28065` (Getafe) y `28079` (Madrid) y que documente los campos reales en el CLAUDE.md §7.1.
-- **Dónde:** `.env.example`, CLAUDE.md §7.1, `scripts/descargar_fuentes.py`.
+- **Dónde:** `.env.example`, CLAUDE.md §7.1, `scripts/download_sources.py`.
 
 ### P-02 · Invitar al equipo al repositorio
 - **Apuntado:** 14/10/2026 · **Para:** mié 14.
@@ -94,7 +94,7 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
 
 ### P-07 · Fuentes que faltan en el script de descarga
 - **Apuntado:** 14/10/2026 · **Para:** mié 14 – jue 15.
-- **Qué:** `scripts/descargar_fuentes.py` **no incluye**:
+- **Qué:** `scripts/download_sources.py` **no incluye**:
   1. **OSM** (extracto de Geofabrik de Madrid): imprescindible para el grafo de rutas (F3) y el mobiliario fuera de la capital.
   2. **AEMET** (P-01).
   3. `callejero_completo_2025` (si D-04 = sí).
@@ -103,7 +103,7 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
 ### P-08 · Política de recarga por niveles (§6.4), sin implementar
 - **Apuntado:** 14/10/2026 · **Para:** dom 18 (caché ante caídas).
 - **Qué:** falta el campo `refresco` en cada entrada de `FUENTES`, la opción `--refresco <nivel>` y la comprobación de cambios (`metadata_modified`, `Last-Modified`/`ETag`) antes de descargar.
-- **Dónde:** `scripts/descargar_fuentes.py`; especificación en CLAUDE.md §6.4.
+- **Dónde:** `scripts/download_sources.py`; especificación en CLAUDE.md §6.4.
 
 ### P-09 · Cruces espaciales pendientes en la ingesta
 - **Apuntado:** 14/10/2026 · **Para:** jue 15.
@@ -125,7 +125,7 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
 ### P-12 · Comprobar el aire del día a otras horas
 - **Apuntado:** 14/10/2026 · **Para:** jue 15.
 - **Qué:** a las 02:08 del 14/10, `calidad_aire_datos_dia.csv` contenía **el día 13** (horas 1–23); el del Ayuntamiento ya traía el 14. Hay que ver a qué hora cambia de día el regional, para no mostrar «aire de hoy» con datos de ayer (RF-19).
-- **Cómo:** `python3 scripts/descargar_fuentes.py --solo aire_dia` a varias horas y mirar `ano/mes/dia`.
+- **Cómo:** `python3 scripts/download_sources.py --solo aire_dia` a varias horas y mirar `ano/mes/dia`.
 
 ---
 
