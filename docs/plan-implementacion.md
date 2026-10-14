@@ -1042,8 +1042,26 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-
 - [ ] **Paso 3: `frontend/Caddyfile`**
 
 ```
-# DOMAIN=:80 sirve HTTP (pruebas); con un dominio real Caddy saca el certificado de Let's Encrypt
-{$DOMAIN} {
+# DOMAIN llega de app/deploy/.env via Compose: ":80" sirve solo HTTP (local); con el dominio real
+# Caddy saca el certificado de Let's Encrypt. {$DOMAIN::80} es red de seguridad si se arranca sin Compose
+{
+	# el log de errores (p. ej. 502 mientras arranca la api) incluye la peticion:
+	# se quitan la consulta de la URL, las IP y las cabeceras (Referer) para no guardar ubicaciones
+	log default {
+		format filter {
+			wrap json
+			fields {
+				request>uri regexp \?.* ?[redacted]
+				request>remote_ip delete
+				request>client_ip delete
+				request>remote_port delete
+				request>headers delete
+			}
+		}
+	}
+}
+
+{$DOMAIN::80} {
 	encode gzip
 	handle /api/* {
 		uri strip_prefix /api
@@ -1085,8 +1103,10 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    # solo DOMAIN, interpolado desde app/deploy/.env (sin claves): Caddy es el contenedor expuesto
+    # y no debe recibir las de app/.env. Sin definir o vacio, compose no arranca
     environment:
-      - DOMAIN=${DOMAIN:-:80}
+      DOMAIN: ${DOMAIN:?Falta DOMAIN en app/deploy/.env (":80" en local, el dominio en la VM)}
     volumes:
       - caddy_data:/data
     depends_on:
@@ -1096,15 +1116,26 @@ volumes:
   caddy_data:
 ```
 
+`deploy/.env.example` (versionado; el `deploy/.env` real no se sube). Compose lo lee solo para interpolar: el contenedor de Caddy, expuesto a Internet, recibe **solo** `DOMAIN`, nunca las claves de `app/.env` (que solo recibe la api):
+
+```
+# Copiar a app/deploy/.env. Compose lo lee solo para interpolar docker-compose.yml. Solo DOMAIN, sin claves
+# (las claves van en app/.env, que solo recibe la api).
+# En local: ":80", solo HTTP. En la VM: el dominio real (p. ej. gomad.example.org) y Caddy saca el
+# certificado de Let's Encrypt. Vacio o sin definir, compose se niega a arrancar.
+DOMAIN=:80
+```
+
 - [ ] **Paso 5: probar**
 
 ```bash
 mkdir -p frontend/dist && echo '<!doctype html><title>GoMad</title><p>GoMad</p>' > frontend/dist/index.html
-touch .env                                                        # si aun no existe (Task 4 lo rellena)
+touch .env && cp deploy/.env.example deploy/.env                  # .env si aun no existe (Task 4 lo rellena); DOMAIN=:80
 docker compose -f deploy/docker-compose.yml up -d --build
 curl -s localhost/api/health                                      # {"status":"ok"}
 curl -s localhost/ | grep GoMad
 docker compose -f deploy/docker-compose.yml exec api ls -a /srv/api      # no aparece .env ni .venv
+docker compose -f deploy/docker-compose.yml exec -T frontend env | cut -d= -f1   # DOMAIN, sin AEMET_API_KEY, IA_* ni ORACLE_*
 docker compose -f deploy/docker-compose.yml down
 ```
 Esperado: lo indicado en los comentarios. `frontend/dist/` no se sube (`dist/` en `.gitignore`).
@@ -3962,7 +3993,7 @@ export const client = {
 | V-F1 | Front | Mapa MapLibre sincronizado con la lista (RF-11); la lista es el equivalente completo; OpenFreeMap en desarrollo | `frontend/src/components/Map.tsx` | Selección sincronizada | Vitest: seleccionar tarjeta cambia el marcador activo |
 | V-F2 | Front | Detalle «¿Por qué?»: nota por factor, línea horaria con mejor franja, aire y tiempo con icono+color+texto (colores ICA de `umbrales.md` §1.3 como pastilla con contraste), fuente y fecha | `frontend/src/screens/Detail.tsx` | Contraste ≥ 4,5:1 | Vitest + axe |
 | V-F3 | Front | Panel «Ajustar» (hoja inferior Radix): pesos con recálculo al soltar (RF-16), perfil, «Salgo con…», tiempo y distancia | `frontend/src/components/SettingsSheet.tsx` | Mover un peso cambia el orden sin recargar | Vitest: soltar lanza una sola petición |
-| V-F4 | Front + Motor **[manual en parte]** | **Primer despliegue HTTPS**: dominio (DEC-10) o subdominio gratuito; `DOMAIN=` en `app/.env` de la VM; imagen `frontend` multi-stage; `app/data/` en la VM | `deploy/*`, `docs/arquitectura.md` §6 | `https://<dominio>/` abre en un móvil y pide la ubicación | `curl -I https://…/api/health` → 200 con certificado válido |
+| V-F4 | Front + Motor **[manual en parte]** | **Primer despliegue HTTPS**: dominio (DEC-10) o subdominio gratuito; `DOMAIN=<dominio>` en `app/deploy/.env` de la VM (no en `app/.env`); imagen `frontend` multi-stage; `app/data/` en la VM | `deploy/*`, `docs/arquitectura.md` §6 | `https://<dominio>/` abre en un móvil y pide la ubicación | `curl -I https://…/api/health` → 200 con certificado válido |
 
 # SÁBADO 17/10 — tareas (rutas relativas a `app/`)
 
