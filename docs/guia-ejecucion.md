@@ -60,6 +60,7 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 | Task 5 — Docker Compose (api + frontend), Caddy sin claves ni ubicación en logs | ✅ fusionada | PR #4 |
 | Task 7 — umbrales de calor del plan de Sanidad y tabla municipio → zona (179) | ✅ fusionada | PR #5, PR #6 |
 | Task 9 — especificación de pantallas + guía del frontend (Task 10 y front pasan a MANUAL GUIADO) | ✅ fusionada; falta validar con la maquetadora | PR #7 → `app/frontend/docs/` |
+| Task 6 — VM de OCI: E5.Flex 2 OCPU / 16 GB en `eu-madrid-1`, `/api/health` responde desde fuera (solo HTTP) | ✅ hecha | `docs/arquitectura.md` §6.1 |
 | Task 10 — base técnica del front (paso 0 de la guía) | ⏳ en curso a mano (Front) | `app/frontend/docs/pendientes.md` §A |
 | **P-13** — cuota de AEMET (`AEMET_PAUSE_S` mal calculado) | ⚠️ pendiente de decisión | `docs/PENDIENTES.md` → DEC-13 abajo |
 
@@ -75,7 +76,7 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 | L2 | Mié | ✅ hecho | 8 | `rutas/mie14-osm` | Rutas | PR #3 |
 | L3 | Mié | MANUAL GUIADO | 10 (paso 0 de `app/frontend/docs/guia.md`) | `front/mie14-base` | Front | Node ≥ 20.19 (mejor 22) y **L1 fusionado** ✅ |
 | L4 | Mié | ✅ hecho | 7 | `motor/mie14-calor` | Motor | PR #5, PR #6 |
-| M2 | Mié | MANUAL | 6 (VM de OCI) | — | Motor | **L1 fusionado** |
+| M2 | Mié | ✅ hecho (jue 15) | 6 (VM de OCI) | — | Motor | arquitectura §6.1 |
 | M3 | Mié | ✅ documentado (PR #7; falta validar) | 9 → `app/frontend/docs/pantallas.md` | — | Front + maquetadora | — |
 | D1 | Mié | DECISIÓN | DEC-P04, DEC-13 | — | Equipo | — |
 | L5 | Jue 9:00 | EJECUTAR + VERIFICAR | 11 | `motor/jue15-contrato` | Motor | — (**primero del jueves**) |
@@ -187,7 +188,9 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 - **Prompt de verificación:** `TAREAS={7}   RAMA={motor/mie14-calor}   BASE={main}` (apenas hay pruebas: el verificador debe cotejar los valores con el PDF).
 - **Comprobación rápida:** `umbrales.md` §2 ya no dice «PENDIENTE»; cada valor lleva página del PDF; `heat_zones.csv` tiene 179 filas (`tail -n +2 docs/assets/heat_zones.csv | wc -l`).
 
-### M2 · MANUAL — Task 6: VM de OCI
+### M2 · ✅ HECHO (15/10) — Task 6: VM de OCI
+
+> **Resultado:** `gomad-vm`, `VM.Standard.E5.Flex` 2 OCPU / 16 GB, Ubuntu 24.04, `eu-madrid-1`, IP `YOUR_SERVER_IP` (A1.Flex sin capacidad). `/api/health` responde desde fuera; el front es una página de prueba hasta la Task 10. Detalle y pasos dados en `docs/arquitectura.md` §6.1. Para el viernes (V-F4): dominio → `DOMAIN` en `app/deploy/.env` de la VM.
 
 - **Qué hace:** crea la máquina donde se desplegará la app y comprueba que responde desde internet.
 - **Por qué:** el primer despliegue con HTTPS es el viernes (V-F4); conviene tener la VM y su IP antes.
