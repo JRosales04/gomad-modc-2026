@@ -95,8 +95,8 @@ Orden propuesto: primero las **bloqueantes** (D-01 a D-04), que impiden empezar 
 
 ## D-06 · Calor: qué umbral usar
 
-**Contexto:** no hay umbral verificado (`umbrales.md` §2). Hay tres fuentes posibles: el plan de Sanidad 2026 (umbral por zona meteosalud, pensado para días de alerta), Meteoalerta de AEMET (avisos por zona) y la sensación térmica horaria de AEMET (para la franja).
-**Recomendación:** decidir **después** de leer el plan de Sanidad (P-03). Combinación probable: «día en alerta» (Sanidad o AEMET) → proponer cubierto o franja temprana; dentro del día, elegir la hora con menor sensación térmica.
+**Contexto:** umbrales oficiales verificados (`umbrales.md` §2): plan de Sanidad 2026, umbral de Tmáx por zona meteosalud (35,8 / 37,4 / 39,2 °C) con la tabla municipio → zona en `heat_zones.csv`. Meteoalerta de AEMET: no localizado. La sensación térmica horaria de AEMET sirve para elegir la franja, pero no tiene umbral oficial.
+**Recomendación:** combinación probable: «día en alerta» (Sanidad o AEMET) → proponer cubierto o franja temprana; dentro del día, elegir la hora con menor sensación térmica (propuesta detallada en `umbrales.md` §2.3).
 **Desbloqueado: umbrales oficiales, tabla municipio → zona (`docs/assets/heat_zones.csv`) y propuesta en `docs/assets/umbrales.md` §2.3.**
 
 ## D-07 · Pesos por defecto y velocidades (RF-07, RF-16)
