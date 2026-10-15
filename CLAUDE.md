@@ -206,7 +206,7 @@ Tablas con nombre en inglés desde el 14/10 (`municipio` → `municipality`, `de
 - `air_station(id PK, network [CM|AY], name, area_type, magnitudes[], ine_code, geom)`
 - `air_reading(station_id, magnitude, ts, value, flag)` — formato largo (H01…H24 → filas)
 - `forecast(ine_code, ts, temp, feels_like, precip_prob, precip, wind, sky)`
-- `edge(id, u, v, geom, longitud_m, tipo_via, pct_verde, trafico, fuente_cerca)`
+- `edge(id, u, v, geom, longitud_m, tipo_via, pct_verde, trafico, fuente_cerca)` — en `app/data/graph/<zona>/edges.parquet`: `length_m`, `highway`, `traffic`, `green_pct` (NaN = municipio sin VPLA), `near_fountain/bench/aed` y `fountain_id/bench_id/aed_id` (punto más cercano a ≤ `poi_radius_m`; la ruta cuenta puntos distintos y solo fuentes con `working IS NOT FALSE`)
 - `route_poi(id, type [fuente|banco|papelera|aseo|area_canina|juegos|dea|biosaludable|supermercado], source, status, working, geom)` — `status`: estado de origen (p. ej. `CERRADA_TEMPORALMENT`), nulo si no hay; `working`: boolean, nulo = sin dato. La ruta solo cuenta `working IS NOT FALSE` (las fuentes fuera de servicio se muestran, no cuentan).
 - `service(id, categoria [salud|farmacia|educacion|social|cultura|transporte], subtipo, ine_code, geom)`
 - `municipality_indicator(ine_code, categoria, indicador, valor (NULL = sin datos), unidad, anio, source)`
