@@ -78,6 +78,16 @@ Depende de que el contrato (Task 11) esté en `main`: `app/frontend/src/api/open
 
 ---
 
+### B2. Diferido de la revisión final del paso 1 (15/10)
+- [ ] **Prueba manual en móvil real** (Chrome Android y Safari iOS): tocar una tarjeta de Resultados abre el Detalle, arrastrar la hoja, Tab hasta un resultado. jsdom no puede probar los gestos.
+- [ ] Probar a 320 px y con zoom al 200 % y 400 %: Resultados (hoja y mapa), cabecera del Detalle, formulario de ubicación.
+- [ ] Mensajes de carga con `role="status"` que se insertan ya con texto (`Home.tsx`, `Municipality.tsx`, `Sources.tsx`): pasarlos a una región viva persistente.
+- [ ] Asistente: descartar respuestas viejas si se pulsa dos veces y marcar la ruta como desactualizada al editar los campos; `aria-invalid`/`aria-describedby` en distancia y duración.
+- [ ] Volver del Detalle a Resultados repite la petición y pierde «Ver más» (lo resuelve la caché de TanStack Query en el paso 3).
+- [ ] `RouteView`: comprobar que la ruta corresponde al destino si cambia `:id` en la misma instancia.
+- [ ] Lista atenuada al recalcular (`opacity: 0.55`) baja el contraste mientras carga; cambiar por otro indicador.
+- [ ] `role="list"` en listas con `list-style: none` (VoiceOver); categorías del municipio como `h3`; nombre «Ajustar preferencias» en los dos botones «Ajustar»; fecha absoluta con `<time>` en Fuentes; números del mapa ilegibles (se va con MapLibre); `useAsync` escribe un ref en el render; quitar CSS muerto (`.filter-chip`, `.results-filter-chips`).
+
 ## C. Aplazado
 
 - [ ] **Iconos:** Google Material Symbols con un fichero `.woff`/`.woff2` propio en `public/fonts/` (sin pedir nada a Google), `@font-face` y clase en `icons.css`. Decidir si se recorta (el `.woff2` completo de Rounded pesa 5,4 MB). Mientras tanto, solo **cerrar el comentario de `icons.css:1`**, que está abierto. Cuando lleguen: icono + color + texto en cada indicador y en la barra inferior. *(15/10: comentario de `icons.css` cerrado; componente `Icon` ya colocado en pastillas, actividades y categorías.)*
