@@ -15,7 +15,7 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
 | P-01 | ✅ | Crear `.env` con la clave de AEMET y verificar su API (hecho el 14/10, CLAUDE.md §7.1) | 30 min |
 | — | ⬜ | Reunión de decisiones D-01 a D-04 (`docs/decisiones-pendientes.md`) | 45 min |
 | P-03 | ✅ | Instalar `poppler-utils` y completar los umbrales de calor y la tabla municipio → zona (hecho el 14/10, `umbrales.md` §2, `heat_zones.csv`) | 30 min |
-| P-04 | ⬜ | Aplicar las correcciones al CLAUDE.md | 20 min |
+| P-04 | ✅ | Aplicar las correcciones al CLAUDE.md (hecho el 15/10) | 20 min |
 
 ---
 
@@ -59,7 +59,7 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
 - **No localizados, no hacen falta** si DEC-06 adopta el plan de Sanidad: tabla de umbrales de Meteoalerta (AEMET) por zona de Madrid y plan de calor propio de la Comunidad de Madrid.
 - **Desbloquea:** D-06.
 
-### P-04 · Correcciones al CLAUDE.md (no aplicadas: requieren vuestro visto bueno)
+### P-04 · ✅ Correcciones al CLAUDE.md (aplicadas el 15/10 tras el visto bueno)
 - **Apuntado:** 14/10/2026 · **Para:** mié 14.
 - **Qué:** esta noche se encontraron datos del CLAUDE.md que no cuadran con la realidad. **No se ha tocado el CLAUDE.md.** Lista:
 
