@@ -13,13 +13,15 @@ Marcar `[x]` al terminar. Cada punto dice cuándo está hecho.
 ## A. Ahora (no depende de la API)
 
 ### A1. Despliegue y base técnica
-- [ ] **Dockerfile multi-stage + `.dockerignore`** (🔴 D1). El actual copia `dist/` local y falla en un clon limpio. Texto listo en `guia.md` §3, paso 0, punto 7 (comprobado con `docker build`). Avisar a Motor antes de fusionar. **→ paso 2** (no tocado en el paso 1).
+- [x] **Dockerfile multi-stage + `.dockerignore`** (🔴 D1). Avisar a Motor antes de fusionar. *(15/10, paso 2: `node:22.23.3-alpine` + `caddy:2.8.4`; `npm ci` funciona con su npm 10.9.9 sin tocar el lock. Comprobado sin `dist/` local: `docker compose build frontend` en 13 s, imagen de 71,2 MB con solo `/srv/web`; `/`, rutas profundas e inexistentes → 200 con el mismo `index.html`, `/assets/…` y `/fonts/…` con su tipo, `/api/health` → `{"status":"ok"}`.)*
   *Hecho cuando:* `cd app/deploy && docker compose build frontend` funciona sin `dist/`.
 - [x] **Node ≥ 20.19 en local** (mejor 22 LTS). Vite 8 no arranca con Node 18. *(15/10: Node 20.20.2; ojo, su npm 10.8.2 falla al instalar vitest: usar `npx npm@11 install`.)*
   *Hecho cuando:* `node -v` ≥ 20.19 y `npm run dev` arranca.
 - [x] **Vitest + axe** y script `"test": "vitest run"` (🟠 D6). Configuración en `guia.md` §3, paso 0, puntos 2–4.
   *Hecho cuando:* `npm test` pasa con la prueba base (un `h1` y axe sin violaciones).
 - [x] **README del servicio** con cómo arrancar y probar (🟡 D17). El actual es el de la plantilla.
+
+- [ ] **`try_files` también responde a assets inexistentes:** `/assets/nope.js` → 200 con el `index.html` (no 404), porque el `Caddyfile` manda todo a `/index.html`. No rompe la SPA, pero un JS perdido tras un despliegue da un error de MIME confuso en vez de un 404. Si se arregla: `handle /assets/*` con `file_server` sin `try_files`. *(Visto en la verificación del paso 2, 15/10; no se toca el `Caddyfile` en este paso.)*
 
 ### A2. Navegación
 - [x] **React Router 7** con una URL por pantalla (🔴 D3). Rutas en `guia.md` §3, paso 0, punto 5. Las pantallas que no existan: página «Próximamente» con su `h1`. *(todas las pantallas existen; 404 con su `h1`.)*
@@ -98,6 +100,6 @@ Depende de que el contrato (Task 11) esté en `main`: `app/frontend/src/api/open
 
 ## D. Con otros roles
 
-- [ ] **Primer despliegue HTTPS (vie 16, con Motor):** necesita A1 (Dockerfile). `guia.md` §3, paso 5.
+- [ ] **Primer despliegue (vie 16, con Motor):** HTTP hecho con `app/deploy/deploy.sh` (paso 2; pendiente de confirmar en la VM), **HTTPS pendiente de dominio** (DEC-10). `guia.md` §3, paso 5.
 - [ ] **Validar con la maquetadora** las secciones «Validar con la maquetadora» de `pantallas.md`, empezando por Inicio, Resultados y la barra inferior.
 - [ ] **Accesibilidad final (lun 19):** `a11y-architect`, teclado y lector de pantalla en el flujo principal (`guia.md` §3, paso 8).
