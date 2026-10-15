@@ -3398,7 +3398,7 @@ if __name__ == "__main__":
 
 **Interfaces (produce; Task 21 en `api` consume los ficheros, no el código):**
 - `app/data/graph/<zona>/nodes.parquet`: `node` (int, 0…n−1), `osm_id`, `lon`, `lat`
-- `app/data/graph/<zona>/edges.parquet`: `u`, `v` (índices de nodo), `length_m`, `highway`, `traffic` (0–1, `config/routing.yaml`), `green_pct` (0–1 o NaN sin dato), `near_fountain`, `near_bench`, `near_aed` (bool), `geom` (WKB LineString 4326)
+- `app/data/graph/<zona>/edges.parquet`: `u`, `v` (índices de nodo), `length_m`, `highway`, `traffic` (0–1, `config/routing.yaml`), `green_pct` (0–1 o NaN sin dato), `near_fountain`, `near_bench`, `near_aed` (bool), `fountain_id`, `bench_id`, `aed_id` (id del punto más cercano o nulo; revisión final 15/10), `geom` (WKB LineString 4326)
 - `build_graph(pbf: Path, bbox: list[float] | None, out_dir: Path, config: dict) -> dict`; `index_nodes(nodes, edges)`; `edge_factors(edges, green, poi, config, has_green) -> GeoDataFrame`; `osm_pois(osm) -> GeoDataFrame`
 - Añade a `clean/poi.parquet` el mobiliario de OSM (`amenity=bench` → `bench`, `amenity=drinking_water` → `fountain`, `amenity=waste_basket` → `bin`, `leisure=dog_park` → `dog_area`, `leisure=playground` → `playground`; `source="osm"`). Claves OSM de `requisitos_fuentes.json`.
 
