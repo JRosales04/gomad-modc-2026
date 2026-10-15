@@ -2,7 +2,7 @@
 
 Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso a paso con Claude Code. El plan dice *qué* hay que construir; esta guía dice **en qué orden lanzarlo, con qué prompt, qué necesita cada paso y cómo saber que ha salido bien**.
 
-- **Actualizada:** jueves 15/10/2026, tarde (L5, L7, L8 y L10 fusionados; L6 hecho con OCI Language en `motor/jue15-ia`, sin fusionar; D2 sin volcar en `app/config/`).
+- **Actualizada:** jueves 15/10/2026, 15:10 (PR #14–#17 fusionadas: D2 en `app/config/`, P-04, nombre GoMad, desnivel, L6 con OCI Language; siguiente: L9).
 - **Prompts que usa:** `docs/prompt_task_executer.md` (ejecutar) y `docs/prompt_task_checker.md` (verificar). En ambos solo se cambia la primera línea.
 
 ---
@@ -48,7 +48,7 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 
 ---
 
-## 2. Estado actual (15/10, 12:45)
+## 2. Estado actual (15/10, 15:10)
 
 | Tarea | Estado | Dónde |
 |---|---|---|
@@ -66,9 +66,11 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 | Tasks 16–17 — utilidades y normalizadores de referencia (`route_poi` con `status`/`working`, regla de cubierto) | ✅ fusionadas | PR #12 |
 | Tasks 20–22 — grafo de Getafe, Dijkstra/A\*, latencia (Getafe p50 0,015 s; capital medida: p50 0,45 s, 1,2 GB) | ✅ fusionadas | PR #13, arquitectura §4.4 |
 | Task 10 — base técnica del front (paso 0 de la guía) | ⏳ en curso a mano (Front), sin commits en `main` | `app/frontend/docs/pendientes.md` §A |
-| Task 15 — prueba del proveedor de IA | ✅ hecha en `motor/jue15-ia` (sin fusionar): DEC-03 = **OCI Language + reglas + plantillas, sin LLM**; 0,23 s de media | L6 abajo |
-| Tasks 18–19 — aire, previsión y bases DuckDB | ⬜ desbloqueada (L8 ✅); el paso 4 espera a DEC-08 | L9 abajo |
-| D2 — DEC-05, 07, 07b, 08 | ⬜ sin volcar: `app/config/` solo tiene `ica_thresholds.yaml` y `routing.yaml` (provisional) | D2 abajo |
+| Task 15 — prueba del proveedor de IA: DEC-03 = **OCI Language + reglas + plantillas, sin LLM**; 0,23 s de media | ✅ fusionada | PR #17 |
+| Tasks 18–19 — aire, previsión y bases DuckDB | ⬜ **siguiente**, completa (DEC-08 y `activities.yaml` ya en `main`) | L9 abajo |
+| D2 — DEC-05, 07, 07b, 08 | ✅ volcadas en `app/config/` (`rules.yaml`, `weights.yaml`, `activities.yaml`; `routing.yaml` ya no provisional) | PR #15 |
+| DEC-P04, DEC-10, DEC-11, DEC-12 | ✅ P-04 aplicado; nombre **GoMad**; IA n.º 1 descartado (palabras clave) y n.º 2 pendiente; desnivel **sí** (Should, sábado con S-R1; MDT05 comprobado por WCS) | PR #16, #17 |
+| ⚠️ Hueco de Getafe | 0 destinos para nadar, tenis y baloncesto (Getafe no está en EIEL y Nomecalles no da el deporte): decidir en P1 (más palabras clave u OSM `sport=*`) | `app/config/activities.yaml` |
 | **P-13** — cuota de AEMET (`AEMET_PAUSE_S` mal calculado) | ⚠️ pendiente de decisión | `docs/PENDIENTES.md` → DEC-13 abajo |
 
 ---
@@ -85,15 +87,15 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 | L4 | Mié | ✅ hecho | 7 | `motor/mie14-calor` | Motor | PR #5, PR #6 |
 | M2 | Mié | ✅ hecho (jue 15) | 6 (VM de OCI) | — | Motor | arquitectura §6.1 |
 | M3 | Mié | ✅ documentado (PR #7; falta validar) | 9 → `app/frontend/docs/pantallas.md` | — | Front + maquetadora | — |
-| D1 | Mié | DECISIÓN | DEC-P04, DEC-13 | — | Equipo | — |
+| D1 | Mié | ✅ P-04 (jue 15); DEC-13 pasa al viernes | DEC-P04, DEC-13 | — | Equipo | — |
 | L5 | Jue 9:00 | ✅ hecho | 11 | `motor/jue15-contrato` | Motor | PR #9, PR #10 |
-| L6 | Jue | ✅ hecho, falta VERIFICAR y fusionar | 15 | `motor/jue15-ia` | Motor | credenciales de OCI (M4) ✅; L5 ✅ |
+| L6 | Jue | ✅ hecho | 15 | `motor/jue15-ia` | Motor | PR #17 |
 | L7 | Jue | ✅ hecho | 12, 13, 14 | `motor/jue15-motor` | Motor | PR #11 |
 | L8 | Jue | ✅ hecho | 16, 17 | `datos/jue15-normalizar` | Datos | PR #12 |
-| L9 | Jue | EJECUTAR + VERIFICAR | 18, 19 | `datos/jue15-aire-build` | Datos | L8 ✅; DEC-08 para el paso 4 de Task 19 |
+| L9 | Jue | EJECUTAR + VERIFICAR (**siguiente**) | 18, 19 | `datos/jue15-aire-build` | Datos | L8 ✅; DEC-08 ✅ |
 | L10 | Jue | ✅ hecho | 20, 21, 22 | `rutas/jue15-grafo` | Rutas | PR #13 |
 | L11 | Jue | MANUAL GUIADO | 23, 24, 25 (pasos 1–3 de `app/frontend/docs/guia.md`) | `front/jue15-pantallas` | Front | **L3 y L5 fusionados**, M3 hecho |
-| D2 | Jue 11:00 | DECISIÓN ⬜ (sin volcar) | DEC-05, 07, 07b, 08 | — | Equipo | propuestas en `docs/decisiones-pendientes.md` |
+| D2 | Jue 11:00 | ✅ hecho | DEC-05, 07, 07b, 08 | — | Equipo | PR #15 |
 | P1 | Jue tarde | PLANIFICAR | detallar viernes | — | Coordinación | cierre del jueves |
 
 Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita antes». Si es una sola persona: el orden de la tabla.
@@ -242,7 +244,7 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 - **Prompt de verificación:** `TAREAS={11}   RAMA={motor/jue15-contrato}   BASE={main}`
 - **Comprobación rápida:** `cd app/api && .venv/bin/pytest -q` (incluye `test_contract.py`) y existe `app/frontend/src/api/openapi.json`. **Fusionar cuanto antes y avisar al equipo.**
 
-### L6 · ✅ HECHO (rama `motor/jue15-ia`, falta verificar y fusionar) — Task 15: prueba del proveedor de IA
+### L6 · ✅ HECHO (PR #17) — Task 15: prueba del proveedor de IA
 
 > **Estado (15/10, tarde):** DEC-03 decidido: **OCI Language** (servicio de IA de Oracle, sin LLM) + reglas + plantillas. OCI Generative AI descartado (404 por permisos en `eu-madrid-1`; `eu-frankfurt-1` no suscrita) y Anthropic descartado (coste propio). `app/api/scripts/probe_ai.py` extrae «15 km», «parque», «bancos» y «supermercado» (no «fuentes») en 0,23 s de media. El paso de entidades a `AssistantParams` (diccionario RF-21, negaciones) y las plantillas de `write_up` son de D-M1. Credenciales: `OCI_*` en `app/.env` y `~/.oci/config`; en la VM se copia `~/.oci` y se monta en solo lectura en el contenedor `api`.
 
@@ -274,13 +276,13 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 - **Prompt de verificación:** `TAREAS={16,17}   RAMA={datos/jue15-normalizar}   BASE={main}`
 - **Comprobación rápida:** `cd app/ingest && .venv/bin/pytest -q` (las `slow` deben **ejecutarse**, no saltarse) y existen `municipality`, `population`, `destination_raw`, `green` y `poi` en `app/data/clean/`.
 
-### L9 · EJECUTAR + VERIFICAR — Tasks 18, 19: aire, previsión y construcción de las bases DuckDB
+### L9 · EJECUTAR + VERIFICAR (siguiente) — Tasks 18, 19: aire, previsión y construcción de las bases DuckDB
 
 - **Qué hace:** normaliza estaciones y lecturas de aire (fecha por fila, `T`/`V` sí, `N` no) y la previsión de AEMET; construye `app/data/gomad.duckdb` y `app/data/realtime.duckdb` de forma atómica, con las medias móviles del ICA (O₃ 8 h, PM 24 h).
 - **Por qué en este orden:** necesita los ficheros de L8; es lo que leerá `/recommend` el viernes.
 - **Utiliza:** `app/ingest/.venv`, DuckDB (+ extensión `spatial`), `app/ingest/tests/data/aemet_28065.json` (Task 4), `app/config/activities.yaml`.
 - **Necesita:** **L8 fusionado**. El paso 4 de la Task 19 (construcción real) necesita **DEC-08** tomada y `app/config/activities.yaml` escrito; si aún no, el ejecutor deja ese paso pendiente.
-- **Prompt de ejecución:** `TAREAS={18,19}   RAMA={datos/jue15-aire-build}   BASE={main}   MANUALES_HECHOS={DEC-08 decidida y app/config/activities.yaml escrito}` (o `{ninguno}` si aún no)
+- **Prompt de ejecución:** `TAREAS={18,19}   RAMA={datos/jue15-aire-build}   BASE={main}   MANUALES_HECHOS={DEC-08 decidida y app/config/activities.yaml escrito (PR #15)}`
 - **Prompt de verificación:** `TAREAS={18,19}   RAMA={datos/jue15-aire-build}   BASE={main}`
 - **Comprobación rápida:** `python -m build_db all` genera los dos `.duckdb`; `green` es NULL (no 0) donde no hay VPLA.
 
@@ -306,17 +308,17 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 - **Formato:** rama `front/jue15-pantallas`, un commit por paso (`Front: tipos del contrato, cliente y respuestas simuladas`, `Front: pantalla de inicio`, `Front: pantalla de resultados`), PR a `main` tras el checklist de la guía §5. Verificación opcional por Claude en solo lectura.
 - **Comprobación rápida:** `cd app/frontend && npm run contract && npm test`; `VITE_MOCK=1 npm run dev` muestra Inicio → Resultados en 3 toques.
 
-### D2 · DECISIÓN — Jueves (⬜ ninguna volcada a `app/config/` a las 12:45)
+### D2 · ✅ DECISIÓN — Jueves (todas tomadas; ver CLAUDE.md §11)
 
 | ID | Qué | Límite | Fichero |
 |---|---|---|---|
-| DEC-10 | Nombre | 10:00 | CLAUDE.md §1, `app/frontend/index.html` |
-| DEC-05 | Regla de aire por perfil | 12:00 | `app/config/rules.yaml` → `air` |
-| DEC-07 | Pesos por defecto, velocidades y pesos de ruta | 12:00 | `app/config/weights.yaml`, `app/config/routing.yaml` |
-| DEC-07b | Umbral de lluvia | 12:00 | `app/config/rules.yaml` → `rain` |
-| DEC-08 | Actividades y tabla actividad → destino | 12:00 | `app/config/activities.yaml` |
+| DEC-10 | ✅ **GoMad** | 10:00 | CLAUDE.md §1, `app/frontend/index.html` |
+| DEC-05 | ✅ General y carrito desde Desfavorable; sensible y mayor desde Regular | 12:00 | `app/config/rules.yaml` → `air` |
+| DEC-07 | ✅ 30/25/20/15/10; 4,5 / 9 / 3,5 km/h; ruta como `routing.yaml` | 12:00 | `app/config/weights.yaml`, `app/config/routing.yaml` |
+| DEC-07b | ✅ Desde el 50 % | 12:00 | `app/config/rules.yaml` → `rain` |
+| DEC-08 | ✅ 8 actividades | 12:00 | `app/config/activities.yaml` |
 | DEC-03 | ✅ OCI Language + reglas + plantillas, sin LLM (L6) | 12:00 | `app/.env`, CLAUDE.md §11 |
-| DEC-11, DEC-12 | Usos de IA de §6.5; desnivel sí/no | 20:00 | CLAUDE.md §11 |
+| DEC-11, DEC-12 | ✅ IA n.º 1 descartado, n.º 2 pendiente; desnivel sí (Should) | 20:00 | CLAUDE.md §11 |
 
 Lo que no tenga fuente oficial se escribe en el YAML con `own_criterion: true`. Escribir los YAML es un commit pequeño a `main` por PR (puede hacerlo Claude si se le dan los valores).
 
@@ -324,6 +326,8 @@ Lo que no tenga fuente oficial se escribe en el YAML con `own_criterion: true`. 
 
 - `pytest` en verde en `app/api` y `app/ingest`; `npx vitest run` en `app/frontend`.
 - Repasar las decisiones de D2.
+- Meter en el plan del viernes lo decidido hoy que aún no tiene tarea: **hueco de Getafe** (nadar, tenis, baloncesto), **desnivel** dentro de S-R1 (WCS del IGN por teselas de ≤ 4096 px; añadir `rasterio` a `ingest`), montaje de `~/.oci` en la `api` del Compose dentro de V-F4 y **dominio** para el HTTPS.
+- Decisiones del viernes 12:00: DEC-06 (calor; `rules.yaml` no admite umbrales por zona), DEC-09 (indicadores F5), DEC-13 (cuota AEMET).
 - Pedir a Claude: «usa superpowers:writing-plans para detallar las tareas del viernes de `docs/plan-implementacion.md` como Task 26 en adelante, con lo aprendido hoy», y añadir aquí los lotes del viernes.
 
 ---
