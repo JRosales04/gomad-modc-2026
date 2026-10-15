@@ -3141,7 +3141,7 @@ def run():
 
 `app/data/realtime.duckdb`:
 - `air_reading(station_id, magnitude, ts, value, flag)` (últimos 3 días)
-- `aqi_hourly(station_id, ts, pollutant, mean, n_hours)` — media móvil: NO2/SO2 1 h, O3 8 h, PM 24 h (`umbrales.md` §1.2)
+- `aqi_hourly(station_id, ts, pollutant, mean, n_hours)` — media móvil: NO2/SO2 1 h, O3 8 h, PM 24 h (`umbrales.md` §1.2) — `n_hours` = horas con dato en la ventana; la tabla **no** filtra por cobertura: quien la consuma (`repository`, V-M1) debe exigir un mínimo antes de dar categoría ICA (una hora suelta de O₃ o PM no es el ICA). El mínimo es decisión del equipo (propuesta: 75 %, 6 de 8 h para O₃ y 18 de 24 h para PM, criterio propio) y va en `config/ica_thresholds.yaml`, no en código.
 - `forecast(ine_code, ts, temp, feels_like, precip_prob, precip, wind, sky, issued)`
 
 Funciones: `build_main(target, rules=None) -> Path`, `build_realtime(target) -> Path`, `apply_activities(destinations, rules) -> DataFrame`, `create_aqi_hourly(con)`, `atomic(target, fill_fn) -> Path`; CLI `python -m build_db {main|realtime|all}`.

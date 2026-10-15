@@ -121,7 +121,13 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
 ### P-12 · Comprobar el aire del día a otras horas
 - **Apuntado:** 14/10/2026 · **Para:** jue 15.
 - **Qué:** a las 02:08 del 14/10, `calidad_aire_datos_dia.csv` contenía **el día 13** (horas 1–23); el del Ayuntamiento ya traía el 14. Hay que ver a qué hora cambia de día el regional, para no mostrar «aire de hoy» con datos de ayer (RF-19).
-- **Cómo:** `python3 scripts/download_sources.py --solo aire_dia` a varias horas y mirar `ano/mes/dia`.
+- **Cómo:** `python3 scripts/download_sources.py --only aire_dia` a varias horas y mirar `ano/mes/dia`.
+- **Observado (15/10, Task 18):**
+  | Hora de descarga | Día del fichero regional | Última hora con dato | Ayuntamiento |
+  |---|---|---|---|
+  | 14/10 02:08 | 13/10 | h23 | 14/10 |
+  | 15/10 15:12 | 15/10 | h12 (12:00), todo `T` | 15/10 |
+  Faltan las tomas de las 09:00 y las 12:00 (la tarea se ejecutó a partir de las 15:00): sigue abierto para saber la hora exacta del cambio de día (entre las 02:08 y las 15:12). Mientras tanto la ingesta ya lee la fecha de cada fila (`normalize/air.py`) y no supone «hoy».
 
 ### P-13 · Cuota de AEMET: `AEMET_PAUSE_S` mal calculado y propuesta sin presentar
 - **Apuntado:** 14/10/2026 (verificación de la Task 4) · **Para:** antes de programar la descarga horaria (sáb 17, S-D2).
