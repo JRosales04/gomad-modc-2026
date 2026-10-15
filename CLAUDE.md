@@ -85,11 +85,11 @@ Capas marcadas PESADAS (no se bajan por defecto; `--include-heavy`): `vpla_redes
 
 **Levantar la app con Docker Compose** (desde `app/`):
 ```bash
-mkdir -p frontend/dist && echo '<!doctype html><title>GoMad</title>' > frontend/dist/index.html   # provisional hasta Task 10
 cp deploy/.env.example deploy/.env        # solo DOMAIN: ":80" en local, el dominio en la VM
 docker compose -f deploy/docker-compose.yml up -d --build
 curl -s localhost/api/health             # {"status":"ok"}
 ```
+El Compose compila el front dentro de la imagen (Dockerfile multi-stage: `node:22.23.3-alpine` hace `npm ci` y `npm run build`, Caddy sirve `dist`), así que no hace falta `dist/` local; las pruebas del front se ejecutan antes, en local (`cd app/frontend && npm test`). En la VM, desde `~/GoMad`: `app/deploy/deploy.sh` (hace `git pull --ff-only`, `up -d --build` y comprueba `/` y `/api/health`; `--no-pull` para saltarse el pull).
 Las claves de `app/.env` solo llegan al contenedor `api`; Caddy (`frontend`) recibe solo `DOMAIN`. Si `docker` da «permission denied» en el socket tras añadirte al grupo `docker`, abre una terminal nueva (o `newgrp docker`).
 
 Página de trabajo publicada (privada): https://claude.ai/artifact/MT3co6p1UKtJypQwBGqZpK
