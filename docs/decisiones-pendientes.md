@@ -8,7 +8,7 @@ Orden propuesto: primero las **bloqueantes** (D-01 a D-04), que impiden empezar 
 |---|---|---|---|
 | D-01 | Almacén | Todo el modelo de datos | DuckDB + GeoParquet |
 | D-02 | Pilotos de ruta | Grafo, F3 | Getafe primero; capital si da tiempo |
-| D-03 | Proveedor de IA (F6) | F6, `.env` | El que se pueda dar de alta mañana; ver criterios |
+| D-03 | Proveedor de IA (F6) | F6, `.env` | El que se pueda dar de alta mañana; ver criterios. **Decidido el 15/10: OCI Language** (arquitectura §10, A-12) |
 | D-04 | Geocodificación (RF-01) | Primera pantalla | Buscador de Nomecalles + callejero completo |
 | D-05 | Regla de aire por perfil | Motor (RF-09, RF-15) | Derivada del texto del BOE |
 | D-06 | Calor: qué umbral usar | Motor (RF-09) | Desbloqueado: umbrales oficiales, tabla municipio → zona (`docs/assets/heat_zones.csv`) y propuesta en `docs/assets/umbrales.md` §2.3 |
@@ -62,6 +62,7 @@ Orden propuesto: primero las **bloqueantes** (D-01 a D-04), que impiden empezar 
 **Opciones:** OCI Generative AI (Oracle) · API de Anthropic (Claude) · otro proveedor.
 **Recomendación:** probar OCI Generative AI la primera hora. Si a mediodía no funciona, pasar al plan B sin más discusión. En cualquier caso: **respuestas de reserva grabadas** para la demo (CLAUDE.md §6.3).
 **Desbloquea:** `IA_PROVEEDOR`, `IA_API_KEY` e `IA_MODELO` en `.env`.
+**Decidido el 15/10:** OCI Language + reglas + plantillas, sin LLM (`docs/arquitectura.md` §10, A-12; CLAUDE.md §11).
 
 ## D-04 · Cómo obtener coordenadas de una dirección escrita (RF-01) — **bloqueante para la pantalla de inicio**
 

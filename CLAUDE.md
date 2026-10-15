@@ -226,11 +226,11 @@ Código de municipio: INE de 5 dígitos `28` + 3 dígitos (`MUN` en EIEL, `CMUN`
   - *Gimnasio / cubierto:* `covered` de EIEL se decide por `TIPOINSTAL` (`app/ingest/normalize/sports.py:eiel_covered`): exteriores «AIRE LIBRE», «SIN CUBRIR», «PISTAS POLIDEPORTIVAS», «TERRENOS DE JUEGO», «ESCUELA DE VELA», «ESTACIONES DE ESQUI», «PUERTO DEPORTIVO»; cubiertos «CUBIERT…» y «GIMNASIO»; tipos mixtos («COMPLEJOS POLIDEPORTIVOS», «OTROS») por `SUP_CUBI > 0`; sin dato → nulo. **No** basta `SUP_CUBI > 0`: lo cumplen piscinas al aire libre y campos con vestuario o grada cubiertos.
 
 ### 6.3 F6 — asistente de rutas (diseño)
-1. LLM: texto → JSON de parámetros (validado contra un esquema cerrado) que se muestra y es editable. Ejemplo: `{actividad:"caminar", distancia_km:15, circular:true, pasar_por:["parque","supermercado"], durante:{fuentes:"frecuentes", bancos:"frecuentes"}}`.
+1. Interpretación (OCI Language + diccionario del catálogo RF-21): texto → parámetros (validados contra un esquema cerrado) que se muestran y son editables. Ejemplo: `{actividad:"caminar", distancia_km:15, circular:true, pasar_por:["parque","supermercado"], durante:{fuentes:"frecuentes", bancos:"frecuentes"}}`.
 2. Motor: elige puntos de paso que sumen la distancia objetivo (±10 %) y los encadena con la ruta saludable sobre el grafo del piloto.
 3. Motor: comprueba cada condición con datos reales.
-4. LLM: redacta la respuesta solo con esos resultados («14,6 km… no hay bancos entre el km 3 y el 5»).
-Riesgos: la ruta circular por distancia es la parte difícil; latencia de 1–2 s; dependencia externa en la demo (guardar respuestas de reserva). Proveedor (DEC-03, 15/10): **OCI Language + reglas + plantillas, sin LLM** (ver §11); los pasos 1 y 4 los hacen el diccionario del catálogo y las plantillas.
+4. Plantillas: redactan la respuesta solo con esos resultados («14,6 km… no hay bancos entre el km 3 y el 5»).
+Riesgos: la ruta circular por distancia es la parte difícil; latencia de OCI Language 0,23 s de media (medida el 15/10); dependencia externa en la demo (guardar respuestas de reserva). Proveedor (DEC-03, 15/10): **OCI Language + reglas + plantillas, sin LLM** (ver §11); los pasos 1 y 4 los hacen el diccionario del catálogo y las plantillas.
 
 ### 6.4 Política de recarga de datos (decidida 14/10, implementada en el script de descarga el 14/10)
 Cada fuente se recarga según la frecuencia con que la publica su portal: ni más (gasta recursos y cuota), ni menos (datos viejos). Sustituye y afina el RNF «estáticos a diario, aire y previsión cada hora». Frecuencias declaradas en los metadatos de CKAN (6/10): sanitarios DIARIO, farmacias SEMANAL, centros educativos ANUAL, atención social MENSUAL, zonas de baño ANUAL, estaciones de aire MENSUAL, aire del día HORARIO; Ayuntamiento: aire y meteo continuo, equipamientos diario.
@@ -252,7 +252,7 @@ Implementación mínima (no sobredimensionar):
 - Nunca un botón público que recargue todo: son ~220 MB, varios minutos, y saturaría los portales y la cuota de AEMET.
 - En la demo, el botón de administración enseña que los datos llegan en directo de los portales oficiales (suma en el criterio 1.1).
 
-### 6.5 Otros usos de IA barajados (no decididos)
+### 6.5 Otros usos de IA barajados (DEC-11, 15/10: n.º 1 descartado, se usan palabras clave; n.º 2 pendiente, necesita un LLM; ver §11)
 1. **Deducir el deporte de cada instalación** de Nomecalles y del texto `EQUIPAMIENTO` del Ayuntamiento con un LLM, en lote, revisando una muestra → enriquece datos públicos (criterio 1.1). **El más recomendado.**
 2. **Select AI + APEX** para la pantalla de administración (preguntas en lenguaje natural).
 3. **Predicción horaria del aire** con AutoML/OML usando el histórico desde 2005 (solo si alguien domina modelos).

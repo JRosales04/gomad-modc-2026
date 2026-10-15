@@ -229,7 +229,7 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 
 ### M4 · MANUAL — Prerrequisitos del jueves
 
-- **Credenciales de IA para L6:** comprobar en la consola de OCI que la región tiene **Generative AI** con un modelo de chat; crear credenciales (`~/.oci/config` y las variables `IA_*` en `app/.env`). Nunca en el repo.
+- **Credenciales de IA para L6:** comprobar en la consola de OCI que la región tiene **OCI Language** (DEC-03); crear credenciales (`~/.oci/config` y las variables `OCI_*` e `IA_PROVEEDOR=oci_language` en `app/.env`). Nunca en el repo. ✅ hecho el 15/10.
 - **Reunión de decisiones a las 11:00** (D2): Motor y Datos llevan sus propuestas escritas.
 
 ### L5 · ✅ HECHO (PR #9, PR #10) — Task 11: contrato de la API
@@ -247,7 +247,7 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 > **Estado (15/10, tarde):** DEC-03 decidido: **OCI Language** (servicio de IA de Oracle, sin LLM) + reglas + plantillas. OCI Generative AI descartado (404 por permisos en `eu-madrid-1`; `eu-frankfurt-1` no suscrita) y Anthropic descartado (coste propio). `app/api/scripts/probe_ai.py` extrae «15 km», «parque», «bancos» y «supermercado» (no «fuentes») en 0,23 s de media. El paso de entidades a `AssistantParams` (diccionario RF-21, negaciones) y las plantillas de `write_up` son de D-M1. Credenciales: `OCI_*` en `app/.env` y `~/.oci/config`; en la VM se copia `~/.oci` y se monta en solo lectura en el contenedor `api`.
 
 - **Qué hace:** crea la interfaz `AIProvider` (`app/api/ai/base.py`) y un script que manda una frase de ejemplo a OCI Language, imprime entidades y frases clave y mide la latencia de 5 llamadas (objetivo < 2 s). No valida contra `AssistantParams`: Language no genera JSON (eso es D-M1).
-- **Por qué en este orden:** tiene hora límite (DEC-03); cuanto antes se sepa, antes se decide el plan B.
+- **Por qué en este orden:** tenía hora límite (DEC-03); resuelta con OCI Language, sin plan B.
 - **Utiliza:** `app/api/.venv`, SDK del proveedor (solo en el `pyproject.toml` de `api`), `schemas.AssistantParams`.
 - **Necesita:** **L5 fusionado**, credenciales (M4).
 - **Prompt de ejecución:** `TAREAS={15}   RAMA={motor/jue15-ia}   BASE={main}   MANUALES_HECHOS={Task 15 paso 1: credenciales de OCI en ~/.oci/config y app/.env; DEC-03 = OCI Language}`
