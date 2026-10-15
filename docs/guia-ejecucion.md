@@ -2,7 +2,7 @@
 
 Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso a paso con Claude Code. El plan dice *qué* hay que construir; esta guía dice **en qué orden lanzarlo, con qué prompt, qué necesita cada paso y cómo saber que ha salido bien**.
 
-- **Actualizada:** jueves 15/10/2026, 12:45 (L5, L7, L8 y L10 fusionados; L6 sin credenciales pasado el límite; D2 sin volcar en `app/config/`).
+- **Actualizada:** jueves 15/10/2026, tarde (L5, L7, L8 y L10 fusionados; L6 hecho con OCI Language en `motor/jue15-ia`, sin fusionar; D2 sin volcar en `app/config/`).
 - **Prompts que usa:** `docs/prompt_task_executer.md` (ejecutar) y `docs/prompt_task_checker.md` (verificar). En ambos solo se cambia la primera línea.
 
 ---
@@ -66,7 +66,7 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 | Tasks 16–17 — utilidades y normalizadores de referencia (`route_poi` con `status`/`working`, regla de cubierto) | ✅ fusionadas | PR #12 |
 | Tasks 20–22 — grafo de Getafe, Dijkstra/A\*, latencia (Getafe p50 0,015 s; capital medida: p50 0,45 s, 1,2 GB) | ✅ fusionadas | PR #13, arquitectura §4.4 |
 | Task 10 — base técnica del front (paso 0 de la guía) | ⏳ en curso a mano (Front), sin commits en `main` | `app/frontend/docs/pendientes.md` §A |
-| Task 15 — prueba de OCI GenAI | ⚠️ sin empezar: no hay `~/.oci/config` ni `IA_*` en `app/.env`; límite 12:00 pasado → **plan B** (DEC-03) | L6 abajo |
+| Task 15 — prueba del proveedor de IA | ✅ hecha en `motor/jue15-ia` (sin fusionar): DEC-03 = **OCI Language + reglas + plantillas, sin LLM**; 0,23 s de media | L6 abajo |
 | Tasks 18–19 — aire, previsión y bases DuckDB | ⬜ desbloqueada (L8 ✅); el paso 4 espera a DEC-08 | L9 abajo |
 | D2 — DEC-05, 07, 07b, 08 | ⬜ sin volcar: `app/config/` solo tiene `ica_thresholds.yaml` y `routing.yaml` (provisional) | D2 abajo |
 | **P-13** — cuota de AEMET (`AEMET_PAUSE_S` mal calculado) | ⚠️ pendiente de decisión | `docs/PENDIENTES.md` → DEC-13 abajo |
@@ -87,7 +87,7 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 | M3 | Mié | ✅ documentado (PR #7; falta validar) | 9 → `app/frontend/docs/pantallas.md` | — | Front + maquetadora | — |
 | D1 | Mié | DECISIÓN | DEC-P04, DEC-13 | — | Equipo | — |
 | L5 | Jue 9:00 | ✅ hecho | 11 | `motor/jue15-contrato` | Motor | PR #9, PR #10 |
-| L6 | Jue | ⚠️ límite pasado → plan B | 15 | `motor/jue15-ia` | Motor | credenciales del proveedor (M4); L5 ✅ |
+| L6 | Jue | ✅ hecho, falta VERIFICAR y fusionar | 15 | `motor/jue15-ia` | Motor | credenciales de OCI (M4) ✅; L5 ✅ |
 | L7 | Jue | ✅ hecho | 12, 13, 14 | `motor/jue15-motor` | Motor | PR #11 |
 | L8 | Jue | ✅ hecho | 16, 17 | `datos/jue15-normalizar` | Datos | PR #12 |
 | L9 | Jue | EJECUTAR + VERIFICAR | 18, 19 | `datos/jue15-aire-build` | Datos | L8 ✅; DEC-08 para el paso 4 de Task 19 |
@@ -242,17 +242,17 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 - **Prompt de verificación:** `TAREAS={11}   RAMA={motor/jue15-contrato}   BASE={main}`
 - **Comprobación rápida:** `cd app/api && .venv/bin/pytest -q` (incluye `test_contract.py`) y existe `app/frontend/src/api/openapi.json`. **Fusionar cuanto antes y avisar al equipo.**
 
-### L6 · ⚠️ LÍMITE PASADO — Task 15: prueba de OCI Generative AI
+### L6 · ✅ HECHO (rama `motor/jue15-ia`, falta verificar y fusionar) — Task 15: prueba del proveedor de IA
 
-> **Estado (15/10, 12:45):** sin credenciales de OCI GenAI (no hay `~/.oci/config`; `IA_*` vacías en `app/.env`). Por la regla de DEC-03 se pasa al **plan B** (API de Anthropic): hace falta una clave en `app/.env` (`IA_PROVEEDOR`, `IA_API_KEY`, `IA_MODELO`) y lanzar L6 con el proveedor del plan B. F6 es *Should* y funciona sin LLM (D-M1), así que no bloquea el viernes.
+> **Estado (15/10, tarde):** DEC-03 decidido: **OCI Language** (servicio de IA de Oracle, sin LLM) + reglas + plantillas. OCI Generative AI descartado (404 por permisos en `eu-madrid-1`; `eu-frankfurt-1` no suscrita) y Anthropic descartado (coste propio). `app/api/scripts/probe_ai.py` extrae «15 km», «parque», «bancos» y «supermercado» (no «fuentes») en 0,23 s de media. El paso de entidades a `AssistantParams` (diccionario RF-21, negaciones) y las plantillas de `write_up` son de D-M1. Credenciales: `OCI_*` en `app/.env` y `~/.oci/config`; en la VM se copia `~/.oci` y se monta en solo lectura en el contenedor `api`.
 
-- **Qué hace:** crea la interfaz `AIProvider` (`app/api/ai/base.py`) y un script que pide a OCI GenAI convertir una frase de ejemplo en `AssistantParams` y mide la latencia. Si a las 12:00 no funciona (JSON válido en < 2 s), pasa al plan B (API de Anthropic).
+- **Qué hace:** crea la interfaz `AIProvider` (`app/api/ai/base.py`) y un script que manda una frase de ejemplo a OCI Language, imprime entidades y frases clave y mide la latencia de 5 llamadas (objetivo < 2 s). No valida contra `AssistantParams`: Language no genera JSON (eso es D-M1).
 - **Por qué en este orden:** tiene hora límite (DEC-03); cuanto antes se sepa, antes se decide el plan B.
 - **Utiliza:** `app/api/.venv`, SDK del proveedor (solo en el `pyproject.toml` de `api`), `schemas.AssistantParams`.
 - **Necesita:** **L5 fusionado**, credenciales (M4).
-- **Prompt de ejecución:** `TAREAS={15}   RAMA={motor/jue15-ia}   BASE={main}   MANUALES_HECHOS={Task 15 paso 1: credenciales de OCI en ~/.oci/config y app/.env}`
+- **Prompt de ejecución:** `TAREAS={15}   RAMA={motor/jue15-ia}   BASE={main}   MANUALES_HECHOS={Task 15 paso 1: credenciales de OCI en ~/.oci/config y app/.env; DEC-03 = OCI Language}`
 - **Prompt de verificación:** `TAREAS={15}   RAMA={motor/jue15-ia}   BASE={main}`
-- **Comprobación rápida:** proveedor elegido y latencia medida, anotados en `docs/arquitectura.md` §10 y `CLAUDE.md` §11; el prompt al LLM **no** lleva ubicación.
+- **Comprobación rápida:** `cd app/api && .venv/bin/python scripts/probe_ai.py` imprime entidades y frases clave y «OK» (media < 2 s); anotado en `docs/arquitectura.md` §10 (A-12) y `CLAUDE.md` §11; el texto enviado **no** lleva ubicación.
 
 ### L7 · ✅ HECHO (PR #11) — Tasks 12, 13, 14: motor de reglas, puntuación y mejor franja
 
@@ -315,7 +315,7 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 | DEC-07 | Pesos por defecto, velocidades y pesos de ruta | 12:00 | `app/config/weights.yaml`, `app/config/routing.yaml` |
 | DEC-07b | Umbral de lluvia | 12:00 | `app/config/rules.yaml` → `rain` |
 | DEC-08 | Actividades y tabla actividad → destino | 12:00 | `app/config/activities.yaml` |
-| DEC-03 | OCI GenAI o plan B (lo resuelve L6) | 12:00 | `app/.env`, CLAUDE.md §11 |
+| DEC-03 | ✅ OCI Language + reglas + plantillas, sin LLM (L6) | 12:00 | `app/.env`, CLAUDE.md §11 |
 | DEC-11, DEC-12 | Usos de IA de §6.5; desnivel sí/no | 20:00 | CLAUDE.md §11 |
 
 Lo que no tenga fuente oficial se escribe en el YAML con `own_criterion: true`. Escribir los YAML es un commit pequeño a `main` por PR (puede hacerlo Claude si se le dan los valores).
