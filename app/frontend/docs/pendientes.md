@@ -21,6 +21,8 @@ Marcar `[x]` al terminar. Cada punto dice cuándo está hecho.
   *Hecho cuando:* `npm test` pasa con la prueba base (un `h1` y axe sin violaciones).
 - [x] **README del servicio** con cómo arrancar y probar (🟡 D17). El actual es el de la plantilla.
 
+- [ ] **`try_files` también responde a assets inexistentes:** `/assets/nope.js` → 200 con el `index.html` (no 404), porque el `Caddyfile` manda todo a `/index.html`. No rompe la SPA, pero un JS perdido tras un despliegue da un error de MIME confuso en vez de un 404. Si se arregla: `handle /assets/*` con `file_server` sin `try_files`. *(Visto en la verificación del paso 2, 15/10; no se toca el `Caddyfile` en este paso.)*
+
 ### A2. Navegación
 - [x] **React Router 7** con una URL por pantalla (🔴 D3). Rutas en `guia.md` §3, paso 0, punto 5. Las pantallas que no existan: página «Próximamente» con su `h1`. *(todas las pantallas existen; 404 con su `h1`.)*
   *Hecho cuando:* el «atrás» del móvil vuelve de Resultados a Inicio y recargar `/resultados` no da 404 (Caddy ya hace `try_files`).

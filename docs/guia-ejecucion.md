@@ -65,7 +65,7 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 | Tasks 12–14 — reglas (ICA, calor, lluvia), puntuación 0–10 y mejor franja | ✅ fusionadas | PR #11 |
 | Tasks 16–17 — utilidades y normalizadores de referencia (`route_poi` con `status`/`working`, regla de cubierto) | ✅ fusionadas | PR #12 |
 | Tasks 20–22 — grafo de Getafe, Dijkstra/A\*, latencia (Getafe p50 0,015 s; capital medida: p50 0,45 s, 1,2 GB) | ✅ fusionadas | PR #13, arquitectura §4.4 |
-| Task 10 — base técnica del front (paso 0 de la guía) | ⏳ a mano: en `main` solo la barra inferior (`152e317`); **faltan** pruebas (Vitest + axe), fuentes propias (`index.html` aún carga Google Fonts) y el Dockerfile multi-stage (sigue el provisional) | `app/frontend/docs/pendientes.md` §A |
+| Task 10 — base técnica del front (paso 0 de la guía) | ⏳ a mano: en `main` solo la barra inferior (`152e317`); **faltan** pruebas (Vitest + axe), fuentes propias (`index.html` aún carga Google Fonts) | `app/frontend/docs/pendientes.md` §A |
 | Front paso 2 — imagen de producción multi-stage (`node:22.23.3-alpine` + Caddy) y `app/deploy/deploy.sh`; probado en local sin `dist/` | ✅ en rama, despliegue en la VM pendiente (solo HTTP; HTTPS con el dominio) | rama `front/vie16-despliegue` |
 | Task 15 — prueba del proveedor de IA: DEC-03 = **OCI Language + reglas + plantillas, sin LLM**; 0,23 s de media | ✅ fusionada | PR #17 |
 | Tasks 18–19 — aire, previsión y bases DuckDB: `gomad.duckdb` (destinos, actividades, municipios, estaciones, mobiliario) y `realtime.duckdb` (aire, ICA horario, previsión) | ✅ fusionadas | PR #19 |
