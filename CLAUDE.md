@@ -207,7 +207,7 @@ Tablas con nombre en inglés desde el 14/10 (`municipio` → `municipality`, `de
 - `air_reading(station_id, magnitude, ts, value, flag)` — formato largo (H01…H24 → filas)
 - `forecast(ine_code, ts, temp, feels_like, precip_prob, precip, wind, sky)`
 - `edge(id, u, v, geom, longitud_m, tipo_via, pct_verde, trafico, fuente_cerca)`
-- `route_poi(id, type [fuente|banco|papelera|aseo|area_canina|juegos|dea|biosaludable|supermercado], source, geom)`
+- `route_poi(id, type [fuente|banco|papelera|aseo|area_canina|juegos|dea|biosaludable|supermercado], source, status, working, geom)` — `status`: estado de origen (p. ej. `CERRADA_TEMPORALMENT`), nulo si no hay; `working`: boolean, nulo = sin dato. La ruta solo cuenta `working IS NOT FALSE` (las fuentes fuera de servicio se muestran, no cuentan).
 - `service(id, categoria [salud|farmacia|educacion|social|cultura|transporte], subtipo, ine_code, geom)`
 - `municipality_indicator(ine_code, categoria, indicador, valor (NULL = sin datos), unidad, anio, source)`
 
@@ -223,7 +223,7 @@ Código de municipio: INE de 5 dígitos `28` + 3 dígitos (`MUN` en EIEL, `CMUN`
   - *Correr:* lo anterior + pistas de atletismo (EIEL `ATLETISMO`) + nombres con «atletismo».
   - *Nadar:* EIEL `TIPOINSTAL` «PISCINAS AL AIRE LIBRE»/«PISCINAS CUBIERTAS» (**no** la columna `NATACION`, vacía), Nomecalles con «piscina» en el nombre, piscinas del Ayto., zonas de baño.
   - *Pádel / tenis / fútbol / baloncesto:* columnas EIEL `PADEL`, `TENIS`, `FUTBOL`, `BALONCESTO`; Nomecalles por palabra clave («pádel/padel», «tenis», «campo de fútbol»…); OSM `sport=*`.
-  - *Gimnasio / cubierto:* EIEL `GIMNASIO`, `POLIDEPORTIVOS CUBIERTOS`, `SUP_CUBI > 0`.
+  - *Gimnasio / cubierto:* `covered` de EIEL se decide por `TIPOINSTAL` (`app/ingest/normalize/sports.py:eiel_covered`): exteriores «AIRE LIBRE», «SIN CUBRIR», «PISTAS POLIDEPORTIVAS», «TERRENOS DE JUEGO», «ESCUELA DE VELA», «ESTACIONES DE ESQUI», «PUERTO DEPORTIVO»; cubiertos «CUBIERT…» y «GIMNASIO»; tipos mixtos («COMPLEJOS POLIDEPORTIVOS», «OTROS») por `SUP_CUBI > 0`; sin dato → nulo. **No** basta `SUP_CUBI > 0`: lo cumplen piscinas al aire libre y campos con vestuario o grada cubiertos.
 
 ### 6.3 F6 — asistente de rutas (diseño)
 1. LLM: texto → JSON de parámetros (validado contra un esquema cerrado) que se muestra y es editable. Ejemplo: `{actividad:"caminar", distancia_km:15, circular:true, pasar_por:["parque","supermercado"], durante:{fuentes:"frecuentes", bancos:"frecuentes"}}`.
