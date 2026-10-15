@@ -68,9 +68,9 @@ Depende de que el contrato (Task 11) esté en `main`: `app/frontend/src/api/open
 - [x] Tipos con `openapi-typescript` por `npx` (`npm run contract` → `src/api/schema.d.ts`, alias en `src/api/types.ts`).
 - [ ] Cliente (`/api`) y, si se quiere, MSW (`guia.md` §4.3) y TanStack Query (`useAsync` de `src/data/useAsync.ts` se puede cambiar por `useQuery` sin tocar pantallas).
 - [ ] **Sustituir el cuerpo de las funciones de `src/data/`** (cada una lleva «paso 3: sustituir por la llamada real a /api/…»): `getActivities()` → `GET /api/activities`; `searchLocation(text)` → `GET /api/location?text=`; `recommend(req)` → `POST /api/recommend`; `getRoute(req)` → `POST /api/route`; `getMunicipality(ine)` → `GET /api/municipality/{ine_code}`; `listMunicipalities()` → decidir fuente (P-09); `interpret(text)` → `POST /api/assistant/interpret` (solo `text`); `assistantRoute(req)` → `POST /api/assistant/route`; `getSources()` → `GET /api/sources`. Lanzar `ApiError(status, …)` (`src/data/errors.ts`) en 404/422/5xx.
-- [ ] Borrar los datos de ejemplo: `src/data/mock/` (salvo `municipalities.ts` si se queda la lista estática), `src/data/scenarios.ts` y el selector «Datos de ejemplo» de `Sources.tsx`; quitar «(ejemplo)» y el aviso «Cifras de ejemplo» de `Municipality.tsx`.
+- [ ] Borrar los datos de ejemplo: `src/data/mock/` (salvo `municipalities.ts` si se queda la lista estática), `src/data/scenarios.ts` y el selector «Datos de ejemplo» de `Sources.tsx`; quitar «(ejemplo)», el aviso «Cifras de ejemplo» de `Municipality.tsx` y el texto «· datos de ejemplo» del subtítulo de `Results.tsx`; `SAMPLE_GPS` de `src/data/mock/location.ts`.
 - [ ] Proxy de `/api` en `vite.config.ts` para desarrollo (`guia.md` §3, paso 0, punto 3).
-- [ ] Ubicación: GPS tras un gesto (hoy «Usar mi ubicación» pone una de ejemplo en `LocationPicker.tsx`) con su mensaje si se deniega; **nunca** en `localStorage`, URL ni título.
+- [ ] Ubicación: GPS tras un gesto (hoy «Usar mi ubicación» llama a `sampleLocation()` de `src/data/location.ts`, que devuelve una de ejemplo) con su mensaje si se deniega; **nunca** en `localStorage`, URL ni título. Quitar también `isSampleLocation()` y su aviso «Es una ubicación de ejemplo» en `LocationPicker.tsx`.
 - [ ] Conectar Inicio, Resultados, Detalle, Perfil, Ruta, Municipio, Fuentes y Asistente a sus endpoints.
 - [ ] Mapa con react-map-gl + MapLibre sincronizado con la lista: sustituir el interior de `src/components/MapView.tsx` (misma interfaz: `markers`, `selectedId`, `origin`, `route`, `secondaryRoute`) y añadir la selección tarjeta ↔ marcador; atribución © OpenStreetMap y decir en Fuentes quién sirve las teselas.
 - [ ] **Petición a Motor:** tipar `RouteVariant.geometry` como GeoJSON `LineString` en el contrato (hoy sale `Record<string, never>`; ver `src/lib/geometry.ts`).
@@ -80,13 +80,14 @@ Depende de que el contrato (Task 11) esté en `main`: `app/frontend/src/api/open
 
 ### B2. Diferido de la revisión final del paso 1 (15/10)
 - [ ] **Prueba manual en móvil real** (Chrome Android y Safari iOS): tocar una tarjeta de Resultados abre el Detalle, arrastrar la hoja, Tab hasta un resultado. jsdom no puede probar los gestos.
-- [ ] Probar a 320 px y con zoom al 200 % y 400 %: Resultados (hoja y mapa), cabecera del Detalle, formulario de ubicación.
-- [ ] Mensajes de carga con `role="status"` que se insertan ya con texto (`Home.tsx`, `Municipality.tsx`, `Sources.tsx`): pasarlos a una región viva persistente.
+- [ ] Probar a 320 px y con zoom al 200 % y 400 %: Resultados (hoja y mapa), cabecera del Detalle, formulario de ubicación. *(15/10: tarjetas de resultado arregladas en CSS — pastillas que se parten y nota debajo del título por debajo de 400 px —; **comprobar a 320 px en navegador**, jsdom no lo mide.)*
+- [x] Mensajes de carga con `role="status"` que se insertan ya con texto (`Home.tsx`, `Municipality.tsx`, `Sources.tsx`): pasarlos a una región viva persistente. *(15/10: región `sr-only` siempre montada; Inicio también anuncia «Ahora en <municipio>: …».)*
 - [ ] Asistente: descartar respuestas viejas si se pulsa dos veces y marcar la ruta como desactualizada al editar los campos; `aria-invalid`/`aria-describedby` en distancia y duración.
 - [ ] Volver del Detalle a Resultados repite la petición y pierde «Ver más» (lo resuelve la caché de TanStack Query en el paso 3).
 - [ ] `RouteView`: comprobar que la ruta corresponde al destino si cambia `:id` en la misma instancia.
-- [ ] Lista atenuada al recalcular (`opacity: 0.55`) baja el contraste mientras carga; cambiar por otro indicador.
-- [ ] `role="list"` en listas con `list-style: none` (VoiceOver); categorías del municipio como `h3`; nombre «Ajustar preferencias» en los dos botones «Ajustar»; fecha absoluta con `<time>` en Fuentes; números del mapa ilegibles (se va con MapLibre); `useAsync` escribe un ref en el render; quitar CSS muerto (`.filter-chip`, `.results-filter-chips`).
+- [x] Lista atenuada al recalcular (`opacity: 0.55`) baja el contraste mientras carga; cambiar por otro indicador. *(15/10: sin atenuar; `aria-busy` + «Actualizando…» visible.)*
+- [x] `role="list"` en listas con `list-style: none` (VoiceOver); nombre «Ajustar preferencias» en los dos botones «Ajustar»; quitar CSS muerto (`.filter-chip`, `.results-filter-chips`). *(15/10)*
+- [ ] Categorías del municipio como `h3`; fecha absoluta con `<time>` en Fuentes; números del mapa ilegibles (se va con MapLibre); `useAsync` escribe un ref en el render.
 
 ## C. Aplazado
 
