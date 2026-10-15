@@ -3134,7 +3134,7 @@ def run():
 - `destination(id, source, name, type, covered, accessible, condition, owner, water, url, ine_code, lon, lat, green DOUBLE NULL, updated TIMESTAMP)` — `green` = fracción 0–1 del círculo de 300 m alrededor del destino cubierta por `green.parquet`; `NULL` en municipios sin VPLA. Radio = **criterio propio** (DEC-07).
 - `destination_activity(destination_id, activity, suitability)` — de `config/activities.yaml`
 - `air_station(id, network, name, ine_code, area_type, lon, lat)`
-- `route_poi(id, type, source, ine_code, lon, lat)`
+- `route_poi(id, type, source, ine_code, status, working, lon, lat)` — `status`: estado de origen (p. ej. `CERRADA_TEMPORALMENT`), nulo si no hay; `working`: boolean, nulo = sin dato
 - `source_date(source, downloaded, modified)` (de `manifest.json`, RF-19)
 
 `app/data/realtime.duckdb`:
