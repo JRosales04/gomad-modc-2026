@@ -2,7 +2,7 @@
 
 Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso a paso con Claude Code. El plan dice *qué* hay que construir; esta guía dice **en qué orden lanzarlo, con qué prompt, qué necesita cada paso y cómo saber que ha salido bien**.
 
-- **Actualizada:** miércoles 14/10/2026, 19:45 (Tasks 5 y 8 fusionadas; Task 7 verificada, pendiente de PR).
+- **Actualizada:** jueves 15/10/2026, 12:45 (L5, L7, L8 y L10 fusionados; L6 sin credenciales pasado el límite; D2 sin volcar en `app/config/`).
 - **Prompts que usa:** `docs/prompt_task_executer.md` (ejecutar) y `docs/prompt_task_checker.md` (verificar). En ambos solo se cambia la primera línea.
 
 ---
@@ -48,7 +48,7 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 
 ---
 
-## 2. Estado actual (14/10, noche)
+## 2. Estado actual (15/10, 12:45)
 
 | Tarea | Estado | Dónde |
 |---|---|---|
@@ -61,7 +61,14 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 | Task 7 — umbrales de calor del plan de Sanidad y tabla municipio → zona (179) | ✅ fusionada | PR #5, PR #6 |
 | Task 9 — especificación de pantallas + guía del frontend (Task 10 y front pasan a MANUAL GUIADO) | ✅ fusionada; falta validar con la maquetadora | PR #7 → `app/frontend/docs/` |
 | Task 6 — VM de OCI: E5.Flex 2 OCPU / 16 GB en `eu-madrid-1`, `/api/health` responde desde fuera (solo HTTP) | ✅ hecha | `docs/arquitectura.md` §6.1 |
-| Task 10 — base técnica del front (paso 0 de la guía) | ⏳ en curso a mano (Front) | `app/frontend/docs/pendientes.md` §A |
+| Task 11 — contrato de la API (Pydantic + `openapi.json`), ventana horaria en hora local de Madrid | ✅ fusionada | PR #9, PR #10 |
+| Tasks 12–14 — reglas (ICA, calor, lluvia), puntuación 0–10 y mejor franja | ✅ fusionadas | PR #11 |
+| Tasks 16–17 — utilidades y normalizadores de referencia (`route_poi` con `status`/`working`, regla de cubierto) | ✅ fusionadas | PR #12 |
+| Tasks 20–22 — grafo de Getafe, Dijkstra/A\*, latencia (Getafe p50 0,015 s; capital medida: p50 0,45 s, 1,2 GB) | ✅ fusionadas | PR #13, arquitectura §4.4 |
+| Task 10 — base técnica del front (paso 0 de la guía) | ⏳ en curso a mano (Front), sin commits en `main` | `app/frontend/docs/pendientes.md` §A |
+| Task 15 — prueba de OCI GenAI | ⚠️ sin empezar: no hay `~/.oci/config` ni `IA_*` en `app/.env`; límite 12:00 pasado → **plan B** (DEC-03) | L6 abajo |
+| Tasks 18–19 — aire, previsión y bases DuckDB | ⬜ desbloqueada (L8 ✅); el paso 4 espera a DEC-08 | L9 abajo |
+| D2 — DEC-05, 07, 07b, 08 | ⬜ sin volcar: `app/config/` solo tiene `ica_thresholds.yaml` y `routing.yaml` (provisional) | D2 abajo |
 | **P-13** — cuota de AEMET (`AEMET_PAUSE_S` mal calculado) | ⚠️ pendiente de decisión | `docs/PENDIENTES.md` → DEC-13 abajo |
 
 ---
@@ -71,7 +78,7 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 | # | Día | Tipo | Tareas | Rama | Rol | Necesita antes |
 |---|---|---|---|---|---|---|
 | — | Mié | ✅ hecho | 1, 2, 3, 4 | — | — | — |
-| M1 | Mié | MANUAL | prerrequisitos | — | quien ejecute | — (Docker ✅, poppler ✅; falta Node 20 si no está) |
+| M1 | Mié | ✅ hecho | prerrequisitos | — | quien ejecute | Docker Engine en WSL, poppler, Node 20.20 |
 | L1 | Mié | ✅ hecho | 5 | `motor/mie14-compose` | Motor | PR #4 |
 | L2 | Mié | ✅ hecho | 8 | `rutas/mie14-osm` | Rutas | PR #3 |
 | L3 | Mié | MANUAL GUIADO | 10 (paso 0 de `app/frontend/docs/guia.md`) | `front/mie14-base` | Front | Node ≥ 20.19 (mejor 22) y **L1 fusionado** ✅ |
@@ -79,14 +86,14 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 | M2 | Mié | ✅ hecho (jue 15) | 6 (VM de OCI) | — | Motor | arquitectura §6.1 |
 | M3 | Mié | ✅ documentado (PR #7; falta validar) | 9 → `app/frontend/docs/pantallas.md` | — | Front + maquetadora | — |
 | D1 | Mié | DECISIÓN | DEC-P04, DEC-13 | — | Equipo | — |
-| L5 | Jue 9:00 | EJECUTAR + VERIFICAR | 11 | `motor/jue15-contrato` | Motor | — (**primero del jueves**) |
-| L6 | Jue | EJECUTAR + VERIFICAR | 15 | `motor/jue15-ia` | Motor | credenciales IA (M4), **L5 fusionado**; límite 12:00 |
-| L7 | Jue | EJECUTAR + VERIFICAR | 12, 13, 14 | `motor/jue15-motor` | Motor | **L5 fusionado** |
-| L8 | Jue | EJECUTAR + VERIFICAR | 16, 17 | `datos/jue15-normalizar` | Datos | datos descargados |
-| L9 | Jue | EJECUTAR + VERIFICAR | 18, 19 | `datos/jue15-aire-build` | Datos | **L8 fusionado**; DEC-08 para el paso 4 de Task 19 |
-| L10 | Jue | EJECUTAR + VERIFICAR | 20, 21, 22 | `rutas/jue15-grafo` | Rutas | **L2 y L8 fusionados** |
+| L5 | Jue 9:00 | ✅ hecho | 11 | `motor/jue15-contrato` | Motor | PR #9, PR #10 |
+| L6 | Jue | ⚠️ límite pasado → plan B | 15 | `motor/jue15-ia` | Motor | credenciales del proveedor (M4); L5 ✅ |
+| L7 | Jue | ✅ hecho | 12, 13, 14 | `motor/jue15-motor` | Motor | PR #11 |
+| L8 | Jue | ✅ hecho | 16, 17 | `datos/jue15-normalizar` | Datos | PR #12 |
+| L9 | Jue | EJECUTAR + VERIFICAR | 18, 19 | `datos/jue15-aire-build` | Datos | L8 ✅; DEC-08 para el paso 4 de Task 19 |
+| L10 | Jue | ✅ hecho | 20, 21, 22 | `rutas/jue15-grafo` | Rutas | PR #13 |
 | L11 | Jue | MANUAL GUIADO | 23, 24, 25 (pasos 1–3 de `app/frontend/docs/guia.md`) | `front/jue15-pantallas` | Front | **L3 y L5 fusionados**, M3 hecho |
-| D2 | Jue 11:00 | DECISIÓN | DEC-05, 07, 07b, 08 | — | Equipo | propuestas de Motor y Datos |
+| D2 | Jue 11:00 | DECISIÓN ⬜ (sin volcar) | DEC-05, 07, 07b, 08 | — | Equipo | propuestas en `docs/decisiones-pendientes.md` |
 | P1 | Jue tarde | PLANIFICAR | detallar viernes | — | Coordinación | cierre del jueves |
 
 Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita antes». Si es una sola persona: el orden de la tabla.
@@ -225,7 +232,7 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 - **Credenciales de IA para L6:** comprobar en la consola de OCI que la región tiene **Generative AI** con un modelo de chat; crear credenciales (`~/.oci/config` y las variables `IA_*` en `app/.env`). Nunca en el repo.
 - **Reunión de decisiones a las 11:00** (D2): Motor y Datos llevan sus propuestas escritas.
 
-### L5 · EJECUTAR + VERIFICAR — Task 11: contrato de la API (9:00)
+### L5 · ✅ HECHO (PR #9, PR #10) — Task 11: contrato de la API
 
 - **Qué hace:** define todos los modelos Pydantic (`app/api/schemas.py`), declara los endpoints (`/activities`, `/location`, `/recommend`, `/route`, `/municipality/{ine_code}`, `/assistant/*`, `/sources`) con respuesta 501 y exporta el OpenAPI a `app/frontend/src/api/openapi.json`.
 - **Por qué en este orden:** **es lo primero del jueves**: el motor, la IA y el front construyen contra este contrato; sin él, se bloquean unos a otros.
@@ -235,7 +242,9 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 - **Prompt de verificación:** `TAREAS={11}   RAMA={motor/jue15-contrato}   BASE={main}`
 - **Comprobación rápida:** `cd app/api && .venv/bin/pytest -q` (incluye `test_contract.py`) y existe `app/frontend/src/api/openapi.json`. **Fusionar cuanto antes y avisar al equipo.**
 
-### L6 · EJECUTAR + VERIFICAR — Task 15: prueba de OCI Generative AI (límite 12:00)
+### L6 · ⚠️ LÍMITE PASADO — Task 15: prueba de OCI Generative AI
+
+> **Estado (15/10, 12:45):** sin credenciales de OCI GenAI (no hay `~/.oci/config`; `IA_*` vacías en `app/.env`). Por la regla de DEC-03 se pasa al **plan B** (API de Anthropic): hace falta una clave en `app/.env` (`IA_PROVEEDOR`, `IA_API_KEY`, `IA_MODELO`) y lanzar L6 con el proveedor del plan B. F6 es *Should* y funciona sin LLM (D-M1), así que no bloquea el viernes.
 
 - **Qué hace:** crea la interfaz `AIProvider` (`app/api/ai/base.py`) y un script que pide a OCI GenAI convertir una frase de ejemplo en `AssistantParams` y mide la latencia. Si a las 12:00 no funciona (JSON válido en < 2 s), pasa al plan B (API de Anthropic).
 - **Por qué en este orden:** tiene hora límite (DEC-03); cuanto antes se sepa, antes se decide el plan B.
@@ -245,7 +254,7 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 - **Prompt de verificación:** `TAREAS={15}   RAMA={motor/jue15-ia}   BASE={main}`
 - **Comprobación rápida:** proveedor elegido y latencia medida, anotados en `docs/arquitectura.md` §10 y `CLAUDE.md` §11; el prompt al LLM **no** lleva ubicación.
 
-### L7 · EJECUTAR + VERIFICAR — Tasks 12, 13, 14: motor de reglas, puntuación y mejor franja
+### L7 · ✅ HECHO (PR #11) — Tasks 12, 13, 14: motor de reglas, puntuación y mejor franja
 
 - **Qué hace:** `rules` (categoría ICA del BOE, filtros de aire/calor/lluvia por perfil), `scoring` (nota 0–10 ponderada, renormalizando factores sin datos) y `slots` (mejor hora y alternativa cubierta). Todo lee los valores de `app/config/`; los tests usan valores de prueba.
 - **Por qué en este orden:** las tres van juntas (cada una usa la anterior) y son el corazón de F2; el viernes `/recommend` las ensambla.
@@ -255,7 +264,7 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 - **Prompt de verificación:** `TAREAS={12,13,14}   RAMA={motor/jue15-motor}   BASE={main}`
 - **Comprobación rápida:** `cd app/api && .venv/bin/pytest tests/engine -q`; entre las pruebas están Carmen (36 °C), Lucía (ozono) y «dos personas, mismo sitio, distinta respuesta».
 
-### L8 · EJECUTAR + VERIFICAR — Tasks 16, 17: utilidades y normalizadores de referencia
+### L8 · ✅ HECHO (PR #12) — Tasks 16, 17: utilidades y normalizadores de referencia
 
 - **Qué hace:** `common.py` (comas decimales, código INE, reproyección 25830→4326, codificaciones) y los normalizadores de municipios, padrón, deporte, zonas verdes y mobiliario → `app/data/clean/*.parquet`. Las pruebas comprueban las cifras del informe de datos (726 EIEL, 166 municipios VPLA, 19 instalaciones en Getafe…).
 - **Por qué en este orden:** todo lo demás de datos (aire, construcción de la base, grafo) parte de estos ficheros limpios.
@@ -275,7 +284,9 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 - **Prompt de verificación:** `TAREAS={18,19}   RAMA={datos/jue15-aire-build}   BASE={main}`
 - **Comprobación rápida:** `python -m build_db all` genera los dos `.duckdb`; `green` es NULL (no 0) donde no hay VPLA.
 
-### L10 · EJECUTAR + VERIFICAR — Tasks 20, 21, 22: grafo de Getafe, motor de rutas y latencia
+### L10 · ✅ HECHO (PR #13) — Tasks 20, 21, 22: grafo de Getafe, motor de rutas y latencia
+
+> **Resultado (15/10):** Dijkstra de igraph por defecto (A\* 2–4× más lento por la heurística en Python); Getafe 59.751 nodos, p50 0,015 s, 221 MB; capital medida también (980.138 nodos, p50 0,45 s / máx 1,06 s, 1,2 GB): **no hacen falta Contraction Hierarchies** y es la primera entrada de DEC-A11. `routing.yaml` sigue PROVISIONAL hasta DEC-07. Detalle en `docs/arquitectura.md` §4.4.
 
 - **Qué hace:** construye el grafo peatonal de Getafe con factores por tramo (tráfico por tipo de vía, % verde, fuentes, bancos y DEA cerca), lo carga en memoria en la API, calcula la ruta directa y la saludable (Dijkstra / A\*) y la distancia a todos los destinos (Dijkstra con límite), y mide la latencia.
 - **Por qué en este orden:** necesita las mediciones de L2 y el verde/mobiliario de L8; el viernes `/route` lo usa.
@@ -295,7 +306,7 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 - **Formato:** rama `front/jue15-pantallas`, un commit por paso (`Front: tipos del contrato, cliente y respuestas simuladas`, `Front: pantalla de inicio`, `Front: pantalla de resultados`), PR a `main` tras el checklist de la guía §5. Verificación opcional por Claude en solo lectura.
 - **Comprobación rápida:** `cd app/frontend && npm run contract && npm test`; `VITE_MOCK=1 npm run dev` muestra Inicio → Resultados en 3 toques.
 
-### D2 · DECISIÓN — Jueves
+### D2 · DECISIÓN — Jueves (⬜ ninguna volcada a `app/config/` a las 12:45)
 
 | ID | Qué | Límite | Fichero |
 |---|---|---|---|
