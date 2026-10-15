@@ -2,7 +2,7 @@
 
 Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso a paso con Claude Code. El plan dice *qué* hay que construir; esta guía dice **en qué orden lanzarlo, con qué prompt, qué necesita cada paso y cómo saber que ha salido bien**.
 
-- **Actualizada:** jueves 15/10/2026, 15:10 (PR #14–#17 fusionadas: D2 en `app/config/`, P-04, nombre GoMad, desnivel, L6 con OCI Language; siguiente: L9).
+- **Actualizada:** jueves 15/10/2026, 16:00 (L9 fusionado: backend de datos completo; falta el front base (L3) y P1).
 - **Prompts que usa:** `docs/prompt_task_executer.md` (ejecutar) y `docs/prompt_task_checker.md` (verificar). En ambos solo se cambia la primera línea.
 
 ---
@@ -48,7 +48,7 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 
 ---
 
-## 2. Estado actual (15/10, 15:10)
+## 2. Estado actual (15/10, 16:00)
 
 | Tarea | Estado | Dónde |
 |---|---|---|
@@ -65,11 +65,12 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 | Tasks 12–14 — reglas (ICA, calor, lluvia), puntuación 0–10 y mejor franja | ✅ fusionadas | PR #11 |
 | Tasks 16–17 — utilidades y normalizadores de referencia (`route_poi` con `status`/`working`, regla de cubierto) | ✅ fusionadas | PR #12 |
 | Tasks 20–22 — grafo de Getafe, Dijkstra/A\*, latencia (Getafe p50 0,015 s; capital medida: p50 0,45 s, 1,2 GB) | ✅ fusionadas | PR #13, arquitectura §4.4 |
-| Task 10 — base técnica del front (paso 0 de la guía) | ⏳ en curso a mano (Front), sin commits en `main` | `app/frontend/docs/pendientes.md` §A |
+| Task 10 — base técnica del front (paso 0 de la guía) | ⏳ a mano: en `main` solo la barra inferior (`152e317`); **faltan** pruebas (Vitest + axe), fuentes propias (`index.html` aún carga Google Fonts) y el Dockerfile multi-stage (sigue el provisional) | `app/frontend/docs/pendientes.md` §A |
 | Task 15 — prueba del proveedor de IA: DEC-03 = **OCI Language + reglas + plantillas, sin LLM**; 0,23 s de media | ✅ fusionada | PR #17 |
-| Tasks 18–19 — aire, previsión y bases DuckDB | ⬜ **siguiente**, completa (DEC-08 y `activities.yaml` ya en `main`) | L9 abajo |
+| Tasks 18–19 — aire, previsión y bases DuckDB: `gomad.duckdb` (destinos, actividades, municipios, estaciones, mobiliario) y `realtime.duckdb` (aire, ICA horario, previsión) | ✅ fusionadas | PR #19 |
 | D2 — DEC-05, 07, 07b, 08 | ✅ volcadas en `app/config/` (`rules.yaml`, `weights.yaml`, `activities.yaml`; `routing.yaml` ya no provisional) | PR #15 |
 | DEC-P04, DEC-10, DEC-11, DEC-12 | ✅ P-04 aplicado; nombre **GoMad**; IA n.º 1 descartado (palabras clave) y n.º 2 pendiente; desnivel **sí** (Should, sábado con S-R1; MDT05 comprobado por WCS) | PR #16, #17 |
+| ⚠️ Previsión AEMET | `realtime.duckdb` solo tiene Getafe y Madrid, descargadas el 14/10 (hasta el 16/10 07:00): hay que recargar antes de probar y decidir DEC-13 (cuota) para los 179 | DEC-13, S-D2 |
 | ⚠️ Hueco de Getafe | 0 destinos para nadar, tenis y baloncesto (Getafe no está en EIEL y Nomecalles no da el deporte): decidir en P1 (más palabras clave u OSM `sport=*`) | `app/config/activities.yaml` |
 | **P-13** — cuota de AEMET (`AEMET_PAUSE_S` mal calculado) | ⚠️ pendiente de decisión | `docs/PENDIENTES.md` → DEC-13 abajo |
 
@@ -92,7 +93,7 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 | L6 | Jue | ✅ hecho | 15 | `motor/jue15-ia` | Motor | PR #17 |
 | L7 | Jue | ✅ hecho | 12, 13, 14 | `motor/jue15-motor` | Motor | PR #11 |
 | L8 | Jue | ✅ hecho | 16, 17 | `datos/jue15-normalizar` | Datos | PR #12 |
-| L9 | Jue | EJECUTAR + VERIFICAR (**siguiente**) | 18, 19 | `datos/jue15-aire-build` | Datos | L8 ✅; DEC-08 ✅ |
+| L9 | Jue | ✅ hecho | 18, 19 | `datos/jue15-aire-build` | Datos | PR #19 |
 | L10 | Jue | ✅ hecho | 20, 21, 22 | `rutas/jue15-grafo` | Rutas | PR #13 |
 | L11 | Jue | MANUAL GUIADO | 23, 24, 25 (pasos 1–3 de `app/frontend/docs/guia.md`) | `front/jue15-pantallas` | Front | **L3 y L5 fusionados**, M3 hecho |
 | D2 | Jue 11:00 | ✅ hecho | DEC-05, 07, 07b, 08 | — | Equipo | PR #15 |
@@ -276,7 +277,7 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 - **Prompt de verificación:** `TAREAS={16,17}   RAMA={datos/jue15-normalizar}   BASE={main}`
 - **Comprobación rápida:** `cd app/ingest && .venv/bin/pytest -q` (las `slow` deben **ejecutarse**, no saltarse) y existen `municipality`, `population`, `destination_raw`, `green` y `poi` en `app/data/clean/`.
 
-### L9 · EJECUTAR + VERIFICAR (siguiente) — Tasks 18, 19: aire, previsión y construcción de las bases DuckDB
+### L9 · ✅ HECHO (PR #19) — Tasks 18, 19: aire, previsión y construcción de las bases DuckDB
 
 - **Qué hace:** normaliza estaciones y lecturas de aire (fecha por fila, `T`/`V` sí, `N` no) y la previsión de AEMET; construye `app/data/gomad.duckdb` y `app/data/realtime.duckdb` de forma atómica, con las medias móviles del ICA (O₃ 8 h, PM 24 h).
 - **Por qué en este orden:** necesita los ficheros de L8; es lo que leerá `/recommend` el viernes.
