@@ -16,7 +16,7 @@ Orden propuesto: primero las **bloqueantes** (D-01 a D-04), que impiden empezar 
 | D-08 | Tabla actividad → destino | RF-02, RF-04 | Propuesta con cifras reales abajo |
 | D-09 | Indicadores de F5 | F5 | Uno o dos por categoría, con cobertura conocida |
 | D-10 | Nombre | Front, dominio | GOATS |
-| D-11 | Usos de IA (§6.5) | Alcance | Solo el n.º 1 (deporte por instalación) |
+| D-11 | Usos de IA (§6.5) | Alcance | Solo el n.º 1 (deporte por instalación). **Decidido el 15/10:** n.º 1 descartado (sin LLM), n.º 2 pendiente (CLAUDE.md §11) |
 | D-12 | Desnivel (IGN) | RF-13 | Fuera del MVP |
 | D-13 | Despliegue | Domingo | Decidir el sábado |
 | D-14 | PDF de presentaciones en el repo | Nada | Dejarlos |
