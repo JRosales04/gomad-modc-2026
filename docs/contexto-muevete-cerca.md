@@ -464,7 +464,7 @@ Origen: **IDEM** = Infraestructura de Datos Espaciales de la Comunidad (WFS) · 
 | Nomecalles: hipermercados | `Nomecalles · hipermercados` | NMC | [ficha](https://gestiona.comunidad.madrid/nomecalles_web/) · [API](https://apiscm.comunidad.madrid/t/ciudadanos.comunidad.madrid/sector-publico/nomecalles-descargas/v1/paquetes/hipermercados) |
 | Nomecalles: mercados de abastos | `Nomecalles · mercadoabastos` | NMC | [ficha](https://gestiona.comunidad.madrid/nomecalles_web/) · [API](https://apiscm.comunidad.madrid/t/ciudadanos.comunidad.madrid/sector-publico/nomecalles-descargas/v1/paquetes/mercadoabastos) |
 | Nomecalles: galerías de alimentación | `Nomecalles · galimentacion` | NMC | [ficha](https://gestiona.comunidad.madrid/nomecalles_web/) · [API](https://apiscm.comunidad.madrid/t/ciudadanos.comunidad.madrid/sector-publico/nomecalles-descargas/v1/paquetes/galimentacion) |
-| OpenStreetMap: shop=supermarket / convenience, amenity=bench / drinking_water | `openstreetmap` | Externa | [ficha](https://download.geofabrik.de/europe/spain/madrid.html) |
+| OpenStreetMap: shop=supermarket / convenience, amenity=bench / drinking_water / waste_basket, leisure=dog_park / playground | `openstreetmap` | Externa | [ficha](https://download.geofabrik.de/europe/spain/madrid.html) |
 | Parques, fuentes, desfibriladores y demás puntos de RF-04 y RF-13 | `—` | IDEM |  |
 
 **Complemento para la capital (Ayuntamiento de Madrid):**
