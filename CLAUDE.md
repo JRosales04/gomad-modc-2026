@@ -1,4 +1,8 @@
-# CLAUDE.md — Proyecto MAD Open Data Challenge 2026 (GoMad, antes «Muévete Cerca»)
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+# Proyecto MAD Open Data Challenge 2026 (GoMAD, antes «Muévete Cerca»)
 
 Este archivo es el contexto completo del proyecto para Claude Code. Se escribió el 14/10/2026 al migrar el trabajo de un portátil a un PC de sobremesa. Todo lo marcado como **comprobado** se verificó contra las API reales de los portales (6–14/10/2026); lo marcado como **sin verificar** viene de documentación.
 
@@ -11,12 +15,8 @@ Este archivo es el contexto completo del proyecto para Claude Code. Se escribió
 - **Objetivo del equipo:** no solo una demo, sino una **app web usable que se pueda ofrecer directamente** a la ciudadanía (desplegada, con HTTPS, rápida en móvil).
 - **El equipo ya tiene clave de AEMET OpenData.** Va en `app/.env` como `AEMET_API_KEY`, nunca en el repositorio. Esquema y cuota comprobados con la clave el 14/10 (§7.1).
 - **El equipo ya tiene cuenta de Oracle** (acceso de Oracle Academy/OCI para el reto). Las credenciales **nunca** van en el repositorio ni en este archivo: solo en `.env` (ver `.env.example`).
-- **Todavía no hay código de la app.** Sí hay: análisis completo de datos, matriz de trazabilidad requisito → fuente y un script probado que descarga todas las fuentes (`scripts/download_sources.py`).
-- **Nombre del proyecto: GoMad** (*Guía de Ocio: Madrid Activo y Deportivo*), decidido el 15/10. Los candidatos que se barajaron: Candidatos favoritos (acrónimo en inglés con significado en español):
-  - **GOATS** — *Guía de Ocio, Actividad y Trayectos Saludables* (recomendado; logo: cabra montés, que vive en Guadarrama y La Pedriza; lema posible «Sé el GOAT de tu barrio»).
-  - **MAD GOAT** — *Madrid Activo y Deportivo: Guía de Ocio, Aire y Trayectos*.
-  - **GO MAD** — *Guía de Ocio: Madrid Activo y Deportivo*.
-  - Otros barajados: MADNESS (*Madrid Activo, Deportivo y Natural: Ejercicio Sin Sofocos*), CATS (*Caminos con Aire limpio, Trayectos y Sombra*), MOVIDA, SENDA, OASIS, BRISA.
+- **Código de la app en marcha (16/10):** ingesta + normalización + `build_db`, grafo de rutas, API FastAPI (`/recommend`, `/route`, `/location`, `/activities`, `/sources`…) y front React; despliegue con Docker Compose. Comandos y flujo en §3.1.
+- **Nombre del proyecto: GoMAD** (*Guía de Ocio: Madrid Activo y Deportivo*), decidido el 15/10.
 
 ## 2. Instrucciones para Claude en este proyecto
 
@@ -91,6 +91,49 @@ curl -s localhost/api/health             # {"status":"ok"}
 ```
 El Compose compila el front dentro de la imagen (Dockerfile multi-stage: `node:22.23.3-alpine` hace `npm ci` y `npm run build`, Caddy sirve `dist`), así que no hace falta `dist/` local; las pruebas del front se ejecutan antes, en local (`cd app/frontend && npm test`). En la VM, desde `~/GoMad`: `app/deploy/deploy.sh` (hace `git pull --ff-only`, `up -d --build` y comprueba `/` y `/api/health`; `--no-pull` para saltarse el pull).
 Las claves de `app/.env` solo llegan al contenedor `api`; Caddy (`frontend`) recibe solo `DOMAIN`. Si `docker` da «permission denied» en el socket tras añadirte al grupo `docker`, abre una terminal nueva (o `newgrp docker`).
+
+### 3.1 Desarrollo: flujo de datos y comandos
+
+**Flujo de datos** (cada paso lee lo que deja el anterior en `app/data/`; `GOMAD_DATA_DIR` y `GOMAD_CONFIG_DIR` cambian las rutas, por defecto `app/data` y `app/config`):
+1. `app/ingest/scripts/download_sources.py` → `data/raw/<fuente>/` + `manifest.json`.
+2. `cd app/ingest && python -m normalize [fuente…]` → GeoParquet limpio (un módulo por dominio en `normalize/`; una fuente rota no para el resto y se conserva el parquet anterior).
+3. `python -m build_db main | realtime | all` → `data/gomad.duckdb` y `data/realtime.duckdb` (se escriben en un fichero temporal y se sustituyen de golpe; la API los abre en solo lectura).
+4. `python graph.py [28065 | <ine> | all]` → `data/graph/<zona>/` (nodos y `edges.parquet`) desde el extracto OSM; `all` = grafo regional.
+
+**API** (`app/api/`, raíz de importación propia, sin paquete): `main.py` define endpoints y carga al arrancar `Repository` (DuckDB), `GraphStore` (grafos en memoria) y `Geocoder`, y valida `rules.yaml` y `weights.yaml` (un YAML erróneo para el arranque). Capas: `services/` orquesta cada endpoint → `engine/` (puntuación, franjas, reglas, explicación con plantillas) y `routing/` (A*/Dijkstra sobre el grafo); `schemas.py` es el contrato Pydantic. Los logs nunca llevan query ni cuerpo (la query de `/location` es una dirección).
+```bash
+cd app/api && .venv/bin/uvicorn main:app --reload --port 8000   # el front en dev hace proxy de /api a :8000
+.venv/bin/pytest tests/engine/test_scoring.py -k nombre           # una prueba
+.venv/bin/pytest -m "not slow"                                     # sin datos reales
+```
+
+**Contrato API ↔ front:** al cambiar `schemas.py` o un endpoint, `cd app/api && .venv/bin/python scripts/export_openapi.py` (escribe `app/frontend/src/api/openapi.json`) y `cd app/frontend && npm run contract` (regenera `schema.d.ts`). `tests/test_contract.py` falla si `openapi.json` está desfasado.
+
+**Front** (`app/frontend/`, empieza por `docs/pendientes.md`): `npm run dev` (:5173), `npm test` (Vitest + Testing Library + axe), `npx vitest run src/App.test.tsx` (un fichero), `npm run lint` (oxlint), `npm run build` (tsc + vite). Datos de ejemplo de las personas de la demo en `src/data/mock/`.
+
+### 3.2 Documentación de contexto (`docs/`)
+
+Los markdown de `docs/` son **contexto del proyecto**: léelos cuando la tarea toque su tema, en vez de deducirlo del código. Prioridad si se contradicen: este archivo → `docs/arquitectura.md` (prevalece sobre §6) → `docs/plan-implementacion.md` → el resto.
+
+| Documento | Qué contiene | Cuándo leerlo |
+|---|---|---|
+| `docs/arquitectura.md` | Diseño técnico aprobado: decisiones D-01…D-13, flujo de `/recommend`, módulos del motor, rutas (coste con suelo, Dijkstra de igraph, latencias medidas), stack del front, accesibilidad, VM de OCI (§6.1: despliegue y **cómo copiar `app/data` a la VM**), fiabilidad, pendientes A-01…A-13 | Antes de tocar la API, las rutas, el front o el despliegue |
+| `docs/plan-implementacion.md` | Plan por tareas (`### Task N:`, 1–32 detalladas; sábado–lunes como tablas S-/D-/L-). Secciones clave: «Estructura por servicios», «Restricciones globales», «Foco de revisión» (5 casos límite con su prueba), «Decisiones del equipo» (DEC-xx → fichero de `app/config/`) | Al ejecutar o verificar una tarea; es muy largo (~340 KB): busca la tarea por su encabezado |
+| `docs/trabajo-paralelo.md` | **Reparto vigente desde el 16/10:** bloques F, M, B1–B5, D y L, cada uno con su rama, sus ficheros («Es suyo»), su rango de Tasks y su plan en `docs/planes/<bloque>.md`; reglas para los ficheros compartidos, decisiones del 16/10 ya cerradas, prompt base y orden de fusión | Antes de empezar cualquier bloque de trabajo |
+| `docs/guia-ejecucion.md` | Orden de ejecución por lotes y roles, estado de cada tarea y PR, ciclo EJECUTAR → VERIFICAR (dos conversaciones distintas) → PR | Para saber qué está hecho y qué toca después |
+| `docs/prompt_task_executer.md` / `prompt_task_checker.md` | Plantillas para ejecutar (`superpowers:executing-plans`, TDD, ledger en `.superpowers/`) y verificar en solo lectura; se cambia solo la primera línea (`TAREAS`, `RAMA`, `BASE`) | Cuando la persona pida ejecutar o verificar tareas del plan |
+| `docs/PENDIENTES.md` | Tareas P-00…P-13 (p. ej. P-12 hora de cambio de día de `aire_dia`, P-13 cuota de AEMET) | Al tocar ingesta horaria o AEMET |
+| `docs/decisiones-pendientes.md` | Fichas D-01…D-14 con opciones y cifras. Muchas ya están decididas (ver §11); **D-10 «GOATS» está superada: el nombre es GoMAD** | Para entender el porqué de una decisión |
+| `docs/informe-datos.md` | Perfil real de las 46 fuentes (filas, cobertura, codificación, CRS) y 12 trampas de datos con su tratamiento | Antes de escribir o cambiar un normalizador |
+| `docs/assets/umbrales.md` | ICA del BOE (bandas, periodos, colores, recomendaciones literales) y calor del plan de Sanidad 2026 (umbrales por zona, regla de niveles, propuesta DEC-06); `heat_zones.csv` = municipio → zona | Antes de tocar `rules.yaml`, `ica_thresholds.yaml` o textos de salud |
+| `docs/contexto-muevete-cerca.md` | Documento de traspaso del 6/10: matriz RF → fuente con enlaces, esquemas, tabla de 25 municipios. Fechas y nombres superados | Solo para enlaces o detalle de una fuente concreta |
+| `docs/idea/ChatGPT-…md` | Notas de ideación del 5/10 (histórico) | Casi nunca |
+
+Reglas de trabajo que salen de estos documentos:
+- **Front = [manual guiado]:** la persona del front programa `app/frontend/` a mano siguiendo `app/frontend/docs/` (`pendientes.md`, `guia.md`, `pantallas.md`). No escribas ahí salvo que lo pida; sí puedes revisar o documentar.
+- **Git:** nadie trabaja en `main`; una rama por lote (`<rol>/<día>-<tema>`, p. ej. `motor/vie16-api-conexion`) creada desde `main` actualizado, y entra por PR. Commits en español con prefijo de rol (`Motor: …`, `Front: …`, `Docs: …`).
+- **Valores sin decisión no van en código:** pesos, umbrales, actividades e indicadores se leen de `app/config/*.yaml`; lo que no tiene fuente oficial lleva `own_criterion: true` y la app lo dice.
+- **Orden de recorte si falta tiempo:** F6 → ruta en toda la Comunidad (solo Getafe) → Oracle/APEX. Congelación de alcance: domingo 18, 23:59.
 
 Página de trabajo publicada (privada): https://claude.ai/artifact/MT3co6p1UKtJypQwBGqZpK
 
@@ -338,9 +381,9 @@ Municipios con al menos uno: fuentes 152, juegos 143, bancos 88, biosaludables 5
 | Día | Objetivo |
 |---|---|
 | Mié 14 | Repo y entorno; decidir almacén (DuckDB vs Oracle), proveedor de IA y nombre; verificar la API de AEMET con la clave del equipo (Madrid 28079, Getafe 28065); ingesta → tablas `municipio`, `destino`, `estacion_aire`, `servicio`; campo `refresco` y comprobación de cambios en el script (§6.4) |
-| Jue 15 | Motor de puntuación + mejor franja + alternativa cubierta; `/recomendar`; grafo peatonal de Getafe |
-| Vie 16 | Ruta saludable en Getafe (y capital si da tiempo); `/ruta`; esqueleto del front |
-| Sáb 17 | Front F1–F4 completo; F5 `/municipio` |
+| Jue 15 | Motor de puntuación + mejor franja + alternativa cubierta; `/recommend`; grafo peatonal de Getafe |
+| Vie 16 | Ruta saludable en Getafe (y capital si da tiempo); `/route`; esqueleto del front |
+| Sáb 17 | Front F1–F4 completo; F5 `/municipality/{ine_code}` |
 | Dom 18 | F6 asistente (Should); caché ante caídas; página de fuentes y licencias; despliegue con HTTPS |
 | Lun 19 | Ensayo con las personas de la demo, corrección de errores, guion de 10 min, respuestas de reserva sin red |
 | **Mar 20** | **Demo** |
@@ -350,7 +393,7 @@ Roles sugeridos (equipo de hasta 4): **Datos** (ingesta, modelo, licencias), **M
 ## 11. Decisiones
 **Tomadas:** toda la Comunidad sin límite de población · Ayuntamiento solo para la capital · foco ciudadano > administración > empresa · ideas de ejemplo opcionales · desfibriladores, bici pública y Nomecalles incluidos · F6 añadido (IA solo interpreta y explica) · sin requisitos nuevos para «espacios cubiertos» (como mucho ampliar RF-09 con bibliotecas/centros cívicos) · no ampliar fuentes (envejecimiento, discapacidad, LoDCORE, atlas de renta fuera) · recarga de datos por 4 niveles (referencia, diario, horario, bajo demanda), sin botón público de recarga total (§6.4). **Arquitectura (14/10, detalle en `docs/arquitectura.md`):** GeoParquet como núcleo + DuckDB en solo lectura para la app, Oracle ADB/APEX opcional · IA de F6: OCI Generative AI con plan B y F6 usable sin LLM (sustituido el 15/10 por DEC-03: OCI Language, ver abajo) · rutas: diseño regional, afinado en Getafe hasta el vie 16 y los 179 municipios el sáb 17 · grafo en memoria con A\*/Dijkstra bidireccional y coste por petición (factor multiplicativo con suelo, nunca negativo) · ubicación escrita con buscador de Nomecalles + `callejero_completo_2025` · despliegue con Docker Compose en VM de OCI, primero el vie 16. · front: React + Vite + TypeScript sobre el prototipo de `docs/idea`, MapLibre, TanStack Query, `main.css` + `icons.css`, Google Material Symbols servidos por nosotros, WCAG 2.1 AA (contraste, teclado, lectores, HTML semántico); modo oscuro con interruptor fuera del MVP. · **Front (14/10, tras la auditoría):** se mantienen React 19 / Vite 8 / TypeScript 6 (no React 18 / Vite 5 como decía el plan) y se corrige lo que esté mal · **barra de navegación inferior** en móvil · iconos: Google Material Symbols desde un fichero `.woff` propio (aplazado) · el front se programa a mano ([manual guiado]) con `app/frontend/docs/`; la conexión con la API, en la siguiente sesión. · **Motor (15/10, D2):** catálogo de 8 actividades (caminar, correr, nadar, pádel, tenis, fútbol, baloncesto, gimnasio y cubierto) en `app/config/activities.yaml` · aire: general y carrito desde «Desfavorable», sensible y mayor desde «Regular» (BOE; mayor = criterio propio) · lluvia: cubierto u otra franja desde el 50 % de probabilidad · pesos por defecto cercanía 30 · adecuación 25 · verde 20 · aire 15 · meteo 10; velocidades 4,5 / 9 / 3,5 km/h (`weights.yaml`, criterio propio) · pesos de ruta: los de `routing.yaml`.
 
-**Nombre y desnivel (15/10):** nombre **GoMad** · **Desnivel (DEC-12, 15/10): sí, como Should**: alturas del IGN MDT05 por nodo y pendiente por tramo, construidas junto con el grafo regional del sábado (S-R1); descarga del MDT05 por WCS comprobada el 15/10 (§7.1). Si no llega, se recorta justo después de F6 y la app dice «sin datos de desnivel».
+**Nombre y desnivel (15/10):** nombre **GoMAD** · **Desnivel (DEC-12, 15/10): sí, como Should**: alturas del IGN MDT05 por nodo y pendiente por tramo, construidas junto con el grafo regional del sábado (S-R1); descarga del MDT05 por WCS comprobada el 15/10 (§7.1). Si no llega, se recorta justo después de F6 y la app dice «sin datos de desnivel».
 
 **IA (15/10, DEC-03 y DEC-11):** F6 = **OCI Language** (entidades y frases clave; 0,23 s de media) **+ reglas + plantillas, sin LLM**: un diccionario del catálogo RF-21 pasa las entidades a `AssistantParams` y `write_up` redacta con plantillas solo con datos del motor (D-M1). OCI Generative AI descartado (404 por permisos en `eu-madrid-1`, no se pide al administrador; `eu-frankfurt-1` no suscrita) y Anthropic descartado (coste propio); no se usa ningún otro proveedor. Credenciales: `OCI_*` en `app/.env` y `~/.oci/config`; en la VM se copia `~/.oci` y se monta en solo lectura en el contenedor `api`. §6.5 n.º 1 (deducir el deporte con LLM) **descartado**: palabras clave. §6.5 n.º 2 (Select AI + APEX) **pendiente**: necesita un LLM.
 
