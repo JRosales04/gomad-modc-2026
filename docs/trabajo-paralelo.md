@@ -36,7 +36,7 @@
 | Orden | Qué | Bloque | Por qué en este orden | Cuándo |
 |---|---|---|---|---|
 | **0** | Desplegar lo que ya hay: arrancar la VM, copiar `app/data`, `deploy.sh`, **dominio + HTTPS** | **D (manual, tú)** | Sin HTTPS el móvil no da GPS; sin despliegue no se prueba nada fuera de tu PC | Vie mañana |
-| **0** | Decisiones: ✅ DEC-09 (indicadores F5), ✅ DEC-13 (cuota AEMET), ✅ DEC-06 (calor) — cerradas el 16/10; pendientes: dominio, teselas del mapa | Equipo | Bloquean B1, B2, B3 y M | Vie 12:00 |
+| **0** | Decisiones: ✅ DEC-09 (indicadores F5), ✅ DEC-13 (cuota AEMET), ✅ DEC-06 (calor) — cerradas el 16/10; ✅ dominio (DuckDNS), ✅ teselas (OpenFreeMap → PMTiles), ✅ hueco de Getafe (OSM filtrado) | Equipo | Bloquean B1, B2, B3 y M | Vie 12:00 |
 | **1** | Vista de municipio y fuentes (F5, RF-19) | **B1** | F5 es MVP y Fuentes da la trazabilidad que puntúa en 1.1 | Vie |
 | **1** | Mapa sincronizado con la lista (RF-11, Must) | **M** | Es Must y lo que más se ve en la demo | Vie |
 | **1** | Diseño del front | **F** | No depende de nadie; empieza ya | Vie → dom |
@@ -75,7 +75,7 @@ Rangos de Task para que no choquen los números: **B1 33–39 · B2 40–46 · B
 - **Qué:** V-F1 y el mapa de la pantalla Ruta: MapLibre con react-map-gl dentro de `MapView.tsx` (misma interfaz: `markers`, `selectedId`, `origin`, `route`, `secondaryRoute`), selección tarjeta ↔ marcador, la lista sigue siendo el equivalente completo, atribución © OpenStreetMap y quién sirve las teselas.
 - **Es suyo:** `app/frontend/src/components/MapView.tsx`, `app/frontend/src/styles/map.css` (nuevo), `package.json`/`package-lock.json` (solo `maplibre-gl` y `react-map-gl`), la prueba de `MapView`.
 - **No toca:** el resto de componentes (si necesita un cambio en `Results.tsx` o `RouteView.tsx` para la selección, una línea y avisando a F).
-- **Necesita:** **decisión de teselas**: OpenFreeMap (online, gratis, sin clave) para ya; PMTiles local de la Comunidad para la demo sin red (L-4). Recomendado: OpenFreeMap ahora y PMTiles el lunes.
+- **Decidido (16/10): teselas de OpenFreeMap** (online, gratis, sin clave) desde ya; **PMTiles local de la Comunidad el lunes** para la demo sin red (L-4). Atribución: © OpenStreetMap y OpenFreeMap. Puede empezar ya.
 
 ### Bloque B1 — Municipio y fuentes (F5, RF-19)
 - **Rama:** `datos/municipio-fuentes` · Tasks 33–39 en `docs/planes/municipio-fuentes.md`.
@@ -154,8 +154,14 @@ heat:            # DEC-06 (16/10): «dia de calor» por zona meteosalud, sin niv
 
   - **Ficheros que añade a «Es suyo»:** `app/config/heat_zones.csv` (copia; `docs/` no se monta en el contenedor), `app/api/engine/slots.py` (solo el desempate) y en `app/api/services/recommend.py` solo pasar `companions` y la Tmáx del día a `evaluate_outdoor` y cambiar el aviso de calor. `validate_rules` comprueba las 3 zonas y que la tabla cubre los 179 municipios.
   - **Caso de Carmen (guion):** 36 °C en Getafe no es día de calor (umbral 37,4). Prueba y respuesta de reserva con **38 °C** en Getafe → «Ahora no: mejor a las 21:00» + alternativa cubierta.
-  - **Pendiente:** decidir el enfoque del hueco de Getafe (palabras clave u OSM).
-- **Cuidado:** si añade OSM `sport=*` como fuente nueva, preguntar antes (CLAUDE.md §2.12) y actualizar `requisitos_fuentes.json`.
+- **Decidido (hueco de Getafe, 16/10): OSM filtrado como fuente de destinos** (aprobada por el equipo, CLAUDE.md §2.12). Getafe no está en EIEL y sus 19 instalaciones de Nomecalles no nombran piscina, tenis ni baloncesto: las palabras clave no lo arreglan. En el extracto ya descargado (`raw/osm/madrid-latest.osm.pbf`, `pyosmium` ya en `ingest/.venv`) entran **solo** los elementos con poca duda (lo demás son a menudo comunidades de vecinos o colegios):
+  - `leisure=sports_centre|stadium` con `sport=*` **y** `name` → actividades según `sport` (`swimming`→swim, `tennis`, `basketball`, `padel`, `soccer`→football, `athletics`→run, `fitness`→gym);
+  - `leisure=pitch` con `sport=tennis|basketball|padel` **solo** si tiene `name` o `access=yes|public`;
+  - `leisure=swimming_pool` **solo** con `name` o `access=public`; nunca las piscinas sin nombre ni las `access=private` (769 en la caja de Getafe).
+  - `suitability: 0.8` (por debajo de las fuentes oficiales, criterio propio); `id` = `osm:<tipo><id>`; nombre que falte → «Pista de tenis (OpenStreetMap)».
+  - Recuento previo en la caja de Getafe (incluye algo de los bordes): Piscina Municipal El Carrascal y Forus Getafe (nadar), Ciudad Deportiva Europa (tenis, baloncesto, atletismo), Zona Deportiva Buenavista (baloncesto, fútbol). Sirve también para los grandes municipios sin EIEL (nadar hoy solo en 58 de 179).
+  - **Ficheros:** `app/ingest/normalize/sports.py` (función OSM), su función en `build_db.py`, reglas `source: osm_sport` en `activities.yaml`. Actualizar `docs/assets/requisitos_fuentes.json` (OSM como fuente de RF-04) y pedir a B1 la entrada de atribución ODbL en `config/sources.yaml` (es de B1).
+  - Prueba: Getafe con ≥ 1 destino de nadar, tenis y baloncesto; ninguna piscina sin nombre ni privada.
 
 ### Bloque B4 — Grafo de toda la Comunidad y desnivel
 - **Rama:** `rutas/regional` · Tasks 52–57 en `docs/planes/regional.md`.
@@ -174,7 +180,7 @@ heat:            # DEC-06 (16/10): «dia de calor» por zona meteosalud, sin niv
 ### Bloque D — Despliegue (manual, tú)
 1. Arrancar la VM (consola OCI → `gomad-vm` → Start).
 2. Copiar los datos y desplegar: `docs/arquitectura.md` §6.1 (`gomad.duckdb`, `realtime.duckdb`, `graph/`, `clean/addresses.parquet` y lo que use la API; después `restart api`).
-3. **Dominio + HTTPS (V-F4):** subdominio gratuito (p. ej. DuckDNS) apuntando a `YOUR_SERVER_IP`; `DOMAIN=<subdominio>` en `app/deploy/.env` **de la VM**; `deploy.sh`; Caddy saca el certificado solo.
+3. **Dominio + HTTPS (V-F4), decidido el 16/10:** subdominio gratuito de **DuckDNS** apuntando a `YOUR_SERVER_IP`; `DOMAIN=<subdominio>` en `app/deploy/.env` **de la VM**; `deploy.sh`; Caddy saca el certificado solo.
 4. Montar `~/.oci` (solo lectura) en el contenedor `api` cuando entre B5.
 5. Repetir el despliegue cada vez que se fusione un bloque.
 

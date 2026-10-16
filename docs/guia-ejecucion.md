@@ -71,7 +71,7 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 | Tasks 18–19 — aire, previsión y bases DuckDB: `gomad.duckdb` (destinos, actividades, municipios, estaciones, mobiliario) y `realtime.duckdb` (aire, ICA horario, previsión) | ✅ fusionadas | PR #19 |
 | D2 — DEC-05, 07, 07b, 08 | ✅ volcadas en `app/config/` (`rules.yaml`, `weights.yaml`, `activities.yaml`; `routing.yaml` ya no provisional) | PR #15 |
 | DEC-P04, DEC-10, DEC-11, DEC-12 | ✅ P-04 aplicado; nombre **GoMad**; IA n.º 1 descartado (palabras clave) y n.º 2 pendiente; desnivel **sí** (Should, sábado con S-R1; MDT05 comprobado por WCS) | PR #16, #17 |
-| ⚠️ Previsión AEMET | `realtime.duckdb` solo tiene Getafe y Madrid, descargadas el 14/10 (hasta el 16/10 07:00): hay que recargar antes de probar y decidir DEC-13 (cuota) para los 179 | DEC-13, S-D2 |
+| ⚠️ Previsión AEMET | `realtime.duckdb` solo tiene Getafe y Madrid, descargadas el 14/10 (hasta el 16/10 07:00): hay que recargar antes de probar; DEC-13 ✅ (16/10: pilotos cada hora + rotación, todos cada 6 h), lo implementa B2 | DEC-13, S-D2 |
 | ⚠️ Hueco de Getafe | 0 destinos para nadar, tenis y baloncesto (Getafe no está en EIEL y Nomecalles no da el deporte): decidir en P1 (más palabras clave u OSM `sport=*`) | `app/config/activities.yaml` |
 | **P-13** — cuota de AEMET (`AEMET_PAUSE_S` mal calculado) | ✅ decidido el 16/10 (DEC-13); lo implementa B2 | `docs/PENDIENTES.md` → DEC-13 abajo |
 
@@ -185,7 +185,7 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 > - **Umbrales oficiales** (`docs/assets/umbrales.md` §2.1, Anexo I, pág. 41): Sierra de Madrid (722801) 35,8 °C · Metropolitana y Henares (722802) 37,4 °C · Sur, Vegas y Oeste (722803) 39,2 °C. Son de **temperatura máxima diaria**, no horaria ni de sensación térmica.
 > - **Regla de niveles** (§2.2, págs. 22–24): suma de grados por encima del umbral en 3 días → 0 verde, ≤ 3,5 amarillo, ≤ 7 naranja, > 7 rojo. Grupos de riesgo del Anexo V (mayores de 65, menores de 4, gestantes…).
 > - **Tabla municipio → zona de los 179** en `docs/assets/heat_zones.csv` (`ine_code`, `municipality`, `zone_code`), sacada del mapa de la pág. 41 sobre las geometrías de `municipios.geojson`. Comprobada: 179 sin huecos ni repetidos, pilotos correctos (Madrid y Getafe 722802, San Lorenzo 722801) y los 54 municipios de frontera cotejados con el mapa.
-> - **Propuesta para DEC-06** (§2.3, no es decisión): «nivel estimado» con la previsión horaria de AEMET y el umbral de la zona; avisar desde naranja a la población general y desde amarillo a «mayor», «niños menores de 4 años» y «carrito» (el carrito es lectura nuestra); dentro del día, la hora con menor `sensTermica`, evitando 14:00–19:00.
+> - ✅ **DEC-06 decidido el 16/10: opción C, más simple que esta propuesta** («día de calor» por zona, sin niveles; `docs/decisiones-pendientes.md` D-06). Propuesta original (§2.3): «nivel estimado» con la previsión horaria de AEMET y el umbral de la zona; avisar desde naranja a la población general y desde amarillo a «mayor», «niños menores de 4 años» y «carrito» (el carrito es lectura nuestra); dentro del día, la hora con menor `sensTermica`, evitando 14:00–19:00.
 > - **Aviso para DEC-06 y L7:** el contrato actual `heat.max_feels_like_c` de `app/config/rules.yaml` (Task 12) **no admite umbrales por zona**; si se acepta la propuesta, hay que ampliarlo.
 > - P-03 ✅ en `docs/PENDIENTES.md`; D-06 y A-06 ya no están bloqueados.
 > - **Pendientes menores:** `decisiones-pendientes.md` D-06 todavía dice «Sanidad o AEMET» (Meteoalerta no se localizó); el script que generó el CSV está solo en el workspace (`.superpowers/…/t7tools/`), no versionado.
@@ -329,7 +329,7 @@ Lo que no tenga fuente oficial se escribe en el YAML con `own_criterion: true`. 
 - `pytest` en verde en `app/api` y `app/ingest`; `npx vitest run` en `app/frontend`.
 - Repasar las decisiones de D2.
 - Meter en el plan del viernes lo decidido hoy que aún no tiene tarea: **hueco de Getafe** (nadar, tenis, baloncesto), **desnivel** dentro de S-R1 (WCS del IGN por teselas de ≤ 4096 px; añadir `rasterio` a `ingest`), montaje de `~/.oci` en la `api` del Compose dentro de V-F4 y **dominio** para el HTTPS.
-- Decisiones del viernes 12:00: DEC-06 (calor; `rules.yaml` no admite umbrales por zona), DEC-09 (indicadores F5), DEC-13 (cuota AEMET).
+- Decisiones del viernes 12:00: ✅ DEC-06 (calor), ✅ DEC-09 (indicadores F5) y ✅ DEC-13 (cuota AEMET), cerradas el 16/10 (`docs/decisiones-pendientes.md`).
 - Pedir a Claude: «usa superpowers:writing-plans para detallar las tareas del viernes de `docs/plan-implementacion.md` como Task 26 en adelante, con lo aprendido hoy», y añadir aquí los lotes del viernes.
 
 ---
@@ -342,7 +342,7 @@ Están en el plan como tablas (V-…, S-…, D-…, L-…). **Se detallan cada t
 
 | Día | Lo principal | Hito |
 |---|---|---|
-| Vie 16 | `/recommend` y `/route` reales, `/location`, indicadores F5, mapa, detalle, ajustes | **Primer despliegue con HTTPS** en la VM; DEC-06 (propuesta lista en `umbrales.md` §2.3) y DEC-09 a las 12:00; DEC-13 (cuota AEMET) |
+| Vie 16 | `/recommend` y `/route` reales, `/location`, indicadores F5, mapa, detalle, ajustes | **Primer despliegue con HTTPS** en la VM; ✅ DEC-06, DEC-09 y DEC-13 cerradas el 16/10 |
 | Sáb 17 | `/municipality`, `/sources`, ingesta programada, **grafo de toda la Comunidad**, pantallas Ruta y Municipio | DEC-A11 a las 14:00 (si no llega: solo Getafe) |
 | Dom 18 | Servicio `ingest` en Compose con cron, caché ante caídas, F6 asistente, ruta circular | **23:59: congelación de alcance** |
 | Lun 19 | Ensayo con las personas de la demo, errores, guion, demo sin red, accesibilidad | — |

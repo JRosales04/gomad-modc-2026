@@ -176,6 +176,12 @@ RF-13 es Should y la fuente está sin verificar. **Recomendación:** fuera del M
 Tiene que haber HTTPS para la geolocalización. Opciones: Render, Railway, OCI (patrocinador). Decidir el sábado, cuando se sepa qué pesa la API y si se usa DuckDB.
 Resuelto en `docs/arquitectura.md` §1 (D-13: Docker Compose en VM de OCI). **No confundir con DEC-13** (cuota de AEMET, abajo): en `docs/guia-ejecucion.md` y `docs/trabajo-paralelo.md` DEC-13 es P-13.
 
+## Decisiones menores del 16/10 (teselas, dominio, hueco de Getafe)
+
+- **Teselas del mapa (bloque M):** OpenFreeMap (online, gratis, sin clave) desde ya; PMTiles local de la Comunidad el lunes para la demo sin red (L-4).
+- **Dominio (A-03, V-F4):** subdominio gratuito de DuckDNS apuntando a la IP de la VM; `DOMAIN` en `app/deploy/.env` de la VM.
+- **Hueco de Getafe (B3):** 0 destinos de nadar, tenis y baloncesto porque Getafe no está en EIEL y los nombres de Nomecalles no lo dicen. Se descartan las palabras clave (habría que adivinar que «Polideportivo» tiene piscina) y OSM amplio (falsos positivos de comunidades y colegios). **Decidido: OSM filtrado** como fuente de destinos: centros deportivos y estadios con `sport` y nombre; pistas de tenis, baloncesto y pádel con nombre o `access=yes|public`; piscinas solo con nombre o `access=public`; `suitability` 0,8. Detalle en la ficha B3 de `docs/trabajo-paralelo.md`.
+
 ## DEC-13 (P-13) · Cuota de AEMET
 
 **Contexto:** `docs/PENDIENTES.md` P-13. Cada municipio son 2 peticiones; el 14/10, 7 peticiones en ~1 min dieron 429 y volvió a responder a los ~100 s. Con `AEMET_PAUSE_S=10` salen ~12 peticiones/min: falla. AEMET **elabora la previsión municipal unas 3 veces al día** (vistas el 14–16/10: `elaborado` 12:01, 20:53 y 07:09), así que bajarla cada hora no aporta nada.
