@@ -207,7 +207,7 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 - **Por qué:** el primer despliegue con HTTPS es el viernes (V-F4); conviene tener la VM y su IP antes.
 - **Utiliza:** consola de OCI con la cuenta del equipo, Ubuntu 24.04, Docker.
 - **Necesita:** **L1 fusionado** ✅ (el Compose).
-- **Pasos:** los de la Task 6 del plan: forma `VM.Standard.A1.Flex` (Always Free) o de pago, puertos 80/443 abiertos en la VCN y en iptables, Docker, `git clone`, `app/.env` creado a mano en la VM (claves), **`app/deploy/.env` con `DOMAIN=:80`** hasta tener dominio (con dominio: `DOMAIN=<dominio>` y Caddy saca el certificado), `docker compose up`.
+- **Pasos:** los de la Task 6 del plan: forma `VM.Standard.A1.Flex` (Always Free) o de pago, puertos 80/443 abiertos en la VCN y en iptables, Docker, `git clone`, `app/.env` creado a mano en la VM (claves), **`app/deploy/.env` con `DOMAIN=:80`** hasta tener dominio (con dominio: `DOMAIN=<dominio>` y Caddy saca el certificado), `docker compose up`. Para llevar los datos que lee la api (`app/data` está vacío en la VM): `docs/arquitectura.md` §6.1, «Llevar los datos a la VM».
 - **Memoria:** con 4 GB la API y la construcción del grafo regional no caben a la vez (arquitectura §3.4: ~3,1 GB al construir, ~1–1,5 GB la API). Preferir A1.Flex con 12 GB o más.
 - **Listo cuando:** `curl -s http://<IP_PÚBLICA>/api/health` → `{"status":"ok"}`. Apuntar forma, región e IP en `docs/arquitectura.md` §6 (**sin** credenciales).
 
