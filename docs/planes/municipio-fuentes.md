@@ -1183,6 +1183,17 @@ def municipality(ine_code: str,
 
 **Terminado cuando:** `/municipality/{ine_code}` acepta `activities`, `profile` y `companions`, `fit` sale con «Cumple N de M» y una frase por preferencia (perro nunca «no», NULL «sin datos», sin nota ni orden), y el contrato está regenerado con `test_contract.py` en verde. **Aviso a los demás bloques** (en el informe): el contrato cambió solo en los parámetros de `/municipality/{ine_code}`; B2 (Task 68) debe partir de este `openapi.json`.
 
+#### Correcciones tras la verificación de LB1-2 (16/10)
+El verificador (⚠️ APTO con observaciones) escaló un Important: «Nadar: no hay en este municipio» era falso en Getafe, porque el catálogo de destinos es parcial (nadar con destinos en 58 de 179). Decidido el 16/10 con una **regla general, no por piloto** (Getafe y Madrid son el contraste: «Nadar: no consta en nuestros datos» frente a «Nadar: sí, 119 sitios»):
+- `fit.activities.when_absent` y `when_absent` de cada `route_poi` en `indicators.yaml`: `none` → «no hay en este municipio» (registro completo o valor medido 0; es lo de los indicadores), `not_listed` → «no consta en nuestros datos» (catálogo parcial: cuenta como no cumplido), `no_data` → «sin datos» (no cuenta). Actividades: `not_listed`; perro: `no_data`. Añadir una fuente o un municipio no toca código.
+- La etiqueta y las unidades del `route_poi` («Áreas caninas», «área»/«áreas») pasan del código (`POI_LABELS`) al YAML; `unit_one` opcional en los indicadores de recuento («1 centro», no «1 centros»).
+- `validate_fit` en la API (al arrancar, en `lifespan`) y `indicators.validate` en ingest comprueban `when_absent`, `label`, `unit` y `unit_one`: un YAML erróneo para el arranque, no da 500.
+- `duckdb.Error` (no solo `CatalogException`) en `municipality_indicators`, `activity_counts` y `poi_count` → 503.
+- `number()`: por debajo de 1, dos cifras significativas y sin ceros de cola (0,96 → «0,96», no «1,0»; 0,004 → «0,004», no «0,00»).
+- RF-19: `Indicator.extra_sources` cita el resto de fuentes del YAML (padrón en las tasas, `nmc_estcerca` en estaciones). `MunicipalityResponse.fit_own_criterion` dice que el encaje es criterio propio. Contrato regenerado (solo campos nuevos con valor por defecto) y dato de ejemplo del front actualizado.
+- Nombre del municipio del padrón con el artículo delante («Las Rozas de Madrid», «Alcalá de Henares») en `normalize/municipalities.py`, en vez de la capa en MAYÚSCULAS sin tildes; el callejero sigue mandando si está. De paso pasa `test_recommend_capital_without_vpla`, que esperaba «Madrid».
+- Pruebas nuevas en `test_municipality.py` (regla de cobertura, singular, parámetros repetidos, fuentes múltiples, `fit_own_criterion`, base rota → 503, `poi_count` sin los fuera de servicio, `validate_fit`), `test_indicators.py` y `test_municipality_names.py`.
+
 ---
 
 ## Lote LB1-3 · Fuentes (servicio `app/api/`) — Task 38 (se puede lanzar en paralelo con LB1-1)
