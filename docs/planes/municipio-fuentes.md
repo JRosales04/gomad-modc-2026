@@ -703,6 +703,11 @@ def create_municipality_indicator(con, config=None):
 
 **Terminado cuando:** `python -m build_db main` deja `municipality_indicator` (179 × 14) en `gomad.duckdb` y `tests/test_municipality_indicator.py` pasa entero sin saltarse.
 
+#### Correcciones tras la verificación de la Task 35 (16/10)
+- `per_1000(counts, pop)` pasa a nivel de módulo y lanza `ValueError` con los municipios sin población (antes daba NaN y la regla `zero` lo convertía en 0 sin avisar).
+- `_shp(source)` lanza `FileNotFoundError` que nombra la fuente si falta su `.shp` (antes, `StopIteration` sin mensaje). `build_db main` necesita en `raw/`: `nmc_deporte`, `nmc_busparadas`, `nmc_estmetro`, `nmc_estcerca`, `vias_pecuarias`, `areas_recreativas` y `eiel_nucleos` (copiarlas a la VM con `app/data`).
+- Pruebas nuevas: `test_rate_divides_by_population`, `test_rate_without_population_fails_readably`, `test_missing_shapefile_fails_readably` y (`slow`) `test_lozoyuela_gets_its_old_code_drove_roads`.
+
 ---
 
 ## Lote LB1-2 · API de municipio (servicio `app/api/`) — Tasks 36, 37
