@@ -33,11 +33,12 @@
 | 7 | Tráfico en tiempo real en la capital | 🟡 | — |
 | 8 | Polen (medido + previsto) | 🟡 | 2 |
 | 9 | Diseño del front | 🟠 | — |
+| 12 | Caché ante caídas de todas las fuentes en vivo | 🟠 | 1, 7, 8 |
 | 13 | `~/.oci` en la VM | 🔴 cuando entre 4 | 4 |
 | 16 | CLAUDE.md al día | 🟡 | — |
 | 17 | Limpieza de ramas en GitHub | 🟡 | — |
 
-**Orden:** 1 + 2 y 4 a la vez → 6 y 9 → 3, 7 y 8 → 13 al desplegar el 4 → 16 y 17.
+**Orden:** 1 + 2 y 4 a la vez → 6 y 9 → 3, 7 y 8 → 12 → 13 al desplegar el 4 → 16 y 17.
 **Congelación de alcance:** domingo 18 a las 23:59. **Demo:** martes 20.
 
 ---
@@ -90,6 +91,10 @@ Cada ficha dice qué hacer y **qué ficheros son suyos**. Una fila no toca los f
 - **Qué:** acabado visual de las 9 pantallas, escritorio y móvil; iconos; textos.
 - **Cómo:** directamente sobre `main`. Antes de cada push: `cd app/frontend && npm test && npm run build && npm run lint` en verde. No tocar `src/data/`, `src/api/` ni la lógica de datos.
 - **Para trabajar sin backend local:** `GOMAD_API=https://example.com npm run dev` (§6).
+
+### 12 · Caché ante caídas 🟠
+- Si una fuente en vivo cae (aire, tráfico, polen), la API sigue con el último dato válido dentro de su `max_age` y avisa con la hora real; pasado ese tiempo, «sin datos». La previsión de Open-Meteo ya lo hace (`data/live/forecast.json`); falta el resto.
+- **Es suyo:** `app/api/live/` (los feeds de aire, tráfico y polen) y `app/config/realtime.yaml`.
 
 ### 13 · `~/.oci` en la VM 🔴 (cuando entre el 4)
 - Copiar `~/.oci` del PC a la VM (por `scp`, nunca por git), montarlo en solo lectura en el servicio `api` de `docker-compose.yml`, poner las variables `OCI_*` en `app/.env` de la VM y reiniciar la API.
