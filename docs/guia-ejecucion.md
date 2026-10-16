@@ -349,3 +349,88 @@ Están en el plan como tablas (V-…, S-…, D-…, L-…). **Se detallan cada t
 | Mar 20 | **Demo** | — |
 
 **Orden de recorte si falta tiempo:** F6 → ruta en toda la Comunidad (solo Getafe) → Oracle/APEX.
+
+---
+
+## 7. Bloque B1 — municipio y fuentes (vie 16 → sáb 17)
+
+Bloque B1 de `docs/trabajo-paralelo.md`, dividido en **4 lotes pequeños** (Tasks 33–39). La división está en `docs/planes/municipio-fuentes.md`. **Cada ejecutor detalla primero solo las Tasks de su lote** en ese fichero (`superpowers:writing-plans`) y después las ejecuta. El ciclo es el del §1: EJECUTAR en una conversación nueva → VERIFICAR en otra → PR → fusionar → siguiente lote. Cada lote va en su rama, que sale de `main` actualizado.
+
+| # | Tipo | Tasks | Rama | Rol | Necesita antes |
+|---|---|---|---|---|---|
+| M-B1 | MANUAL | prerrequisitos | — | quien ejecute | — |
+| LB1-1 | EJECUTAR + VERIFICAR | 33, 34, 35 | `datos/b1-indicadores` | Datos | M-B1 y la PR de documentación con este plan fusionada |
+| LB1-3 | EJECUTAR + VERIFICAR | 38 | `motor/b1-fuentes` | Motor | M-B1 (en paralelo con LB1-1) |
+| LB1-2 | EJECUTAR + VERIFICAR | 36, 37 | `motor/b1-municipio` | Motor | **LB1-1 fusionado** |
+| LB1-4 | EJECUTAR + VERIFICAR | 39 | `front/b1-conexion` | Front | **LB1-2 y LB1-3 fusionados** |
+
+**Añadido a los prompts de este bloque** (después de la primera línea; el resto de la plantilla no cambia):
+- Ejecutor: `PLAN=docs/planes/municipio-fuentes.md. Lee antes docs/trabajo-paralelo.md (§1 y ficha B1). Primero usa superpowers:writing-plans para detallar en PLAN SOLO las Tasks de TAREAS, sin cambiar lo que fija la división, y haz commit «Plan: B1 Tasks …». Después usa superpowers:executing-plans con PLAN (no con docs/plan-implementacion.md); ledger en .superpowers/sdd/municipio-fuentes/progress.md.`
+- Verificador: `El plan está en docs/planes/municipio-fuentes.md, no en docs/plan-implementacion.md. Compara con la división (alcance, «Es suyo» y pruebas clave), que escribió otra sesión antes de ejecutar, y con el detalle que añadió el ejecutor; un detalle que contradiga la división sin su Ruling es 🟠. Comprueba que la rama solo toca los ficheros «Es suyo» de sus Tasks y la ficha B1 de docs/trabajo-paralelo.md.`
+
+### M-B1 · MANUAL — Prerrequisitos del bloque (en el equipo donde se ejecute)
+
+- **Qué hace:** deja listo el equipo donde se va a ejecutar el bloque. Si ya tiene algo de esto (acceso a GitHub, `superpowers`, venvs, `node_modules`, `app/.env`, `app/data`), sáltate ese paso.
+- **Qué hacer:**
+  1. Acceso a GitHub desde la terminal (clave SSH o token): `git fetch` tiene que funcionar, porque la plantilla del ejecutor hace `git pull --ff-only`.
+  2. Instalar `superpowers` con `/plugin`.
+  3. Entornos:
+     ```bash
+     cd app/ingest && python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
+     cd ../api && python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
+     cd ../frontend && npm ci
+     cd .. && cp .env.example .env          # B1 no necesita claves; la descarga de aemet fallará y no pasa nada
+     ```
+  4. Datos (desde `app/ingest`, unos minutos). `ay_bancos` y `vpla_redes` son pesadas pero las leen los normalizadores; OSM y `callejero` no hacen falta en B1:
+     ```bash
+     .venv/bin/python scripts/download_sources.py --group full
+     .venv/bin/python scripts/download_sources.py --only vpla_redes,ay_bancos --include-heavy
+     .venv/bin/python scripts/profile_sources.py      # app/data/perfil/perfil.json, para comprobar columnas
+     .venv/bin/python -m normalize                    # puede fallar alguna fuente sin descargar (aemet, callejero): sigue con las demás
+     .venv/bin/python -m build_db main
+     ```
+  5. Línea base: `cd app/ingest && .venv/bin/pytest -q`, `cd app/api && .venv/bin/pytest -q`, `cd app/frontend && npm test`. Apunta los fallos que ya haya antes de empezar.
+- **Listo cuando:** `git fetch` funciona, existe `app/data/gomad.duckdb` y las tres baterías de pruebas tienen su línea base.
+- **Además:** fusionar antes la PR de documentación que trae este plan (rama `docs/vie16-claude-md`); si no, la rama del lote no verá `docs/planes/municipio-fuentes.md`.
+
+### LB1-1 · EJECUTAR + VERIFICAR — Tasks 33, 34, 35: servicios, `indicators.yaml` y `municipality_indicator`
+
+- **Qué hace:** normaliza los servicios (sanitarios, farmacias, educativos, atención social, desfibriladores) en `clean/service.parquet`, escribe los 14 indicadores de DEC-09 en `app/config/indicators.yaml` y construye la tabla `municipality_indicator` (179 × 14) en `gomad.duckdb`.
+- **Por qué primero:** `/municipality` (LB1-2) lee esta tabla.
+- **Utiliza:** `app/ingest/.venv`, GeoPandas, DuckDB, `app/data/raw/` y `clean/population.parquet`.
+- **Necesita:** M-B1.
+- **Prompt de ejecución:** `TAREAS={33,34,35}   RAMA={datos/b1-indicadores}   BASE={main}   MANUALES_HECHOS={M-B1: entornos y datos descargados}`, más la línea de ejecutor de este §7.
+- **Prompt de verificación:** `TAREAS={33,34,35}   RAMA={datos/b1-indicadores}   BASE={main}`, más la línea de verificador de este §7.
+- **Comprobación rápida:**
+  ```bash
+  cd app/ingest && .venv/bin/pytest -q                       # las slow se EJECUTAN
+  .venv/bin/python -c "import duckdb; c=duckdb.connect('../data/gomad.duckdb', read_only=True); print(c.sql('select count(*), count(distinct ine_code) from municipality_indicator'))"   # 2506 filas, 179
+  ```
+
+### LB1-3 · EJECUTAR + VERIFICAR — Task 38: `/sources`
+
+- **Qué hace:** amplía `app/config/sources.yaml` con editor, licencia y URL de cada fuente, y saca `/sources` del 501, con la última recarga y el último fallo desde `manifest.json`.
+- **Por qué en paralelo:** no comparte ficheros con LB1-1. En `main.py` solo toca la función `sources`.
+- **Necesita:** M-B1.
+- **Prompt de ejecución:** `TAREAS={38}   RAMA={motor/b1-fuentes}   BASE={main}   MANUALES_HECHOS={M-B1: entornos y datos descargados}`, más la línea de ejecutor.
+- **Prompt de verificación:** `TAREAS={38}   RAMA={motor/b1-fuentes}   BASE={main}`, más la línea de verificador.
+- **Comprobación rápida:** `cd app/api && .venv/bin/pytest -q tests/test_sources.py tests/test_contract.py`; con la API en marcha, `curl -s localhost:8000/sources` lista las fuentes con `license` y `url`.
+
+### LB1-2 · EJECUTAR + VERIFICAR — Tasks 36, 37: `/municipality` y encaje
+
+- **Qué hace:** saca `/municipality/{ine_code}` del 501 (indicadores por categoría, «sin datos» explícito, sin ranking, 404 si el código no existe) y añade el encaje RF-18 con `activities`, `profile` y `companions`. Esto **cambia el contrato**: hay que regenerar `openapi.json` y `schema.d.ts`.
+- **Necesita:** **LB1-1 fusionado** en `main` (tabla `municipality_indicator`) y `build_db main` vuelto a ejecutar en local.
+- **Ojo:** si LB1-3 se fusiona antes, el ejecutor parte de un `main` que ya tiene `/sources`; no pasa nada, porque son funciones distintas de `main.py`.
+- **Prompt de ejecución:** `TAREAS={36,37}   RAMA={motor/b1-municipio}   BASE={main}   MANUALES_HECHOS={M-B1; LB1-1 fusionado y build_db main reejecutado}`, más la línea de ejecutor.
+- **Prompt de verificación:** `TAREAS={36,37}   RAMA={motor/b1-municipio}   BASE={main}`, más la línea de verificador.
+- **Comprobación rápida:** `cd app/api && .venv/bin/pytest -q` (incluido `test_contract.py`); `curl -s "localhost:8000/municipality/28107"` (Patones) da «sin datos» en deporte y `curl -s localhost:8000/municipality/28999` da 404. **Avisar al front y a los demás bloques** del cambio de contrato.
+
+### LB1-4 · EJECUTAR + VERIFICAR — Task 39: conectar Municipio y Fuentes en el front
+
+- **Qué hace:** `getMunicipality`, `listMunicipalities` y `getSources` llaman a la API, y se quitan los textos de ejemplo de esas dos pantallas. No toca el diseño, que es del bloque F.
+- **Necesita:** **LB1-2 y LB1-3 fusionados**, y `npm run contract` al día.
+- **Prompt de ejecución:** `TAREAS={39}   RAMA={front/b1-conexion}   BASE={main}   MANUALES_HECHOS={M-B1; LB1-2 y LB1-3 fusionados}`, más la línea de ejecutor.
+- **Prompt de verificación:** `TAREAS={39}   RAMA={front/b1-conexion}   BASE={main}`, más la línea de verificador.
+- **Comprobación rápida:** `cd app/frontend && npm test && npm run lint && npm run build`. Con `uvicorn` en `:8000` y `npm run dev`: Municipio (Getafe, Madrid, Patones) y Fuentes muestran datos reales.
+
+**Al cerrar el bloque:** desplegar (bloque D: copiar `gomad.duckdb` a la VM y hacer `restart api`) y anotar en la PR de documentación lo que el ejecutor diga que hay que cambiar en `CLAUDE.md`, `docs/arquitectura.md` y `docs/assets/requisitos_fuentes.json`.

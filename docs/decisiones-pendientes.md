@@ -161,7 +161,7 @@ Además: VPLA zonas verdes (166 municipios), sendas (224), vías pecuarias (1.69
 
 ## D-10 · Nombre
 
-GOATS (recomendado en el CLAUDE.md §1), MAD GOAT o GO MAD. El repositorio ya se llama GoMad. **Es cosa de cinco minutos**: mejor no dejarlo para después del jueves 15 (logo, dominio, textos).
+**Decidido el 15/10: GoMad** (*Guía de Ocio: Madrid Activo y Deportivo*), como el repositorio. Se barajaron GOATS, MAD GOAT y GO MAD.
 
 ## D-11 · Usos de IA del §6.5
 
