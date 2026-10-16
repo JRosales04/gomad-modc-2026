@@ -460,7 +460,7 @@ def load(path=None):
 - `nmc_deporte`: 1.358 filas, `CMUN` con 178 códigos (falta Patones 28107) → Patones NULL.
 - `nmc_busparadas`: `CMUN` con 209 códigos → cruce espacial de `UTM_X/UTM_Y` (25830): 179 municipios, 396 paradas fuera de la Comunidad (se descartan).
 - `nmc_estmetro` (15 municipios) + `nmc_estcerca` (**34**, no 33) por `CMUN` → 39 municipios con estación.
-- `green.parquet` (`area_m2`): **163** municipios con zonas verdes (no 162); `in_vpla` = 167, de ellos 4 sin ninguna zona verde (28016, 28039, 28063, 28146): regla `null` → NULL. Madrid sin filas → NULL; Getafe con valor.
+- `green.parquet` (`area_m2`): **163** municipios con zonas verdes (no 162); `in_vpla` = 167, de ellos 4 sin ninguna zona verde (28016, 28039, 28063, 28146): están en VPLA, así que valen 0 (DEC-09: NULL solo fuera de VPLA; cobertura **167**, revisión final). Madrid sin filas → NULL; Getafe con valor.
 - `vias_pecuarias`: `NM_LONG` en **metros** (igual a la longitud de la geometría en EPSG:25830). `CD_MUNI` que no es de los 179: `28077` (código antiguo de Lozoyuela-Navas-Sieteiglesias, 28901; 11 tramos) y `28906`–`28912` (distritos de Madrid anexionados; 37 tramos, 272 km). Ni 28079 ni 28901 tienen tramos con su código. Ruling: esos tramos se asignan por **cruce espacial** de su punto representativo (→ 28079 y 28901) en vez de ignorarse; si no, Madrid saldría con «0 km» falso. Cobertura **171** (no 169).
 - `areas_recreativas`: 84, sin código de municipio → cruce espacial de `NM_COOX/NM_COOY` (como `green.py`) → 55 municipios.
 - `eiel_nucleos`: 467 núcleos en 155 municipios; `CALIDADUMT` ∈ {BUENO 434, REGULAR 28, MALA 5}.
@@ -553,6 +553,7 @@ def test_patones_without_nomecalles_is_null(db):
 def test_green_null_outside_vpla(db):
     assert value(db, "28079", "green_m2_per_inhabitant") is None   # Madrid, sin VPLA
     assert value(db, "28065", "green_m2_per_inhabitant") > 0       # Getafe
+    assert value(db, "28016", "green_m2_per_inhabitant") == 0      # en VPLA sin zonas verdes: 0, no «sin datos»
     leaked = db.execute("SELECT count(*) FROM municipality_indicator i JOIN municipality m USING (ine_code) "
                         "WHERE i.key='green_m2_per_inhabitant' AND NOT m.in_vpla AND i.value IS NOT NULL").fetchone()[0]
     assert leaked == 0
@@ -567,7 +568,7 @@ def test_health_centres_total(db):
 @pytest.mark.slow
 @pytest.mark.parametrize("key, covered", [
     ("sport_facilities", 178), ("sport_facilities_per_1000", 178), ("catalog_activities", 179),
-    ("green_m2_per_inhabitant", 163),   # ficha: 162 (Ruling: datos del 16/10)
+    ("green_m2_per_inhabitant", 167),   # ficha: 162; hoy in_vpla = 167 (Ruling)
     ("drove_roads_km", 171),            # ficha: 169 (Ruling: 28077 y 289xx por cruce espacial)
     ("recreation_areas", 55), ("bus_stops_per_1000", 179),
     ("rail_stations", 39),              # ficha: metro 15, cercanías 33 (hoy 34); unión 39
@@ -626,7 +627,10 @@ def indicator_values(con, config):
     sport = _count(_shp("nmc_deporte")["CMUN"].map(ine_code))
     catalog = con.execute("SELECT d.ine_code, count(DISTINCT a.activity) AS n FROM destination_activity a "
                           "JOIN destination d ON d.id = a.destination_id GROUP BY 1").df().set_index("ine_code")["n"]
+    # DEC-09: NULL solo fuera de VPLA; un municipio de VPLA sin zonas verdes tiene 0 m2
+    in_vpla = [c for (c,) in con.execute("SELECT ine_code FROM municipality WHERE in_vpla").fetchall()]
     green = gpd.read_parquet(CLEAN / "green.parquet").groupby("ine_code")["area_m2"].sum()
+    green = green.reindex(in_vpla, fill_value=0.0)
     vp = gpd.read_file(RAW / "vias_pecuarias" / "vias_pecuarias.geojson").set_crs(25830, allow_override=True)
     vp_code = vp["CD_MUNI"].map(ine_code).where(lambda c: c.isin(codes))
     # 28077 (codigo antiguo de 28901) y 289xx (distritos de Madrid anexionados): por su punto representativo
