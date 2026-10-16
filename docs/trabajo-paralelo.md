@@ -111,6 +111,7 @@ Rangos de Task para que no choquen los números: **B1 33–39 · B2 40–46 y 68
 - **Es suyo:** `app/api/live/`, `app/config/realtime.yaml`, los cuerpos de `Repository.forecast` y `Repository.air_categories` (misma firma), `Repository.air_pattern`, la línea del `LiveStore` en `lifespan`, `app/api/services/conditions.py` y la función `conditions` de `main.py`, el trozo de `services/route.py` que elige el tráfico de cada tramo, el trozo de `services/recommend.py` que rellena el aire por hora, `app/ingest/traffic.py`, la función `air_pattern` en `build_db.py`, `app/ingest/jobs/`, `app/ingest/Dockerfile`, el servicio `ingest` en `app/deploy/docker-compose.yml`, `app/.env.example` (AEMET), `src/data/conditions.ts`. Detalle por Task en el plan.
 - **Sigue valiendo de DEC-13:** 4 peticiones/min a AEMET, reintento de un 429 tras 120 s, aviso «previsión antigua» con más de 12 h y pilotos primero. **Deja de valer:** la rotación horaria 1/6 desde la ingesta y `realtime.duckdb` para aire y previsión (se deja de leer; se borra tras la demo).
 - **Contrato:** solo la Task 68 lo cambia, y después de B1 (un bloque a la vez, §1).
+- **Ya existe (16/10):** `app/ingest/Dockerfile` + `app/ingest/scripts/init_data.sh` + `app/deploy/docker-compose.init.yml`, para inicializar los datos de un equipo nuevo. La Task 70 puede reutilizar la imagen (añadiendo el cron) en vez de crear otra.
 - **Necesita:** `AEMET_API_KEY` en `app/.env` (en la VM también) para la Task 42; nada más. LB2-1 y LB2-2 pueden empezar ya.
 
 ### Bloque B3 — Calor y hueco de Getafe
