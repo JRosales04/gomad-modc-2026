@@ -98,7 +98,7 @@ Los datos que caducan en horas (aire medido, previsión, tráfico) **no se guard
 **Ficheros:** Crear `app/config/realtime.yaml`, `app/api/live/__init__.py`, `app/api/live/store.py`, `app/api/tests/live/test_store.py`. Modificar `app/config/README.md` (una fila), `main.py` (`lifespan`: validar `realtime.yaml` y crear, arrancar y parar el `LiveStore`), `repository.py` (`__init__` con `live=None`) y `tests/conftest.py` (`GOMAD_LIVE=off`).
 
 **Valores de `realtime.yaml`** (criterio propio salvo `max_issued_age_h`, de DEC-13):
-- `air_cm`: URL del manifiesto de `aire_dia`, `ttl_s: 600`, `max_age_h: 3`, `timeout_s: 10`.
+- `air_cm`: URL del manifiesto de `aire_dia`, `ttl_s: 600`, `max_age_h: 4`, `timeout_s: 10`. **Cambiado el 16/10 por decisión del equipo** (antes 3 h): se usa la última medición de cada estación con su hora, el tope se aplica **por estación** y una estación que lo supera se sustituye por la siguiente más cercana con dato; `recommend.yaml` `air_reading_valid_h` pasa también a 4.
 - `air_ay`: URL del manifiesto de `ay_aire` y los mismos valores.
 - `forecast`: `url` con `{ine}`, `ttl_s: 3600`, `max_age_h: 12`, `timeout_s: 15`, `requests_per_min: 4`, `retry_429_s: 120`, `refetch_after_h: 6`, `pilots: ["28065", "28079", "28131"]`, `forecast_fallback_km: 10`, `max_issued_age_h: 12`.
 - `air_buffer_h: 24`, `tick_s: 5`.
@@ -110,7 +110,7 @@ Los datos que caducan en horas (aire medido, previsión, tráfico) **no se guard
   - `register(name, fetch)`, donde `fetch(store) -> (value, observed_at)`;
   - `refresh(name) -> bool`: no vuelve a pedir dentro del TTL y hace una sola descarga a la vez por fuente (lock sin espera);
   - `get(name) -> Entry | None`: `None` si `observed_at < now − max_age_h`;
-  - `entry(name)`, `http_get(source, url, headers=None, key="data") -> bytes` (en modo instantánea lee `snapshot_dir/<source>/<key>` y nunca abre conexiones), `start()`, `stop()`, `snapshot` (bool).
+  - `entry(name)`, `http_get(source, url, headers=None, key="data") -> (bytes, content_type)` (el `content_type` hace falta para la codificación de AEMET; en modo instantánea lee `snapshot_dir/<source>/<key>`, devuelve `content_type` vacío y nunca abre conexiones), `start()`, `stop()`, `snapshot` (bool).
 
 **Pasos:**
 - [ ] Escribir `tests/live/test_store.py` con estas pruebas: `test_within_ttl_does_not_refetch`, `test_portal_down_recent_value_is_stale`, `test_portal_down_old_value_is_none`, `test_slow_portal_does_not_block_get`, `test_concurrent_refresh_single_request`, `test_snapshot_mode_never_opens_connections`, `test_realtime_yaml_without_max_age_names_source` (además, el `realtime.yaml` real pasa la validación).
@@ -147,7 +147,7 @@ Los datos que caducan en horas (aire medido, previsión, tráfico) **no se guard
 **Ficheros:** Crear `live/forecast.py`, `tests/live/test_forecast.py` y `tests/data/aemet_28065.json` (copia de la muestra de ingest). Modificar el cuerpo de `Repository.forecast`. `.env.example` no cambia: `download_sources.py` usa todavía `AEMET_MUNICIPALITIES` y `AEMET_PAUSE_S`, y así se dirá en el informe.
 
 **Interfaces que produce:**
-- `decode(raw, charset=None)`.
+- `decode(raw, content_type="")` (usa el `content_type` de `http_get`).
 - `parse_forecast(doc) -> (series {ts: (temp, feels_like, precip_prob, precip)}, issued)`. Solo cuenta las horas con temperatura; `probPrecipitacion` se toma de la franja de 6 h que contiene la hora; «Ip» → 0.
 - `RateLimiter(per_min, now)`, con `allow() -> bool` (ventana de 60 s; cuenta cada petición HTTP, 2 por municipio).
 - `ForecastFeed(store, cfg, codes, centers=None, cache_path=None, key=None)`, con estos métodos:
