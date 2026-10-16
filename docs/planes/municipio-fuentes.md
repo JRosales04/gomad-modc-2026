@@ -30,6 +30,226 @@
 - **Pruebas clave** (`slow` con datos reales): 429 centros de salud + consultorios en 179 municipios; educativos ALTA 3.906 en **156** municipios; 0 filas «RESERVADO»; DEA en **172** municipios por cruce espacial; ninguna coordenada fuera de la Comunidad. Más una prueba rápida con muestra pequeña: coma decimal → float.
 - **Terminado cuando:** `python -m normalize services` escribe `clean/service.parquet` y las pruebas pasan sin saltarse.
 
+#### Detalle de la Task 33 (ejecutor de LB1-1, 16/10)
+
+**Rol:** Datos · **Servicio:** `app/ingest/` · **Depende de:** Task 16 (`common.py`), `municipios` descargado · **Duración:** 1 h
+
+**Ficheros:** Crear `normalize/services.py`, `tests/test_services.py`.
+
+**Datos reales comprobados el 16/10** (`app/data/raw/`, descarga de hoy; las cifras de la división son de días antes):
+- `sanitarios` (46.000 filas): `centro_nro_registro`, `centro_tipo`, `municipio_nombre`, `localizacion_coordenada_x/_y` (25830). `centro_tipo` y la coordenada son únicos por centro. 15.885 centros; **430** (no 429) con `centro_tipo` ∈ {«Centro de salud», «Consultorio de atención primaria»}, en 179 municipios por nombre, 8 sin coordenadas. 5 centros con coordenada `-109, -208` (fuera).
+- `farmacias` (2.956): `FARMACIA_NRO_SOE` (único), `MUNICIPIO_NOMBRE`, `LOCALIZACION_COORDENADA_X/_Y` (25830, coma decimal en 2.760; 4 vacías). Cruce espacial → 160 municipios.
+- `educativos` (7.757): `CODIGO` (único), `TIPO_EXT`, `CDMUNI`, `UTM_X/_Y` (25830), `SITUACIÓN`. ALTA 3.906 en 156 municipios; 55 sin coordenadas.
+- `atencion_social` (2.643): `numero_registro` (único), `tipo`, `municipio_codigo`, `direccion_coor_x/_y` (25830). **175** (no 177) con `direccion_coor_x` = «RESERVADO» (también municipio, calle y CP); otras 2 solo tienen el teléfono reservado y sí se pueden situar. Quedan 2.468 en 138 municipios; 84 sin coordenadas.
+- `desfibriladores` (13.156): `codigo_dea` (1 repetido), `tipo_establecimiento`, `municipio_codigo`, `direccion_coordenada_x/_y` (25830) y `direccion_longitud/_latitud` (coma decimal). Cruce espacial con las UTM (como `route_poi` `aed` en `furniture.py`) → 172 municipios, ninguno sin casar.
+- EIEL `nucleos`: **no** entra aquí. `good_3g_pct` es un % de núcleos, no un servicio situado; lo calcula la Task 35 leyendo `eiel_nucleos` (Ruling en el ledger).
+
+**Interfaces:**
+- Consume: `common.RAW`, `common.filter_region`, `common.ine_code`, `common.latest_csv`, `common.municipalities`, `common.normalize_name`, `common.read_csv`, `common.to_float`, `common.to_wgs84`, `common.assign_municipality`, `common.write`; `normalize.normalizer`.
+- Produce: `app/data/clean/service.parquet` (GeoParquet, EPSG:4326), una fila por servicio con municipio conocido. Columnas: `id` (`'{source}:{id_origen}'`, único), `source` (id de `download_sources.py`), `category` (`health` | `pharmacy` | `education` | `social` | `aed`), `subtype` (`centro_tipo`, `TIPO_EXT`, `tipo`, `tipo_establecimiento`; nulo en farmacias), `ine_code` (str 5), `geometry` (punto o **nula**).
+- Reglas: `ine_code` es el que declara la fuente (`municipio_nombre` normalizado, `CDMUNI`, `municipio_codigo`), salvo `farmacias` y `desfibriladores`, que van por **cruce espacial** con `municipality.geom` cuando tienen coordenadas (DEC-09). Coordenada ausente, a 0 o fuera de la Comunidad (`common.filter_region`) → `geometry` nula, pero la fila se queda si conoce su municipio: así los indicadores cuentan los 430 centros y los 3.906 educativos (Ruling: «situado» = con municipio; el mapa solo pinta las geometrías no nulas). Fila sin municipio → fuera.
+- Funciones: `located(df, x, y, crs) -> GeoDataFrame` (todas las filas, coma decimal, geometría nula si falta coordenada), `health(df, by_name)`, `pharmacies(df, by_name)`, `schools(df)`, `social(df)`, `aeds(df)` (cada una → `GeoDataFrame` con `COLUMNS`), `build(parts) -> GeoDataFrame`.
+
+- [ ] **Paso 1: prueba que falla** — `tests/test_services.py`:
+
+```python
+import geopandas as gpd
+import pandas as pd
+import pytest
+
+from common import CLEAN, RAW, latest_csv, municipalities, read_csv, to_wgs84
+from normalize import load_all
+from normalize.services import health, located, schools, social
+
+HEALTH_TYPES = {"Centro de salud", "Consultorio de atención primaria"}
+
+
+def test_located_parses_comma_decimal_and_keeps_rows_without_coordinates():
+    df = pd.DataFrame({"x": ["440267,13", ""], "y": ["4475425,75", "4475425"]})
+    g = located(df, "x", "y", 25830)
+    lon, lat = to_wgs84([440267.13], [4475425.75])
+    assert len(g) == 2 and g.crs.to_epsg() == 4326
+    assert g.geometry.iloc[0].x == pytest.approx(lon[0]) and g.geometry.iloc[0].y == pytest.approx(lat[0])
+    assert g.geometry.iloc[1] is None
+
+
+def test_health_one_row_per_centre_by_name():
+    df = pd.DataFrame({"centro_nro_registro": ["C1", "C1", "C2"],
+                       "centro_tipo": ["Centro de salud", "Centro de salud", "Clínica dental"],
+                       "municipio_nombre": ["Rozas de Madrid (Las)", "Rozas de Madrid (Las)", "Getafe"],
+                       "localizacion_coordenada_x": ["", "", "437838"],
+                       "localizacion_coordenada_y": ["", "", "4461942"]})
+    g = health(df, {"las rozas de madrid": "28127", "getafe": "28065"})
+    assert list(g["id"]) == ["sanitarios:C1", "sanitarios:C2"]
+    assert list(g["ine_code"]) == ["28127", "28065"] and g.geometry.iloc[0] is None
+    assert list(g["subtype"]) == ["Centro de salud", "Clínica dental"]
+
+
+def test_schools_only_alta_and_social_without_reserved():
+    s = schools(pd.DataFrame({"CODIGO": ["1", "2"], "TIPO_EXT": ["CEIP", "CEIP"], "CDMUNI": ["65", "065"],
+                              "UTM_X": ["437838", ""], "UTM_Y": ["4461942", ""], "SITUACIÓN": ["ALTA", "BAJA"]}))
+    assert list(s["id"]) == ["educativos:1"] and list(s["ine_code"]) == ["28065"]
+    a = social(pd.DataFrame({"numero_registro": ["C1", "C2"], "tipo": ["RESIDENCIAS", "RESIDENCIAS"],
+                             "municipio_codigo": ["079", "RESERVADO"],
+                             "direccion_coor_x": ["443644", "RESERVADO"], "direccion_coor_y": ["4476188", "RESERVADO"]}))
+    assert list(a["id"]) == ["atencion_social:C1"] and list(a["ine_code"]) == ["28079"]
+
+
+@pytest.fixture(scope="module")
+def service():
+    load_all()["services"]()
+    return gpd.read_parquet(CLEAN / "service.parquet")
+
+
+@pytest.mark.slow
+def test_service_points_inside_region(service):
+    assert service.crs.to_epsg() == 4326
+    assert service["id"].is_unique
+    assert service["ine_code"].str.match(r"^28\d{3}$").all()
+    assert set(service["category"]) == {"health", "pharmacy", "education", "social", "aed"}
+    region = municipalities().union_all()
+    assert service.geometry.dropna().intersects(region).all()
+
+
+@pytest.mark.slow
+def test_health_centres(service):
+    # division: 429; la descarga del 16/10 trae 430 (Ruling en el ledger)
+    hc = service[(service.category == "health") & service.subtype.isin(HEALTH_TYPES)]
+    assert len(hc) == 430 and hc.ine_code.nunique() == 179
+
+
+@pytest.mark.slow
+def test_schools_alta(service):
+    s = service[service.category == "education"]
+    assert len(s) == 3906 and s.ine_code.nunique() == 156
+
+
+@pytest.mark.slow
+def test_social_without_reserved(service):
+    raw = read_csv(latest_csv(RAW / "atencion_social", ["numero_registro", "direccion_coor_x"]))
+    reserved = "atencion_social:" + raw.loc[raw.direccion_coor_x == "RESERVADO", "numero_registro"]
+    assert len(reserved) == 175                                   # division: 177 (Ruling en el ledger)
+    s = service[service.category == "social"]
+    assert not s["id"].isin(reserved).any() and len(s) == len(raw) - len(reserved)
+    assert not s["subtype"].eq("RESERVADO").any()
+
+
+@pytest.mark.slow
+def test_aed_and_pharmacies_by_spatial_join(service):
+    aed = service[service.category == "aed"]
+    assert aed.ine_code.nunique() == 172                          # municipio_codigo daria 161
+    assert aed.geometry.notna().all()
+    assert service[service.category == "pharmacy"].ine_code.nunique() == 160
+```
+
+- [ ] **Paso 2:** Run: `.venv/bin/pytest tests/test_services.py -q` → Esperado: FAIL en la recogida con `ModuleNotFoundError: No module named 'normalize.services'`.
+- [ ] **Paso 3: implementación** — `normalize/services.py`:
+
+```python
+"""Servicios de la Comunidad -> clean/service.parquet (V-D1, DEC-09).
+
+Una fila por servicio con municipio conocido. ine_code: el que declara la fuente (nombre o codigo), salvo
+farmacias y DEA, que van por cruce espacial con municipality.geom. Geometria en EPSG:4326, nula si la fuente
+no trae coordenadas o caen fuera de la Comunidad: la fila sigue contando en los indicadores, el mapa no la pinta.
+"""
+import geopandas as gpd
+import pandas as pd
+
+from common import (RAW, assign_municipality, filter_region, ine_code, latest_csv, municipalities, normalize_name,
+                    read_csv, to_float, to_wgs84, write)
+from normalize import normalizer
+
+COLUMNS = ["id", "source", "category", "subtype", "ine_code", "geometry"]
+SPATIAL = ("farmacias", "desfibriladores")
+
+
+def located(df, x, y, crs):
+    """Todas las filas de df con su punto; nulo si falta una coordenada. Acepta coma decimal."""
+    xs = df[x].map(to_float).to_numpy(dtype=float)
+    ys = df[y].map(to_float).to_numpy(dtype=float)
+    ok = ~(pd.isna(xs) | pd.isna(ys))
+    if crs == 25830 and ok.any():
+        xs[ok], ys[ok] = to_wgs84(xs[ok], ys[ok])
+    g = gpd.GeoDataFrame(df.reset_index(drop=True), geometry=gpd.points_from_xy(xs, ys), crs=4326)
+    g.loc[~ok, "geometry"] = None
+    return g
+
+
+def _frame(g, source, category, ids, subtype, ine):
+    return g.assign(id=source + ":" + ids.astype(str).str.strip(), source=source, category=category,
+                    subtype=subtype, ine_code=ine)[COLUMNS]
+
+
+def health(df, by_name):
+    """sanitarios trae una fila por servicio: una por centro (centro_tipo y coordenada son del centro)."""
+    g = located(df.drop_duplicates("centro_nro_registro"), "localizacion_coordenada_x", "localizacion_coordenada_y",
+                25830)
+    return _frame(g, "sanitarios", "health", g["centro_nro_registro"], g["centro_tipo"].str.strip(),
+                  g["municipio_nombre"].map(normalize_name).map(by_name))
+
+
+def pharmacies(df, by_name):
+    g = located(df, "LOCALIZACION_COORDENADA_X", "LOCALIZACION_COORDENADA_Y", 25830)
+    return _frame(g, "farmacias", "pharmacy", g["FARMACIA_NRO_SOE"], None,
+                  g["MUNICIPIO_NOMBRE"].map(normalize_name).map(by_name))
+
+
+def schools(df):
+    """Solo SITUACIÓN = ALTA (hay 3.552 de baja)."""
+    g = located(df[df["SITUACIÓN"].str.strip() == "ALTA"], "UTM_X", "UTM_Y", 25830)
+    return _frame(g, "educativos", "education", g["CODIGO"], g["TIPO_EXT"].str.strip(), g["CDMUNI"].map(ine_code))
+
+
+def social(df):
+    """Fuera los centros protegidos: direccion_coor_x «RESERVADO» (tambien municipio y calle)."""
+    g = located(df[df["direccion_coor_x"].str.strip() != "RESERVADO"], "direccion_coor_x", "direccion_coor_y", 25830)
+    return _frame(g, "atencion_social", "social", g["numero_registro"], g["tipo"].str.strip(),
+                  g["municipio_codigo"].map(ine_code))
+
+
+def aeds(df):
+    """Mismas coordenadas que route_poi aed (furniture.py); municipio_codigo solo de respaldo sin coordenadas."""
+    g = located(df.drop_duplicates("codigo_dea"), "direccion_coordenada_x", "direccion_coordenada_y", 25830)
+    return _frame(g, "desfibriladores", "aed", g["codigo_dea"], g["tipo_establecimiento"].str.strip(),
+                  g["municipio_codigo"].map(ine_code))
+
+
+def build(parts):
+    out = gpd.GeoDataFrame(pd.concat(parts, ignore_index=True), geometry="geometry", crs=4326)
+    has = out.geometry.notna()
+    inside, outside = filter_region(out[has])
+    out.loc[has & ~out.index.isin(inside.index), "geometry"] = None
+    spatial = out["source"].isin(SPATIAL) & out.geometry.notna()
+    joined = assign_municipality(out.loc[spatial, ["geometry"]].assign(ine_code=None))
+    out.loc[spatial, "ine_code"] = joined["ine_code"]
+    dropped = int(out["ine_code"].isna().sum())
+    out = out[out["ine_code"].notna()].reset_index(drop=True)
+    print(f"   service: {len(out)} servicios ({outside} fuera de la Comunidad sin punto, {dropped} sin municipio):",
+          out["category"].value_counts().to_dict())
+    return out
+
+
+@normalizer("services")
+def run():
+    by_name = dict(zip(municipalities()["name_norm"], municipalities()["ine_code"]))
+    def raw(source, columns):
+        return read_csv(latest_csv(RAW / source, columns))
+    parts = [
+        health(raw("sanitarios", ["centro_nro_registro", "centro_tipo", "municipio_nombre"]), by_name),
+        pharmacies(raw("farmacias", ["FARMACIA_NRO_SOE", "MUNICIPIO_NOMBRE"]), by_name),
+        schools(raw("educativos", ["CODIGO", "CDMUNI", "SITUACIÓN"])),
+        social(raw("atencion_social", ["numero_registro", "municipio_codigo", "direccion_coor_x"])),
+        aeds(raw("desfibriladores", ["codigo_dea", "municipio_codigo", "direccion_coordenada_x"])),
+    ]
+    return write(build(parts), "service")
+```
+
+- [ ] **Paso 4:** Run: `.venv/bin/pytest tests/test_services.py -q -m "not slow"` → Esperado: `3 passed`. Después `.venv/bin/python -m normalize services` → Esperado: `-> services: …/clean/service.parquet` y la línea `service:` con las cinco categorías. Y `.venv/bin/pytest tests/test_services.py -q` → Esperado: `8 passed` (ninguno saltado).
+- [ ] **Paso 5:** Run: `.venv/bin/pytest -q` → Esperado: los mismos 4 fallos previos de la línea base (ledger, «Preparación») y ninguno nuevo.
+- [ ] **Paso 6: commit** — `git -C ../.. add app/ingest/normalize/services.py app/ingest/tests/test_services.py && git -C ../.. commit -m "Datos: normalizador de servicios -> clean/service.parquet (B1 Task 33)"`
+
+**Terminado cuando:** `python -m normalize services` escribe `clean/service.parquet` con las cinco categorías y `tests/test_services.py` pasa entero sin saltarse.
+
 ### Task 34: B1-D2 · `app/config/indicators.yaml` y su validación
 - **Alcance:** los **14 indicadores** de la tabla DEC-09 de la ficha B1 (`key`, `category`, `label`, `source`, `unit`, regla «sin filas» `zero` | `null`, `year`), y la sección `fit` del encaje RF-18 (`own_criterion: true`): qué indicador mira cada perfil y cada «Salgo con…» (`senior` → `health_centres` y `aed_per_1000`; `kids` → `schools`; `stroller` → `green_m2_per_inhabitant`; `dog` → áreas caninas de `route_poi`). Validación al cargar: claves obligatorias, `category` dentro de las del contrato (`Indicator.category` en `app/api/schemas.py`) y `key` sin repetir.
 - **Es suyo:** `app/config/indicators.yaml`, `app/config/README.md` (una línea), la validación en `app/ingest/` (lee el YAML) y su prueba.
