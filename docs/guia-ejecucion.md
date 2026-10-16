@@ -1,5 +1,7 @@
 # Guía de ejecución del plan — GoMad (14–20/10/2026)
 
+> **Histórico desde el 17/10/2026.** El documento de trabajo vigente es `docs/pendientes-app.md`; este ya no se actualiza.
+
 Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso a paso con Claude Code. El plan dice *qué* hay que construir; esta guía dice **en qué orden lanzarlo, con qué prompt, qué necesita cada paso y cómo saber que ha salido bien**.
 
 - **Actualizada:** jueves 15/10/2026, 16:00 (L9 fusionado: backend de datos completo; falta el front base (L3) y P1).

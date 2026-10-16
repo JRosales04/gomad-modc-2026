@@ -119,6 +119,8 @@ cd app/api && .venv/bin/uvicorn main:app --reload --port 8000   # el front en de
 
 ### 3.2 Documentación de contexto (`docs/`)
 
+**Documento de trabajo vigente (desde el 17/10): `docs/pendientes-app.md`** — estado, lo que falta, ficha de cada tarea, reglas de trabajo en paralelo, cómo lanzar/verificar y despliegue. `docs/trabajo-paralelo.md` y `docs/guia-ejecucion.md` son históricos.
+
 Los markdown de `docs/` son **contexto del proyecto**: léelos cuando la tarea toque su tema, en vez de deducirlo del código. Prioridad si se contradicen: este archivo → `docs/arquitectura.md` (prevalece sobre §6) → `docs/plan-implementacion.md` → el resto.
 
 | Documento | Qué contiene | Cuándo leerlo |
