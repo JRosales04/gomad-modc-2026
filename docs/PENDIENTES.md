@@ -37,6 +37,8 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
 - **Datos generados (no se suben):** `data/perfil/perfil.json` (perfil por columna) y `data/perfil/municipios_referencia.json`.
 
 ### P-01 · ✅ Clave de AEMET y verificación de su API
+
+> Histórico: AEMET sustituida por Open-Meteo (DEC-16, 16/10); la clave ya no se usa.
 - **Hecho:** 14/10/2026. `app/.env` creado por el equipo; AEMET en el script de descarga (Task 3) y verificado con `app/ingest/scripts/verify_aemet.py` (Task 4). Esquema, codificación y cuota en CLAUDE.md §7.1. Muestra de Getafe en `app/ingest/tests/data/aemet_28065.json`.
 - **Apuntado:** 14/10/2026 · **Para:** mié 14 (CLAUDE.md §10).
 - **Qué:** `.env` todavía **no existe**. El esquema de AEMET está «sin verificar» (CLAUDE.md §7.1). Además, el script de descarga **no incluye AEMET**.
@@ -130,6 +132,8 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
   Faltan las tomas de las 09:00 y las 12:00 (la tarea se ejecutó a partir de las 15:00): sigue abierto para saber la hora exacta del cambio de día (entre las 02:08 y las 15:12). Mientras tanto la ingesta ya lee la fecha de cada fila (`normalize/air.py`) y no supone «hoy».
 
 ### P-13 · Cuota de AEMET: `AEMET_PAUSE_S` mal calculado y propuesta sin presentar
+
+> **Superado por DEC-16 (16/10):** AEMET se elimina y la previsión pasa a Open-Meteo (los 179 municipios en una petición, sin clave). Lo que sigue es histórico.
 - **✅ Decidido el 16/10 (DEC-13):** pilotos cada hora + rotación de 1/6 del resto, `AEMET_PAUSE_S=30` (`docs/decisiones-pendientes.md` DEC-13; lo implementa B2).
 - **Apuntado:** 14/10/2026 (verificación de la Task 4) · **Para:** antes de programar la descarga horaria (sáb 17, S-D2).
 - **Qué:**

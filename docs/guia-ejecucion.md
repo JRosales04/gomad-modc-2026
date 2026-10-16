@@ -71,7 +71,7 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 | Tasks 18–19 — aire, previsión y bases DuckDB: `gomad.duckdb` (destinos, actividades, municipios, estaciones, mobiliario) y `realtime.duckdb` (aire, ICA horario, previsión) | ✅ fusionadas | PR #19 |
 | D2 — DEC-05, 07, 07b, 08 | ✅ volcadas en `app/config/` (`rules.yaml`, `weights.yaml`, `activities.yaml`; `routing.yaml` ya no provisional) | PR #15 |
 | DEC-P04, DEC-10, DEC-11, DEC-12 | ✅ P-04 aplicado; nombre **GoMad**; IA n.º 1 descartado (palabras clave) y n.º 2 pendiente; desnivel **sí** (Should, sábado con S-R1; MDT05 comprobado por WCS) | PR #16, #17 |
-| ⚠️ Previsión AEMET | `realtime.duckdb` solo tiene Getafe y Madrid, descargadas el 14/10 (hasta el 16/10 07:00): hay que recargar antes de probar; DEC-13 ✅ (16/10: pilotos cada hora + rotación, todos cada 6 h), lo implementa B2 | DEC-13, S-D2 |
+| ✅ Previsión (DEC-16: **Open-Meteo**, 179 municipios en una petición, sin clave; rama `motor/open-meteo`, Tasks 72–79 de `docs/planes/open-meteo.md`). *Histórico:* Previsión AEMET | `realtime.duckdb` solo tenía Getafe y Madrid, descargadas el 14/10 (hasta el 16/10 07:00): hay que recargar antes de probar; DEC-13 ✅ (16/10: pilotos cada hora + rotación, todos cada 6 h), lo implementa B2 | DEC-13, S-D2 |
 | ⚠️ Hueco de Getafe | 0 destinos para nadar, tenis y baloncesto (Getafe no está en EIEL y Nomecalles no da el deporte): decidir en P1 (más palabras clave u OSM `sport=*`) | `app/config/activities.yaml` |
 | **P-13** — cuota de AEMET (`AEMET_PAUSE_S` mal calculado) | ✅ decidido el 16/10 (DEC-13); lo implementa B2 | `docs/PENDIENTES.md` → DEC-13 abajo |
 
@@ -488,4 +488,4 @@ Bloque B2 de `docs/trabajo-paralelo.md` (rediseñado el 16/10, DEC-15), dividido
 - **Prompt de verificación:** `TAREAS={70,71}   RAMA={datos/b2-recarga}   BASE={main}`, más la línea de verificador.
 - **Comprobación rápida:** `docker compose -f app/deploy/docker-compose.yml run --rm ingest jobs/run_level.sh daily`; con polen, `/conditions/28065` trae polen con su fecha.
 
-**Al cerrar el bloque:** desplegar (bloque D) con `AEMET_API_KEY` en el `app/.env` de la VM; anotar en la PR de documentación los cambios de `CLAUDE.md` §6.4 (el nivel horario pasa a la API) y §7.1, `docs/arquitectura.md` (flujo de datos vivos) y, si entra el polen, `requisitos_fuentes.json`.
+**Al cerrar el bloque:** desplegar (bloque D); desde DEC-16 la previsión es de Open-Meteo y `AEMET_API_KEY` ya no hace falta; anotar en la PR de documentación los cambios de `CLAUDE.md` §6.4 (el nivel horario pasa a la API) y §7.1, `docs/arquitectura.md` (flujo de datos vivos) y, si entra el polen, `requisitos_fuentes.json`.
