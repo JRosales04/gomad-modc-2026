@@ -130,6 +130,7 @@ Estado: ⬜ por hacer · 🔶 bloqueado · ✅ hecho
   Faltan las tomas de las 09:00 y las 12:00 (la tarea se ejecutó a partir de las 15:00): sigue abierto para saber la hora exacta del cambio de día (entre las 02:08 y las 15:12). Mientras tanto la ingesta ya lee la fecha de cada fila (`normalize/air.py`) y no supone «hoy».
 
 ### P-13 · Cuota de AEMET: `AEMET_PAUSE_S` mal calculado y propuesta sin presentar
+- **✅ Decidido el 16/10 (DEC-13):** pilotos cada hora + rotación de 1/6 del resto, `AEMET_PAUSE_S=30` (`docs/decisiones-pendientes.md` DEC-13; lo implementa B2).
 - **Apuntado:** 14/10/2026 (verificación de la Task 4) · **Para:** antes de programar la descarga horaria (sáb 17, S-D2).
 - **Qué:**
   1. `app/.env.example` pone `AEMET_PAUSE_S=10` y dice «~6 peticiones/min», pero la pausa es **por municipio** y cada municipio son **2 peticiones** (`download_aemet`): salen **~12 peticiones/min**. El 14/10 dio 429 tras 6 peticiones en ~1 min, así que con 10 s la ejecución horaria fallará casi siempre (`download_aemet` es todo o nada).

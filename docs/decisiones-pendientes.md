@@ -11,14 +11,15 @@ Orden propuesto: primero las **bloqueantes** (D-01 a D-04), que impiden empezar 
 | D-03 | Proveedor de IA (F6) | F6, `.env` | El que se pueda dar de alta mañana; ver criterios. **Decidido el 15/10: OCI Language** (arquitectura §10, A-12) |
 | D-04 | Geocodificación (RF-01) | Primera pantalla | Buscador de Nomecalles + callejero completo |
 | D-05 | Regla de aire por perfil | Motor (RF-09, RF-15) | Derivada del texto del BOE |
-| D-06 | Calor: qué umbral usar | Motor (RF-09) | Desbloqueado: umbrales oficiales, tabla municipio → zona (`docs/assets/heat_zones.csv`) y propuesta en `docs/assets/umbrales.md` §2.3 |
+| D-06 | Calor: qué umbral usar | Motor (RF-09) | **Decidido el 16/10:** «día de calor» por zona meteosalud (Tmáx horaria > umbral de Sanidad), perfiles de riesgo sin exterior de 14 a 19 h; sin niveles |
 | D-07 | Pesos por defecto y velocidades | Motor (RF-07) | Propuesta de partida abajo |
 | D-08 | Tabla actividad → destino | RF-02, RF-04 | Propuesta con cifras reales abajo |
-| D-09 | Indicadores de F5 | F5 | Uno o dos por categoría, con cobertura conocida |
+| D-09 | Indicadores de F5 | F5 | **Decidido el 16/10:** 14 indicadores en 7 categorías; encaje = lista Sí/No/Sin datos + «Cumple N de M» |
 | D-10 | Nombre | Front, dominio | GOATS |
 | D-11 | Usos de IA (§6.5) | Alcance | Solo el n.º 1 (deporte por instalación). **Decidido el 15/10:** n.º 1 descartado (sin LLM), n.º 2 pendiente (CLAUDE.md §11) |
 | D-12 | Desnivel (IGN) | RF-13 | Fuera del MVP |
-| D-13 | Despliegue | Domingo | Decidir el sábado |
+| D-13 | Despliegue | Domingo | Resuelto en `docs/arquitectura.md` §1 (Compose en VM de OCI) |
+| DEC-13 (P-13) | Cuota de AEMET | B2, F2 en 179 municipios | **Decidido el 16/10:** pilotos cada hora + rotación de 1/6 del resto (todos cada 6 h), `AEMET_PAUSE_S=30` |
 | D-14 | PDF de presentaciones en el repo | Nada | Dejarlos |
 
 ---
@@ -100,6 +101,14 @@ Orden propuesto: primero las **bloqueantes** (D-01 a D-04), que impiden empezar 
 **Recomendación:** combinación probable: «día en alerta» (Sanidad o AEMET) → proponer cubierto o franja temprana; dentro del día, elegir la hora con menor sensación térmica (propuesta detallada en `umbrales.md` §2.3).
 **Desbloqueado: umbrales oficiales, tabla municipio → zona (`docs/assets/heat_zones.csv`) y propuesta en `docs/assets/umbrales.md` §2.3.**
 
+**Decidido el 16/10: opción C, «día de calor» simple (sin niveles de la Ecuación 1).**
+- **Día de calor** (municipio, día) = máximo de la `temperatura` horaria de AEMET de ese día **>** umbral de Tmáx de su zona meteosalud (35,8 / 37,4 / 39,2 °C; plan de Sanidad 2026, Anexo I pág. 41; zona por `heat_zones.csv`). Oficial: umbrales y zonas. Criterio propio: usar el máximo horario como Tmáx y evaluar día a día, sin el sumatorio de 3 días.
+- **Perfiles de riesgo:** `senior`, `stroller` y «Salgo con…» `kids` (Anexo V pág. 52: mayores de 65 y menores de 4 años; que carrito o niños sean menores de 4 años es lectura propia).
+- **Efecto:** en día de calor y con perfil de riesgo, las horas de 14:00 a 19:00 no valen para exterior (RF-09: cubierto u otra franja), citando «especialmente entre las 14:00h y las 19:00h» (Anexo V pág. 52; convertirlo en bloqueo es criterio propio). Entre las horas válidas, desempate por menor `sensTermica` (criterio propio; hace falta para el caso de Carmen). Resto de perfiles: solo aviso informativo «Día de calor en tu zona», sin bloqueo.
+- Se aplica todo el año (el plan se activa del 16/5 al 30/9: criterio propio). Se descartan la propuesta completa por niveles (A) y el umbral propio único de sensación térmica (D).
+- **Caso de Carmen:** con 36 °C en Getafe (zona 722802, umbral 37,4) **no** es día de calor. El guion pasa a **38 °C** con previsión de reserva grabada → «Ahora no: mejor a las 21:00» (la previsión es horaria: no puede salir 20:30).
+- Formato de `heat` en `rules.yaml` y ficheros afectados: ficha de B3 en `docs/trabajo-paralelo.md`.
+
 ## D-07 · Pesos por defecto y velocidades (RF-07, RF-16)
 
 **Propuesta de partida** (números redondos para mover en la demo; **no** son datos oficiales):
@@ -143,6 +152,13 @@ Además: VPLA zonas verdes (166 municipios), sendas (224), vías pecuarias (1.69
 - Conectividad: EIEL núcleos 155.
 - Social: 137.
 
+**Coberturas re-medidas el 16/10** (DuckDB sobre `app/data/gomad.duckdb`, `app/data/clean/` y `app/data/raw/`). No cuadran: **educación 156** (no 170; 3.906 centros en ALTA por `CDMUNI`), **zonas verdes VPLA 162** (166 es `in_vpla`; 4 no tienen «Zonas Verdes»), **desfibriladores 172** por cruce espacial (161 por `municipio_codigo`), **áreas recreativas 55** (no 51), **cercanías 33 municipios / 92 estaciones** y metro 296 estaciones (no 34 / 297). Coinciden: salud 179 por `municipio_nombre` (429 centros; 8 sin coordenadas), farmacias 160, vías pecuarias 169 (sin los códigos `289xx` que no son municipios), bus 179 por cruce espacial (`CMUN` de `busparadas` trae 209 códigos: no usarlo), deporte Nomecalles 178, conectividad 155, social 137 (2.471 centros sin los 177 «RESERVADO»).
+
+**Decidido el 16/10: opción A (14 indicadores) y encaje como lista de comprobación.**
+- Regla de valores: en **registros regionales completos** (farmacias, educativos, sanitarios, social, DEA, metro y cercanías, áreas recreativas) un municipio sin filas vale **0**; en **fuentes parciales** (EIEL, VPLA, Nomecalles `deporte`) vale **NULL = «sin datos»**. Tasas por 1.000 hab. con `population.parquet` (2025, 179).
+- **Encaje (RF-18):** solo del municipio consultado. Una línea Sí / No / Sin datos por cada actividad elegida («Pádel: sí, 4 sitios») y por cada necesidad del perfil (mayor: centros de salud y DEA; «con niños»: centros educativos; carrito: zonas verdes), más un resumen «Cumple N de M». Sin nota, sin orden entre municipios y sin percentiles. Qué necesidad mira cada perfil es criterio propio.
+- Lista con fuente, unidad y cálculo: ficha de B1 en `docs/trabajo-paralelo.md`. Descartados (C): bibliotecas EIEL (104), comercio Nomecalles (23–27) y mobiliario OSM.
+
 ## D-10 · Nombre
 
 GOATS (recomendado en el CLAUDE.md §1), MAD GOAT o GO MAD. El repositorio ya se llama GoMad. **Es cosa de cinco minutos**: mejor no dejarlo para después del jueves 15 (logo, dominio, textos).
@@ -158,6 +174,25 @@ RF-13 es Should y la fuente está sin verificar. **Recomendación:** fuera del M
 ## D-13 · Despliegue
 
 Tiene que haber HTTPS para la geolocalización. Opciones: Render, Railway, OCI (patrocinador). Decidir el sábado, cuando se sepa qué pesa la API y si se usa DuckDB.
+Resuelto en `docs/arquitectura.md` §1 (D-13: Docker Compose en VM de OCI). **No confundir con DEC-13** (cuota de AEMET, abajo): en `docs/guia-ejecucion.md` y `docs/trabajo-paralelo.md` DEC-13 es P-13.
+
+## Decisiones menores del 16/10 (teselas, dominio, hueco de Getafe)
+
+- **Teselas del mapa (bloque M):** OpenFreeMap (online, gratis, sin clave) desde ya; PMTiles local de la Comunidad el lunes para la demo sin red (L-4).
+- **Dominio (A-03, V-F4):** subdominio gratuito de DuckDNS apuntando a la IP de la VM; `DOMAIN` en `app/deploy/.env` de la VM.
+- **Hueco de Getafe (B3):** 0 destinos de nadar, tenis y baloncesto porque Getafe no está en EIEL y los nombres de Nomecalles no lo dicen. Se descartan las palabras clave (habría que adivinar que «Polideportivo» tiene piscina) y OSM amplio (falsos positivos de comunidades y colegios). **Decidido: OSM filtrado** como fuente de destinos: centros deportivos y estadios con `sport` y nombre; pistas de tenis, baloncesto y pádel con nombre o `access=yes|public`; piscinas solo con nombre o `access=public`; `suitability` 0,8. Detalle en la ficha B3 de `docs/trabajo-paralelo.md`.
+
+## DEC-13 (P-13) · Cuota de AEMET
+
+**Contexto:** `docs/PENDIENTES.md` P-13. Cada municipio son 2 peticiones; el 14/10, 7 peticiones en ~1 min dieron 429 y volvió a responder a los ~100 s. Con `AEMET_PAUSE_S=10` salen ~12 peticiones/min: falla. AEMET **elabora la previsión municipal unas 3 veces al día** (vistas el 14–16/10: `elaborado` 12:01, 20:53 y 07:09), así que bajarla cada hora no aporta nada.
+
+**Decidido el 16/10: opción (d), pilotos cada hora + rotación.**
+- `AEMET_PAUSE_S=30` (por municipio → 4 peticiones/min, por debajo de las ~6 del 429).
+- Cada ejecución horaria: los 3 pilotos (`AEMET_HOURLY=28065,28079,28131`) + 1/6 del resto (`AEMET_ROTATION_SLICES=6`, porción = hora % 6 sobre los 176 restantes ordenados por código; ~30). ≈ 33 municipios × 30 s ≈ **16,5 min**; todos se refrescan cada 6 h. ≈ 1.550 peticiones/día (cuota diaria de AEMET no publicada ni medida: si hay 429 sostenido, `AEMET_ROTATION_SLICES=0` = solo pilotos).
+- Un 429 se reintenta una vez tras 120 s; si vuelve a fallar se salta ese municipio y siguen los demás (hoy `download_aemet` es todo o nada).
+- **Sin previsión reciente:** se usa la última que cubra la hora pedida y se muestra su `elaborado` (RF-19); aviso «previsión antigua» si `elaborado` tiene **más de 12 h** (criterio propio); si ninguna cubre la hora → «Previsión: sin datos», no se evalúan lluvia ni calor.
+- Descartadas: (a) solo pilotos (176 municipios sin F2), (b) solo consultados (la api tendría que avisar a la ingesta) y (c) los 179 cada 6 h (90 min por ejecución).
+- Valores y comportamiento para implementar: ficha de B2 en `docs/trabajo-paralelo.md`.
 
 ## D-14 · PDF de presentaciones en el repositorio (46 MB)
 
