@@ -1,5 +1,7 @@
 # Trabajo en paralelo hasta la demo — GoMad (16–20/10/2026)
 
+> **Histórico desde el 17/10/2026.** El documento de trabajo vigente es `docs/pendientes-app.md`; este ya no se actualiza.
+
 **Para qué sirve:** repartir lo que falta en **bloques que se pueden ejecutar a la vez**, cada uno en su conversación y su rama, sin pisarse. Dice qué ficheros son de cada bloque, qué decisiones necesita y en qué orden hay que lanzarlos para tener **el MVP listo para probar** cuanto antes.
 
 - **Escrito:** viernes 16/10/2026, madrugada. Estado de partida: `main` en `e933ae2` (PR #23).
