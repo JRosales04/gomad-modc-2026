@@ -256,6 +256,193 @@ def run():
 - **Pruebas clave:** el YAML real pasa la validación; un YAML con una categoría fuera del contrato o una clave repetida falla con un mensaje legible.
 - **Terminado cuando:** existe `indicators.yaml` con los 14 indicadores y `fit`, y la validación está probada.
 
+#### Detalle de la Task 34 (ejecutor de LB1-1, 16/10)
+
+**Rol:** Datos · **Servicio:** `app/ingest/` · **Depende de:** DEC-09 (ficha B1), contrato `Indicator` (`app/api/schemas.py`) · **Duración:** 45 min
+
+**Ficheros:** Crear `../config/indicators.yaml`, `indicators.py`, `tests/test_indicators.py`. Modificar `../config/README.md` (la fila de `indicators.yaml`).
+
+**Comprobado el 16/10:** `Indicator.category` del contrato = `sport | nature | mobility | health | education | connectivity | social` (igual en `app/frontend/src/api/openapi.json`); `Profile` = `general | senior | stroller | sensitive` y `Companion` = `dog | kids` (`stroller` es un **perfil**, no un acompañante); `route_poi.type` de las áreas caninas = `dog_area`; las 8 actividades de `activities.yaml` (`walk`, `run`, `swim`, `padel`, `tennis`, `football`, `basketball`, `gym`). `pyyaml` ya es dependencia de `ingest`.
+
+**Interfaces:**
+- Consume: `common.CONFIG_DIR`; `../config/indicators.yaml`.
+- Produce: `indicators.py` (módulo de primer nivel del servicio, como `build_db.py`):
+  - `CATEGORIES`, `PROFILES`, `COMPANIONS`: copias de los `Literal` del contrato (sin importar de `app/api`); `test_contract_enums_in_sync` las compara con `openapi.json`.
+  - `REQUIRED = ("key", "category", "label", "source", "unit", "no_rows", "year")`, `NO_ROWS = ("zero", "null")`.
+  - `validate(config) -> dict` (devuelve el mismo `config`; lanza `IndicatorConfigError(ValueError)` con un mensaje en español que nombra el indicador y la clave) y `load(path=CONFIG_DIR / "indicators.yaml") -> dict`.
+- Formato de `indicators.yaml`:
+  - `population_year: 2025` (DEC-09: población de `clean/population.parquet`, año 2025).
+  - `indicators:` lista de 14 con `key`, `category`, `label` (con tildes), `source` (**lista** de ids de `download_sources.py`; `catalog_activities` usa la tabla `destination_activity`), `unit`, `no_rows` (`zero` | `null`: municipio sin filas → 0 o NULL) y `year` (entero o `null`).
+  - `fit:` `own_criterion: true`, `source`, `met_if_above: 0` (un indicador se cumple si su valor es mayor; NULL = «sin datos»), `profiles` (perfil → lista de `key`), `companions` (acompañante → lista de `key` o `{route_poi: <tipo>, when_absent: no_data}`). `activities: destination_activity` (cada actividad elegida se cuenta en esa tabla; la frase es de la Task 37).
+  - Validación: claves obligatorias; `category` del contrato; `no_rows` en `NO_ROWS`; `source` lista no vacía; `year` entero o nulo; `key` sin repetir; `population_year` entero; en `fit`, perfiles y acompañantes del contrato y cada `key` citado existente.
+
+- [ ] **Paso 1: prueba que falla** — `tests/test_indicators.py`:
+
+```python
+import copy
+import json
+
+import pytest
+import yaml
+
+from common import CONFIG_DIR
+from indicators import CATEGORIES, COMPANIONS, PROFILES, IndicatorConfigError, load, validate
+
+DEC09_KEYS = ["sport_facilities", "sport_facilities_per_1000", "catalog_activities", "green_m2_per_inhabitant",
+              "drove_roads_km", "recreation_areas", "bus_stops_per_1000", "rail_stations", "health_centres",
+              "pharmacies_per_1000", "aed_per_1000", "schools", "good_3g_pct", "social_centres"]
+
+
+@pytest.fixture
+def real():
+    return yaml.safe_load((CONFIG_DIR / "indicators.yaml").read_text(encoding="utf-8"))
+
+
+def test_real_yaml_is_valid_with_dec09_indicators():
+    cfg = load()
+    assert [i["key"] for i in cfg["indicators"]] == DEC09_KEYS
+    by_key = {i["key"]: i for i in cfg["indicators"]}
+    assert by_key["sport_facilities"]["no_rows"] == "null" and by_key["health_centres"]["no_rows"] == "zero"
+    assert by_key["green_m2_per_inhabitant"]["no_rows"] == "null" and by_key["good_3g_pct"]["no_rows"] == "null"
+    assert sum(i["no_rows"] == "null" for i in cfg["indicators"]) == 4
+    assert by_key["good_3g_pct"]["year"] == 2023 and cfg["population_year"] == 2025
+    fit = cfg["fit"]
+    assert fit["own_criterion"] is True
+    assert fit["profiles"]["senior"] == ["health_centres", "aed_per_1000"]
+    assert fit["profiles"]["stroller"] == ["green_m2_per_inhabitant"]
+    assert fit["companions"]["kids"] == ["schools"]
+    assert fit["companions"]["dog"] == {"route_poi": "dog_area", "when_absent": "no_data"}
+
+
+def test_unknown_category_fails_readably(real):
+    real["indicators"][3]["category"] = "green"
+    with pytest.raises(IndicatorConfigError, match=r"green_m2_per_inhabitant.*categoría «green»"):
+        validate(real)
+
+
+def test_duplicate_key_fails_readably(real):
+    real["indicators"].append(copy.deepcopy(real["indicators"][0]))
+    with pytest.raises(IndicatorConfigError, match=r"clave repetida.*sport_facilities"):
+        validate(real)
+
+
+def test_missing_required_field_fails_readably(real):
+    del real["indicators"][8]["unit"]
+    with pytest.raises(IndicatorConfigError, match=r"health_centres.*falta «unit»"):
+        validate(real)
+
+
+@pytest.mark.parametrize("change, message", [
+    (lambda c: c["indicators"][0].update(no_rows="cero"), r"sport_facilities.*no_rows"),
+    (lambda c: c["fit"]["profiles"].update(elderly=["schools"]), r"perfil «elderly»"),
+    (lambda c: c["fit"]["companions"].update(kids=["playgrounds"]), r"indicador «playgrounds»"),
+])
+def test_bad_values_fail_readably(real, change, message):
+    change(real)
+    with pytest.raises(IndicatorConfigError, match=message):
+        validate(real)
+
+
+def test_contract_enums_in_sync(root):
+    schemas = json.loads((root.parent / "frontend" / "src" / "api" / "openapi.json")
+                         .read_text(encoding="utf-8"))["components"]["schemas"]
+    assert list(CATEGORIES) == schemas["Indicator"]["properties"]["category"]["enum"]
+    assert list(PROFILES) == schemas["RecommendRequest"]["properties"]["profile"]["enum"]
+    assert list(COMPANIONS) == schemas["RecommendRequest"]["properties"]["companions"]["items"]["enum"]
+```
+
+- [ ] **Paso 2:** Run: `.venv/bin/pytest tests/test_indicators.py -q` → Esperado: FAIL en la recogida con `ModuleNotFoundError: No module named 'indicators'`.
+- [ ] **Paso 3: implementación** — `indicators.py`:
+
+```python
+"""Carga y valida config/indicators.yaml (DEC-09, Task 34): indicadores de la vista de municipio y encaje RF-18.
+
+Las categorias, perfiles y acompanantes son copia del contrato (app/api/schemas.py): ningun servicio importa
+codigo de otro; test_contract_enums_in_sync las compara con el openapi.json.
+"""
+import yaml
+
+from common import CONFIG_DIR
+
+CATEGORIES = ("sport", "nature", "mobility", "health", "education", "connectivity", "social")
+PROFILES = ("general", "senior", "stroller", "sensitive")
+COMPANIONS = ("dog", "kids")
+REQUIRED = ("key", "category", "label", "source", "unit", "no_rows", "year")
+NO_ROWS = ("zero", "null")
+
+
+class IndicatorConfigError(ValueError):
+    pass
+
+
+def _fail(msg):
+    raise IndicatorConfigError(f"indicators.yaml: {msg}")
+
+
+def _check_indicator(ind, n):
+    name = ind.get("key") or f"n.º {n}"
+    for field in REQUIRED:
+        if field not in ind:
+            _fail(f"al indicador «{name}» le falta «{field}»")
+    if ind["category"] not in CATEGORIES:
+        _fail(f"el indicador «{name}» tiene la categoría «{ind['category']}», que no está en el contrato "
+              f"({', '.join(CATEGORIES)})")
+    if ind["no_rows"] not in NO_ROWS:
+        _fail(f"el indicador «{name}» tiene no_rows «{ind['no_rows']}»; debe ser {' o '.join(NO_ROWS)}")
+    if not isinstance(ind["source"], list) or not ind["source"]:
+        _fail(f"el indicador «{name}» necesita «source» como lista de ids de fuente")
+    if ind["year"] is not None and not isinstance(ind["year"], int):
+        _fail(f"el indicador «{name}» tiene «year» {ind['year']!r}; debe ser un año o null")
+
+
+def _check_refs(kind, allowed, mapping, keys):
+    for who, refs in (mapping or {}).items():
+        if who not in allowed:
+            _fail(f"fit: {kind} «{who}» no está en el contrato ({', '.join(allowed)})")
+        if isinstance(refs, dict):
+            if "route_poi" not in refs:
+                _fail(f"fit: {kind} «{who}» necesita una lista de indicadores o «route_poi»")
+            continue
+        for ref in refs:
+            if ref not in keys:
+                _fail(f"fit: {kind} «{who}» cita el indicador «{ref}», que no existe")
+
+
+def validate(config):
+    """Devuelve config si es valido; si no, IndicatorConfigError con un mensaje legible."""
+    if not isinstance(config.get("population_year"), int):
+        _fail("falta «population_year» (año del padrón para las tasas)")
+    seen = set()
+    for n, ind in enumerate(config.get("indicators") or [], start=1):
+        _check_indicator(ind, n)
+        if ind["key"] in seen:
+            _fail(f"clave repetida «{ind['key']}»")
+        seen.add(ind["key"])
+    if not seen:
+        _fail("no hay indicadores")
+    fit = config.get("fit") or _fail("falta la sección «fit» (encaje RF-18)")
+    if fit.get("own_criterion") is not True:
+        _fail("fit: es criterio propio y debe llevar «own_criterion: true»")
+    _check_refs("perfil", PROFILES, fit.get("profiles"), seen)
+    _check_refs("acompañante", COMPANIONS, fit.get("companions"), seen)
+    return config
+
+
+def load(path=None):
+    path = path or CONFIG_DIR / "indicators.yaml"
+    return validate(yaml.safe_load(path.read_text(encoding="utf-8")))
+```
+
+  `../config/indicators.yaml`: los 14 indicadores de la tabla DEC-09 en su orden, con la etiqueta, la unidad y la regla «sin filas» de la tabla; `source` con los ids de la columna «Fuente» (`[nmc_deporte, padron]` en las tasas, `[nmc_estmetro, nmc_estcerca]`, `[destination_activity]`); `year` 2023 en `good_3g_pct` (EIEL 2023), 2025 en `green_m2_per_inhabitant` (VPLA 2025 y padrón 2025), `null` en el resto (sin año en la fuente: la fecha va por `source_date`). Un comentario por indicador con el cálculo de la columna «Cálculo» (lo implementa la Task 35). Sección `fit` como en «Interfaces».
+
+  `../config/README.md`: la fila de `indicators.yaml` dice «14 indicadores de la vista de municipio (F5) con su regla «sin filas», y `fit`: qué indicador mira cada perfil y acompañante (RF-18, criterio propio) | DEC-09 (16/10); lo valida `ingest/indicators.py`».
+
+- [ ] **Paso 4:** Run: `.venv/bin/pytest tests/test_indicators.py -q` → Esperado: `8 passed`. Y `.venv/bin/python -c "import indicators; print(len(indicators.load()['indicators']))"` → Esperado: `14`.
+- [ ] **Paso 5:** Run: `.venv/bin/pytest -q` → Esperado: los mismos fallos previos de la línea base (ledger, «Preparación») y ninguno nuevo.
+- [ ] **Paso 6: commit** — `git -C ../.. add app/config/indicators.yaml app/config/README.md app/ingest/indicators.py app/ingest/tests/test_indicators.py && git -C ../.. commit -m "Datos: config/indicators.yaml (DEC-09) y su validacion (B1 Task 34)"`
+
+**Terminado cuando:** `indicators.load()` devuelve los 14 indicadores de DEC-09 y la sección `fit`, y `tests/test_indicators.py` prueba que una categoría fuera del contrato, una clave repetida o una clave obligatoria ausente fallan con un mensaje que nombra el indicador.
+
 ### Task 35: B1-D3 · Tabla `municipality_indicator` en `build_db.py`
 - **Alcance:** una función **nueva** llamada desde `build_main` (sin cambiar las existentes) que calcula los 14 indicadores de `indicators.yaml` para los 179 municipios → `municipality_indicator(ine_code, category, key, value, unit, year, source)`. `value` es NULL cuando no hay datos: con regla `zero`, municipio sin filas = 0; con regla `null`, fuera de cobertura = NULL. Población de `clean/population.parquet`, año 2025. Paradas de bus, farmacias y DEA por cruce espacial (`nmc_busparadas` trae 209 códigos). `drove_roads_km`: comprobar que `NM_LONG` está en metros e ignorar los `CD_MUNI` `289xx`. `catalog_activities` sale de `destination_activity`.
 - **Es suyo:** su función en `app/ingest/build_db.py` y su prueba.
