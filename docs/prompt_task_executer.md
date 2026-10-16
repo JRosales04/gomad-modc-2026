@@ -1,4 +1,4 @@
-TAREAS={2,3}   RAMA={datos/mie14-descarga}   BASE={main}   MANUALES_HECHOS={ninguno}
+TAREAS={33}   RAMA={datos/b1-indicadores}   BASE={docs/vie16-claude-md}   MANUALES_HECHOS={ninguno: M-B1 pasos 1 (GitHub) y 5 (linea base) sin hacer; los pasos 3 y 4 (entornos y datos) los haces tu como «Preparacion»}
 
 Usa superpowers:executing-plans con docs/plan-implementacion.md.
 
