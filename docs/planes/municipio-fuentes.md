@@ -461,7 +461,7 @@ def load(path=None):
 - `nmc_busparadas`: `CMUN` con 209 códigos → cruce espacial de `UTM_X/UTM_Y` (25830): 179 municipios, 396 paradas fuera de la Comunidad (se descartan).
 - `nmc_estmetro` (15 municipios) + `nmc_estcerca` (**34**, no 33) por `CMUN` → 39 municipios con estación.
 - `green.parquet` (`area_m2`): **163** municipios con zonas verdes (no 162); `in_vpla` = 167, de ellos 4 sin ninguna zona verde (28016, 28039, 28063, 28146): regla `null` → NULL. Madrid sin filas → NULL; Getafe con valor.
-- `vias_pecuarias`: `NM_LONG` en **metros** (igual a la longitud de la geometría en EPSG:25830). `CD_MUNI` que no es de los 179: `28077` (código antiguo de Lozoyuela-Navas-Sieteiglesias, 28901; 11 tramos) y `28906`–`28912` (distritos de Madrid anexionados; 37 tramos, 463 km). Ni 28079 ni 28901 tienen tramos con su código. Ruling: esos tramos se asignan por **cruce espacial** de su punto representativo (→ 28079 y 28901) en vez de ignorarse; si no, Madrid saldría con «0 km» falso. Cobertura **171** (no 169).
+- `vias_pecuarias`: `NM_LONG` en **metros** (igual a la longitud de la geometría en EPSG:25830). `CD_MUNI` que no es de los 179: `28077` (código antiguo de Lozoyuela-Navas-Sieteiglesias, 28901; 11 tramos) y `28906`–`28912` (distritos de Madrid anexionados; 37 tramos, 272 km). Ni 28079 ni 28901 tienen tramos con su código. Ruling: esos tramos se asignan por **cruce espacial** de su punto representativo (→ 28079 y 28901) en vez de ignorarse; si no, Madrid saldría con «0 km» falso. Cobertura **171** (no 169).
 - `areas_recreativas`: 84, sin código de municipio → cruce espacial de `NM_COOX/NM_COOY` (como `green.py`) → 55 municipios.
 - `eiel_nucleos`: 467 núcleos en 155 municipios; `CALIDADUMT` ∈ {BUENO 434, REGULAR 28, MALA 5}.
 - `service.parquet` (Task 33): `health` 179, `pharmacy` 160, `aed` 172, `education` 156 (3.906), `social` 138 municipios; 430 centros de salud y consultorios (Ruling de la Task 33: la división decía 429).
@@ -588,7 +588,7 @@ def test_rates_and_units_are_plausible(db):
     assert db.execute("SELECT max(value) FROM municipality_indicator WHERE key='good_3g_pct'").fetchone()[0] <= 100
     assert db.execute("SELECT max(value) FROM municipality_indicator WHERE key='catalog_activities'").fetchone()[0] <= 8
     assert schools_getafe == int(schools_getafe) and pop["28065"] > 100_000
-    assert 400 < value(db, "28079", "drove_roads_km") < 500       # Madrid: tramos 289xx (463 km)
+    assert 250 < value(db, "28079", "drove_roads_km") < 300       # Madrid: tramos 28906–28912 (272 km)
 ```
 
 - [ ] **Paso 2:** Run: `.venv/bin/pytest tests/test_municipality_indicator.py -q` → Esperado: FAIL, `AttributeError: module 'build_db' has no attribute 'indicator_table'` en las rápidas y `municipality_indicator` inexistente (`CatalogException`) en las `slow`.
@@ -664,7 +664,7 @@ def indicator_table(config, ine_codes, values):
     rows = []
     for ind in config["indicators"]:
         if ind["key"] not in values:
-            raise ValueError(f"indicators.yaml cita «{ind['key']}», pero build_db no sabe calcularlo")
+            raise ValueError(f"indicators.yaml cita «{ind['key']}», pero no se sabe calcular en build_db")
         series, fill = values[ind["key"]], (0.0 if ind["no_rows"] == "zero" else None)
         for code in ine_codes:
             v = series.get(code)
