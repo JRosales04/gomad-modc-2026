@@ -22,30 +22,22 @@
 
 ## 2. Lo que falta
 
-| # | Qué | Prioridad | Depende de | Dónde |
-|---|---|---|---|---|
-| 1 | Recarga programada por fuente en la VM | 🔴 | — | Otro PC |
-| 2 | Aire de las horas futuras con CAMS | 🔴 | — | Otro PC |
-| 3 | `/conditions` + «Ahora en tu zona» | 🟠 | 2 | Otro PC |
-| 4 | Asistente F6, fase A | 🔴 | 13 al desplegar | Tu PC |
-| 5 | Ruta circular por distancia | 🟠 | 4 | Tu PC |
-| 6 | Desnivel | 🟠 | — | Tu PC |
-| 7 | Tráfico en tiempo real en la capital | 🟡 | — | Otro PC |
-| 8 | Polen (medido + previsto) | 🟡 | 2 | Otro PC |
-| 9 | Diseño del front | 🟠 | — | Mac (sobre `main`) |
-| 10 | Prueba en móvil real y accesibilidad | 🔴 | 9 | Equipo |
-| 12 | Caché ante caídas de todas las fuentes en vivo | 🟠 | 1, 7, 8 | Otro PC |
-| 13 | `~/.oci` en la VM | 🔴 cuando entre 4 | 4 | Tú (VM) |
-| 14 | IP fija de la VM | 🟠 | — | Tú (OCI) |
-| 15 | Pruebas con cifras exactas → rangos o invariantes | 🟠 | 1 | Cada fila |
-| 16 | CLAUDE.md al día | 🟡 | — | Cualquiera |
-| 17 | Limpieza de ramas en GitHub | 🟡 | — | Tú |
-| 18 | Demo sin red | 🟡 secundario | 1–8 | Al final |
-| 19 | Ensayo con personas | 🟡 al final | todo | Equipo |
+| # | Qué | Prioridad | Depende de |
+|---|---|---|---|
+| 1 | Recarga programada por fuente en la VM | 🔴 | — |
+| 2 | Aire de las horas futuras con CAMS | 🔴 | — |
+| 3 | `/conditions` + «Ahora en tu zona» | 🟠 | 2 |
+| 4 | Asistente F6, fase A | 🔴 | 13 al desplegar |
+| 5 | Ruta circular por distancia | 🟠 | 4 |
+| 6 | Desnivel | 🟠 | — |
+| 7 | Tráfico en tiempo real en la capital | 🟡 | — |
+| 8 | Polen (medido + previsto) | 🟡 | 2 |
+| 9 | Diseño del front | 🟠 | — |
+| 13 | `~/.oci` en la VM | 🔴 cuando entre 4 | 4 |
+| 16 | CLAUDE.md al día | 🟡 | — |
+| 17 | Limpieza de ramas en GitHub | 🟡 | — |
 
-(La fila 11, escenarios de calor y ozono, se descartó el 17/10.)
-
-**Orden:** 1 + 2 (otro PC) y 4 (tu PC) a la vez → 6 y 9 → 3, 7 y 8 → 10 y 12 → 13 y 14 al desplegar → 15–19.
+**Orden:** 1 + 2 y 4 a la vez → 6 y 9 → 3, 7 y 8 → 13 al desplegar el 4 → 16 y 17.
 **Congelación de alcance:** domingo 18 a las 23:59. **Demo:** martes 20.
 
 ---
@@ -99,32 +91,14 @@ Cada ficha dice qué hacer y **qué ficheros son suyos**. Una fila no toca los f
 - **Cómo:** directamente sobre `main`. Antes de cada push: `cd app/frontend && npm test && npm run build && npm run lint` en verde. No tocar `src/data/`, `src/api/` ni la lógica de datos.
 - **Para trabajar sin backend local:** `GOMAD_API=https://example.com npm run dev` (§6).
 
-### 10 · Prueba en móvil real y accesibilidad 🔴
-- Android e iOS sobre https://example.com; a 320 px y con zoom al 200–400 %; teclado y lector de pantalla (TalkBack y VoiceOver) en el flujo principal: Inicio → Resultados → Detalle → Ruta. Apuntar lo que falle y arreglarlo (en el diseño, fila 9).
-
-### 12 · Caché ante caídas 🟠
-- Si una fuente en vivo cae (aire, tráfico, polen), la API sigue con el último dato válido dentro de su `max_age` y avisa con la hora real; pasado ese tiempo, «sin datos». La previsión ya lo hace (`data/live/forecast.json`).
-
 ### 13 · `~/.oci` en la VM 🔴 (cuando entre el 4)
 - Copiar `~/.oci` del PC a la VM (por `scp`, nunca por git), montarlo en solo lectura en el servicio `api` de `docker-compose.yml`, poner las variables `OCI_*` en `app/.env` de la VM y reiniciar la API.
-
-### 14 · IP fija de la VM 🟠
-- La IP `YOUR_SERVER_IP` es efímera. Reservarla en OCI (Networking → IP Management → Reserved public IPs) y asignarla a la VNIC. Si cambia, actualizar DuckDNS (`gomaduc3m`).
-
-### 15 · Pruebas con cifras exactas 🟠
-- Las pruebas `slow` que fijan cifras de una descarga (centros de salud, VPLA…) se cambian por rangos amplios o invariantes (sin duplicados, sin «RESERVADO», códigos de 5 cifras, coberturas mínimas), o por valores calculados desde el dato en bruto. Regla para todas las filas desde ahora.
 
 ### 16 · CLAUDE.md al día 🟡
 - §1 (estado), §6 (la barra dice «Preferencias», no «Perfil»), §10 (fechas). Cada fila actualiza CLAUDE.md §7 si añade una fuente.
 
 ### 17 · Limpieza de GitHub 🟡
 - Borrar las ramas ya fusionadas y activar en GitHub Settings → General → «Automatically delete head branches».
-
-### 18 · Demo sin red 🟡 (secundario)
-- Compose en un portátil con los datos congelados, teselas del mapa en local (PMTiles de la Comunidad) y previsión y aire congelados (`GOMAD_LIVE_SNAPSHOT`).
-
-### 19 · Ensayo con personas 🟡 (al final)
-- Carmen (mayor), Lucía (corredora sensible), Dani (carrito), Ana (perro), familia que se muda (Municipio) y «dos personas, mismo sitio, distinta respuesta» moviendo los pesos. Como prueba de uso, no de presentación.
 
 ---
 
@@ -148,8 +122,7 @@ Cada ficha dice qué hacer y **qué ficheros son suyos**. Una fila no toca los f
 
 5. **Valores en `app/config/`, nunca en el código.** Lo que no tenga fuente oficial lleva `own_criterion: true`.
 6. **Privacidad:** la ubicación de la persona nunca sale hacia terceros ni va a los logs; a los proveedores solo van los puntos de los 179 municipios.
-7. **Pruebas sin cifras exactas de una descarga** (fila 15).
-8. **Nadie trabaja en la VM:** solo se despliega en ella (§6).
+7. **Nadie trabaja en la VM:** solo se despliega en ella (§6).
 
 ---
 
