@@ -4,7 +4,7 @@
 
 - **Escrito:** viernes 16/10/2026, madrugada. Estado de partida: `main` en `e933ae2` (PR #23).
 - **Ya funciona en local:** las 9 pantallas, `/activities`, `/recommend` (con explicación), `/route` (Getafe y capital con grafo) y `/location`. Siguen en 501: `/municipality`, `/sources`, `/assistant/*`.
-- **No está desplegado:** la VM tiene la versión anterior y `app/data` vacío.
+- **Desplegado (16/10, 11:40):** https://example.com con `main` en `5e57b33`, datos copiados y HTTPS (bloque D, pasos 1–3 ✅). Aire y previsión de la VM, los copiados (los recarga B2).
 
 ---
 
@@ -178,11 +178,12 @@ heat:            # DEC-06 (16/10): «dia de calor» por zona meteosalud, sin niv
 - **Empieza** cuando B4 haya fijado la interfaz del grafo (o usa la actual de `routing/graph.py` sin cambiarla).
 
 ### Bloque D — Despliegue (manual, tú)
-1. Arrancar la VM (consola OCI → `gomad-vm` → Start).
-2. Copiar los datos y desplegar: `docs/arquitectura.md` §6.1 (`gomad.duckdb`, `realtime.duckdb`, `graph/`, `clean/addresses.parquet` y lo que use la API; después `restart api`).
-3. **Dominio + HTTPS (V-F4), decidido el 16/10:** subdominio gratuito de **DuckDNS** apuntando a `YOUR_SERVER_IP`; `DOMAIN=<subdominio>` en `app/deploy/.env` **de la VM**; `deploy.sh`; Caddy saca el certificado solo.
+1. ✅ Arrancar la VM (consola OCI → `gomad-vm` → Start).
+2. ✅ (16/10) Copiar los datos y desplegar: `docs/arquitectura.md` §6.1 (`gomad.duckdb`, `realtime.duckdb`, `graph/`, `clean/addresses.parquet` y lo que use la API; después `restart api`).
+3. ✅ (16/10, **https://example.com**) **Dominio + HTTPS (V-F4):** subdominio gratuito de **DuckDNS** apuntando a `YOUR_SERVER_IP`; `DOMAIN=<subdominio>` en `app/deploy/.env` **de la VM**; `deploy.sh`; Caddy saca el certificado solo.
 4. Montar `~/.oci` (solo lectura) en el contenedor `api` cuando entre B5.
-5. Repetir el despliegue cada vez que se fusione un bloque.
+5. Repetir el despliegue cada vez que se fusione un bloque: `GOMAD_URL=https://example.com app/deploy/deploy.sh` en la VM; si el bloque cambia datos, copiarlos antes y `restart api` (`docs/arquitectura.md` §6.1).
+6. Pendientes menores del despliegue (no bloquean, `docs/guia-ejecucion.md` L3): la api corre como root, falta publicar `443/udp` (HTTP/3), `/api` sin barra cae en la SPA, la `/config` de Caddy no tiene volumen y `build/` entra en la imagen de la api.
 
 ### Bloque L — Demo (lunes, todos)
 L-1 ensayo con las personas (Carmen, Lucía, Dani, Ana, familia que se muda) y «dos personas, mismo sitio, distinta respuesta» · L-2 correcciones (nada nuevo) · L-3 guion de 10 min ligado a los criterios · L-4 **demo sin red** (Compose en un portátil, datos congelados, PMTiles) · L-5 accesibilidad final (`a11y-architect`, teclado, lector de pantalla).

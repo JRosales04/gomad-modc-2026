@@ -126,7 +126,7 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 > - **Caddy filtra su log de errores** (bloque global `log default`): sin consulta de la URL, IP ni cabeceras. Con la api caída (502) el log escribía `/api/location?text=…&lat=…`.
 > - **`DOMAIN` va en `app/deploy/.env`** (copia de `app/deploy/.env.example`, `:80` en local), **no** en `app/.env`. El contenedor de Caddy, el expuesto a Internet, recibe **solo** `DOMAIN`; las claves de `app/.env` solo llegan a la `api`. Sin `DOMAIN` o vacío, Compose se niega a arrancar (para no quedarse sin HTTPS sin aviso).
 > - `app/api/.dockerignore` excluye también `.env*`, `.pytest_cache/`, `*.egg-info/` y `**/__pycache__/`.
-> - **Pendientes menores aplazados** (para D-D1 / V-F4): la API corre como root (`USER`), falta publicar `443/udp`, `/api` sin barra cae en la SPA, la imagen lleva `build/` y `egg-info`, `/config` de Caddy sin volumen, `app/frontend/` sin `.dockerignore` (L3).
+> - **Pendientes menores aplazados** (para D-D1 / V-F4): la API corre como root (`USER`), falta publicar `443/udp`, `/api` sin barra cae en la SPA, la imagen lleva `build/` y `egg-info`, `/config` de Caddy sin volumen, `app/frontend/` sin `.dockerignore` (L3). **16/10:** ya resueltos `.dockerignore` del front y `egg-info` fuera de la imagen de la api; siguen abiertos root, `443/udp`, `/api` sin barra, `/config` de Caddy y `build/` en la imagen de la api. V-F4 ✅ (https://example.com).
 
 
 - **Qué hace:** crea `app/api/Dockerfile`, el Caddyfile y un Dockerfile provisional en `app/frontend/`, y `app/deploy/docker-compose.yml`. Levanta en local la API (`/api/health`) y una página estática detrás de Caddy, sin log de acceso (privacidad).
