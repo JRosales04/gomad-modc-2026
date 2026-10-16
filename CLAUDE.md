@@ -83,6 +83,12 @@ python3 scripts/download_sources.py --refresh weekly --include-heavy      # OSM 
 `aemet` está en el grupo `minimal` y en el nivel `hourly`: sin `AEMET_API_KEY` en `app/.env` falla (las demás fuentes siguen) y con `AEMET_MUNICIPALITIES=todos` son 179 × 2 peticiones por ejecución, que gastan cuota.
 Capas marcadas PESADAS (no se bajan por defecto; `--include-heavy`): `vpla_redes`, `viales`, `cubierta_terrestre` (~137.000 polígonos: mejor pedirla filtrada por `bbox` del piloto), `aire_historico`, `ay_bancos`, `osm` (~85 MB), `callejero` (~33 MB zip). `--force` descarga aunque la fuente no haya cambiado.
 
+**Inicializar los datos en un equipo nuevo, sin instalar Python** (desde `app/`; 20–30 min la primera vez, Docker con ≥ 6 GB de RAM; la clave de AEMET de `app/.env` si existe):
+```bash
+docker compose -f deploy/docker-compose.init.yml run --rm ingest     # descarga, normaliza, gomad.duckdb, realtime.duckdb y grafo regional
+```
+Opciones: `--skip-download` (rehacer con lo ya descargado) y `--skip-graph`; `INIT_AEMET_MUNICIPALITIES` (por defecto `28065,28079`) y `GOMAD_DATA_PATH` (otra carpeta de datos). Imagen `app/ingest/Dockerfile`, guion `app/ingest/scripts/init_data.sh`. Solo para equipos de desarrollo: no forma parte del despliegue.
+
 **Levantar la app con Docker Compose** (desde `app/`):
 ```bash
 cp deploy/.env.example deploy/.env        # solo DOMAIN: ":80" en local, el dominio en la VM
