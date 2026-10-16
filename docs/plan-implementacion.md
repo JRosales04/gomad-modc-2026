@@ -4002,15 +4002,2529 @@ export const client = {
 | ID | Rol | Tarea | Ficheros | Terminado cuando | Prueba |
 |---|---|---|---|---|---|
 | V-D1 | Datos | Normalizador de servicios (`sanitarios` contando `centro_nro_registro` distintos, tipos «Centro de salud»/«Consultorio de atención primaria»; `farmacias` con coma decimal; `educativos` con `SITUACIÓN`=ALTA; `atencion_social` sin «RESERVADO»; EIEL `cultural`/`nucleos`) → `service.parquet`; tabla `municipality_indicator(ine_code, category, key, value NULL=sin datos, unit, year, source)` según **DEC-09** (`config/indicators.yaml`) en `build_main` | `ingest/normalize/services.py`, `ingest/build_db.py`, `config/indicators.yaml` | 179 municipios con todas sus filas de indicador (valor o NULL), coberturas iguales a D-09 | `ingest/tests/test_services.py`: 429 centros de salud + consultorios; educativos ALTA 3.906; 177 RESERVADO excluidos; Patones `sport` NULL (no 0) |
-| V-D2 | Datos | `/location`: `ingest/normalize/addresses.py` (CSV cp1252 → `clean/addresses.parquet` con vial, número, coordenadas reproyectadas, `ine_code`; **comprobar antes los nombres reales de columnas del CSV**); en la API, cliente del buscador de Nomecalles (sin clave) con `httpx`, caché de 1 h en memoria y respaldo «centro del municipio» | `ingest/normalize/addresses.py`, `api/geocoding.py`, `api/main.py` | «calle madrid 10 getafe» → x 437838,98 / y 4461942,01 reproyectado (D-04); sin resultado → municipio por nombre; buscador caído → municipio | `api/tests/test_location.py` con buscador simulado + 1 prueba `slow` real |
+| V-D2 | Datos | → **Tasks 26 y 31**. `/location`: `ingest/normalize/addresses.py` (CSV cp1252 → `clean/addresses.parquet` con vial, número, coordenadas reproyectadas, `ine_code`; **comprobar antes los nombres reales de columnas del CSV**); en la API, cliente del buscador de Nomecalles (sin clave) con `httpx`, caché de 1 h en memoria y respaldo «centro del municipio» | `ingest/normalize/addresses.py`, `api/geocoding.py`, `api/main.py` | «calle madrid 10 getafe» → x 437838,98 / y 4461942,01 reproyectado (D-04); sin resultado → municipio por nombre; buscador caído → municipio | `api/tests/test_location.py` con buscador simulado + 1 prueba `slow` real |
 | V-D3 | Datos | Patrón horario del aire para horas futuras (CLAUDE.md §6.2): `--only aire_historico --include-heavy`, mediana por estación × magnitud × mes × hora → tabla `air_pattern` en `gomad.duckdb`. Hasta que exista, el motor usa la última categoría medida y lo dice | `ingest/normalize/air.py`, `ingest/build_db.py` | `air_pattern` con las estaciones con histórico | 24 horas × 12 meses por estación-magnitud con datos |
-| V-M1 | Motor | `/activities` y `/recommend` reales: `repository.py` (candidatos por caja + haversine en DuckDB solo lectura, reabriendo `realtime.duckdb` por petición), `bounded_distances` (Task 21) donde hay grafo y haversine × factor de rodeo (criterio propio, marcado) donde no, estación más cercana o de la zona, `HourContext` por hora, `slots`, `scoring`; «Sorpréndeme» = 3 actividades distintas; middleware de log **sin ubicación** (ruta, código y ms) | `api/repository.py`, `api/services/recommend.py`, `api/main.py` | < 3 s en Getafe y capital; `warnings` cuando falta un factor | `api/tests/test_endpoints.py`: `test_recommend_getafe`, `test_recommend_capital_without_vpla`, `test_surprise_me_three_distinct_activities`, `test_logs_without_location` |
-| V-M2 | Motor | `explanation.py`: plantillas en lenguaje llano con factores dominantes y mejor hora; cita fuente y fecha; marca criterio propio | `api/engine/explanation.py` | Explicación sin datos que no estén en la respuesta | `api/tests/engine/test_explanation.py`: cifras de la frase = cifras del objeto; Carmen recibe «Ahora no: mejor a las …» |
-| V-R1 | Rutas | `/route` en Getafe: grafo cargado al arrancar (`lifespan`), directa y saludable en paralelo (`ThreadPoolExecutor`), GeoJSON, `description`, POIs de `route_poi` a ≤ 25 m (solo `working IS NOT FALSE`: las fuentes fuera de servicio no cuentan para la ruta ni para F6; el mapa puede mostrarlas como «Fuera de servicio»); fuera del grafo o desconectado → línea recta `approximate=True` + aviso; tiempo con la velocidad de DEC-07 | `api/services/route.py`, `api/main.py` | < 5 s; nunca 500 por ruta imposible | `test_route_getafe`, `test_route_outside_graph_is_approximate` |
+| V-M1 | Motor | → **Tasks 28 y 29**. `/activities` y `/recommend` reales: `repository.py` (candidatos por caja + haversine en DuckDB solo lectura, reabriendo `realtime.duckdb` por petición), `bounded_distances` (Task 21) donde hay grafo y haversine × factor de rodeo (criterio propio, marcado) donde no, estación más cercana o de la zona, `HourContext` por hora, `slots`, `scoring`; «Sorpréndeme» = 3 actividades distintas; middleware de log **sin ubicación** (ruta, código y ms) | `api/repository.py`, `api/services/recommend.py`, `api/main.py` | < 3 s en Getafe y capital; `warnings` cuando falta un factor | `api/tests/test_endpoints.py`: `test_recommend_getafe`, `test_recommend_capital_without_vpla`, `test_surprise_me_three_distinct_activities`, `test_logs_without_location` |
+| V-M2 | Motor | → **Task 27**. `explanation.py`: plantillas en lenguaje llano con factores dominantes y mejor hora; cita fuente y fecha; marca criterio propio | `api/engine/explanation.py` | Explicación sin datos que no estén en la respuesta | `api/tests/engine/test_explanation.py`: cifras de la frase = cifras del objeto; Carmen recibe «Ahora no: mejor a las …» |
+| V-R1 | Rutas | → **Task 30**. `/route` en Getafe: grafo cargado al arrancar (`lifespan`), directa y saludable en paralelo (`ThreadPoolExecutor`), GeoJSON, `description`, POIs de `route_poi` a ≤ 25 m (solo `working IS NOT FALSE`: las fuentes fuera de servicio no cuentan para la ruta ni para F6; el mapa puede mostrarlas como «Fuera de servicio»); fuera del grafo o desconectado → línea recta `approximate=True` + aviso; tiempo con la velocidad de DEC-07 | `api/services/route.py`, `api/main.py` | < 5 s; nunca 500 por ruta imposible | `test_route_getafe`, `test_route_outside_graph_is_approximate` |
 | V-F1 | Front **[manual guiado]** | Mapa MapLibre sincronizado con la lista (RF-11); la lista es el equivalente completo; OpenFreeMap en desarrollo | `frontend/src/components/Map.tsx` | Selección sincronizada | Vitest: seleccionar tarjeta cambia el marcador activo |
 | V-F2 | Front **[manual guiado]** | Detalle «¿Por qué?»: nota por factor, línea horaria con mejor franja, aire y tiempo con icono+color+texto (colores ICA de `umbrales.md` §1.3 como pastilla con contraste), fuente y fecha | `frontend/src/screens/Detail.tsx` | Contraste ≥ 4,5:1 | Vitest + axe |
 | V-F3 | Front **[manual guiado]** | Panel «Ajustar» (hoja inferior Radix): pesos con recálculo al soltar (RF-16), perfil, «Salgo con…», tiempo y distancia | `frontend/src/components/SettingsSheet.tsx` | Mover un peso cambia el orden sin recargar | Vitest: soltar lanza una sola petición |
 | V-F4 | Front + Motor **[manual en parte]**; parte del front **[manual guiado]** | **Primer despliegue HTTPS**: dominio (DEC-10) o subdominio gratuito; `DOMAIN=<dominio>` en `app/deploy/.env` de la VM (no en `app/.env`); imagen `frontend` multi-stage; `app/data/` en la VM | `deploy/*`, `docs/arquitectura.md` §6 | `https://<dominio>/` abre en un móvil y pide la ubicación | `curl -I https://…/api/health` → 200 con certificado válido |
+
+## VIERNES 16/10 — detalle de V-D2, V-M2, V-M1, V-R1 y conexión del front (Tasks 26–32)
+
+> Detallado el 16/10 con `superpowers:writing-plans` (rama `motor/vie16-api-conexion`). Especificación: filas V-D2, V-M1, V-M2 y V-R1 de la tabla de arriba, CLAUDE.md §2, §5, §6, §11 y `docs/arquitectura.md` §4. **Fuera de este bloque** (siguen en 501 y el front con datos de ejemplo): `/municipality` (S-M1), `/sources` (S-D1), `/assistant/*` (D-M1), V-D1, V-D3, mapa MapLibre (V-F1), HTTPS (V-F4). La conexión del front (Task 32) la pidió la persona para este encargo, aunque el front sea [manual guiado].
+
+**Objetivo:** que GoMad funcione de punta a punta: `/activities`, `/recommend`, `/route` y `/location` reales sobre `app/data/` y el front llamándolos.
+
+**Arquitectura:** `repository.py` es el único que habla con DuckDB (solo lectura, una conexión por consulta para ver las sustituciones atómicas de `ingest`); `routing/store.py` guarda en memoria los grafos de `data/graph/<zona>/` (cargados en el `lifespan`); `services/recommend.py` y `services/route.py` orquestan el motor (`engine/*`, `routing/graph.py`) sin IA; `engine/explanation.py` redacta con plantillas; `geocoding.py` resuelve texto → coordenadas con el callejero normalizado por `ingest` y el buscador público de Nomecalles. El front cambia el cuerpo de sus funciones de `src/data/` por un cliente HTTP.
+
+**Datos reales comprobados el 16/10** (no inventar otros): `gomad.duckdb` → `destination(id, source, name, type, covered, accessible, condition, owner, water, url, ine_code, lon, lat, green, updated)`, `destination_activity(destination_id, activity, suitability)`, `municipality(ine_code, name [MAYÚSCULAS], population, in_eiel, in_vpla, geom)`, `air_station(id, network [CM|AY], name, ine_code, area_type, lon, lat)`, `route_poi(id, type, source, ine_code, status, working, lon, lat)`, `source_date(source, downloaded, modified)`; `realtime.duckdb` → `forecast(ine_code, ts, temp, feels_like, precip_prob, precip, wind, sky, issued)`, `aqi_hourly(station_id, ts, pollutant [NO2|O3|PM10|PM2_5|SO2], mean, n_hours)`; `graph/{getafe,madrid}/nodes.parquet(node, osm_id, lon, lat)` y `edges.parquet(u, v, length_m, highway, traffic, green_pct, near_*, *_id, geom)` (la `geom` de cada tramo va de `u` a `v`); `clean/municipality.parquet(ine_code, name, name_norm, geometry WKB EPSG:4326, in_eiel, in_vpla)`. Callejero `raw/callejero/gdie_callejero_completo.csv`: **separado por comas**, cp1252, 855.909 filas, `cdtipo` A (portal) / K (punto kilométrico) / V (vial sin número), `cdmuni` 3 dígitos, `dsmuni` con mayúsculas y tildes correctas («Las Rozas de Madrid»), `cdvial`, `cdtvia` («Calle», «Avda»…), `dspart` («de la»), `dsvial`, `tiponumero` (N = número), `numero` («000010»), `calif` (letra), `coord_x`/`coord_y` EPSG:25830. «calle madrid 10 getafe» → `cdvial` 065A0460, x 437838,9803 / y 4461942,0104 → lon −3,7314934 / lat 40,3056775. Buscador de Nomecalles (sin clave) → `data.direcciones[]` con `direccion` («Calle Madrid 10»), `tipo` (`app` portal / `calle`), `municipio` («065»), `nombreMunicipio`, `cdVial`.
+
+**Decisiones de este bloque (criterio propio en `app/config/`, con Ruling en el ledger):**
+- `config/recommend.yaml` (nuevo, `own_criterion: true`): `straight_line_detour: 1.3` (distancia a pie ≈ línea recta × 1,3 donde no hay grafo), `dedupe_radius_m: 50` (mismo nombre a < 50 m = mismo sitio en dos fuentes; cierra el Ruling I7 de Task 19), `max_candidates: 400` (por actividad, los más cercanos en línea recta), `indoor_fallback_activity: gym` (alternativa cubierta de RF-09 si la actividad no tiene destinos cubiertos), `air_reading_valid_h: 3` (sin patrón horario V-D3, la última medición vale 3 h; después, aire `null`).
+- `config/ica_thresholds.yaml` + `min_coverage: 0.75` (`min_coverage_own_criterion: true`): cobertura mínima de las medias móviles (O₃ 6 de 8 h, PM 18 de 24 h), como pedía el contrato de Task 19.
+- `config/routing.yaml` + `snap_max_m: 300` (distancia máxima del punto a la red peatonal; antes valor por defecto en código).
+- `config/rules.yaml` → `air.own_criterion_profiles: [senior]`: qué perfiles usan un umbral de aire sin fuente oficial (para marcar «criterio propio» en la explicación).
+- `config/sources.yaml` (nuevo): solo `labels` (texto de cada fuente para `DataSource.label`); S-D1 añadirá editor, licencia y URL.
+
+**Restricciones globales de este bloque** (de CLAUDE.md y del encargo; aplican a todas las tareas):
+- Código en inglés; comentarios y docstrings en español **sin tildes**; textos visibles en español **con tildes**.
+- Cada servicio con su venv y desde su directorio; **ningún import entre `app/api` y `app/ingest`**; datos y config por `GOMAD_DATA_DIR` / `GOMAD_CONFIG_DIR`.
+- La IA no decide; aquí no hay IA. **No fijar en código** pesos, umbrales, actividades ni velocidades: `rules.yaml`, `weights.yaml`, `activities.yaml`, `routing.yaml`, `recommend.yaml`.
+- **Privacidad:** la ubicación solo en el cuerpo (o en la query de `/location`, que es texto); **nunca en logs**: middleware con método, ruta, código y ms, sin cuerpo ni query.
+- **Contrato:** `app/api/schemas.py`. Si cambia: `scripts/export_openapi.py`, `npm run contract` en el front, `test_contract.py` en verde y Ruling.
+- Rendimiento: `/recommend` < 3 s y `/route` < 5 s en Getafe y en la capital.
+- Nunca un 500 por falta de un dato o por una ruta imposible: factor `null` + `warnings`, o línea recta `approximate`.
+- Pruebas del front deterministas: en `MODE=test` datos de ejemplo o `vi.spyOn`/`vi.stubGlobal`, nunca la red.
+
+**Foco de revisión de este bloque** (entradas que ninguna prueba obvia cubre):
+1. **Ventana ya pasada o sin previsión** (el front manda «ahora → +3 h» y la previsión de AEMET del municipio no está descargada o es vieja): horas sin nota o con factores `null`, aviso legible y nunca 500. → Task 29 `test_window_in_past_warns`, `test_missing_factors_renormalize_with_warnings`.
+2. **Mismo sitio en dos fuentes** (EIEL y Nomecalles con el mismo parque): el top 3 no lo repite. → Task 29 `test_dedupe_same_name_close`.
+3. **Punto de origen o destino fuera de cualquier grafo** (Patones, o un punto en mitad del campo): `/recommend` usa línea recta × 1,3 marcada «aproximada» y `/route` línea recta `approximate=True`. → Task 29 `test_distance_graph_or_approximate`, Task 30 `test_route_outside_graph_is_approximate`.
+4. **Buscador de Nomecalles caído o lento** (timeout, 5xx, JSON raro): `/location` responde con el callejero local, sin esperar más de 3 s. → Task 31 `test_location_nomecalles_down_falls_back_local`.
+5. **Geolocalización denegada o sin HTTPS** (la VM de la demo va por HTTP hasta V-F4): mensaje claro y se puede escribir una dirección. → Task 32 `geolocation.test.ts`.
+
+---
+
+### Task 26: V-D2 (1/2) · Callejero normalizado para `/location`
+
+**Rol:** Datos · **Servicio:** `app/ingest/` · **Depende de:** Task 16 (`common.py`) · **Duración:** 45 min
+
+**Ficheros:** Crear `normalize/addresses.py`, `tests/test_addresses.py`, `tests/data/callejero_sample.csv` (cp1252).
+
+**Interfaces:**
+- Consume: `common.RAW`, `common.ine_code`, `common.to_wgs84`, `common.write`; `normalize.normalizer`.
+- Produce: `app/data/clean/addresses.parquet` con columnas `ine_code` (str 5), `municipality` (`dsmuni`), `street_code` (`cdvial`), `street_type` (`cdtvia`), `street` (`dspart` + `dsvial`), `street_norm` (`plain(street)`), `number` (Int64, nulo en filas de vial), `letter` (`calif`), `lon`, `lat` (EPSG:4326). `plain(text)`: minúsculas, sin tildes, solo `[a-z0-9]` separados por un espacio (la API usa la misma regla en `geocoding.plain`). `build(path) -> pandas.DataFrame`.
+
+- [ ] **Paso 1: prueba que falla** — `tests/data/callejero_sample.csv` (escribirlo en cp1252 con Python: `pathlib.Path(...).write_text(texto, encoding="cp1252")`):
+
+```
+cdtipo,cdmuni,dsmuni,cdtvia,cdvial,dspart,dsvial,tiponumero,numero,calif,coord_x,coord_y
+"A","065","Getafe","Calle","065A0460","","Madrid","N","000010"," ",437838.98030000,4461942.01040000
+"A","065","Getafe","Calle","065A0460","","Madrid","N","000065","B",438024.93100000,4462262.10770000
+"K","061","Galapagar","Ctra","061C0001","","El Escorial","","9600","",419343.90540000,4495000.00000000
+"V","006","Alcobendas","Calle","006A0078","de la","Constitución","","","",445785.36110000,4488340.73990000
+"A","079","Madrid","Calle","079A0001","","Sin Número","S","000000","",440000.00000000,4474000.00000000
+```
+
+`tests/test_addresses.py`:
+
+```python
+import pathlib
+
+import pandas as pd
+import pytest
+
+from common import CLEAN, to_wgs84
+from normalize import load_all
+from normalize.addresses import build, plain
+
+SAMPLE = pathlib.Path(__file__).parent / "data" / "callejero_sample.csv"
+
+
+def test_plain():
+    assert plain("Cñada. de la Ñora-Vieja") == "cnada de la nora vieja"
+    assert plain("  GRAN   Vía ") == "gran via"
+
+
+def test_build_keeps_numbered_portals_and_streets():
+    out = build(SAMPLE)
+    assert len(out) == 3                                   # fuera: punto kilometrico (K) y portal sin numero (S)
+    row = out[(out.ine_code == "28065") & (out.number == 10)].iloc[0]
+    lon, lat = to_wgs84([437838.9803], [4461942.0104])
+    assert row.lon == pytest.approx(lon[0]) and row.lat == pytest.approx(lat[0])
+    assert (row.street, row.street_norm, row.street_type, row.municipality, row.street_code) == (
+        "Madrid", "madrid", "Calle", "Getafe", "065A0460")
+    assert out[out.number == 65].letter.item() == "B"
+    street = out[out.ine_code == "28006"].iloc[0]
+    assert pd.isna(street.number)
+    assert street.street == "de la Constitución" and street.street_norm == "de la constitucion"
+    assert not (out.municipality == "Galapagar").any()
+
+
+@pytest.mark.slow
+def test_addresses_real():
+    load_all()["addresses"]()
+    out = pd.read_parquet(CLEAN / "addresses.parquet")
+    assert out.ine_code.nunique() == 179
+    row = out[(out.ine_code == "28065") & (out.street_code == "065A0460") & (out.number == 10)].iloc[0]
+    assert row.lon == pytest.approx(-3.7314934, abs=1e-6) and row.lat == pytest.approx(40.3056775, abs=1e-6)
+    assert out.lon.between(-4.7, -3.0).all() and out.lat.between(39.8, 41.2).all()
+```
+
+- [ ] **Paso 2:** Run: `.venv/bin/pytest tests/test_addresses.py -q -m "not slow"` → Esperado: FAIL con `ModuleNotFoundError: No module named 'normalize.addresses'`.
+- [ ] **Paso 3: implementación** — `normalize/addresses.py`:
+
+```python
+"""Callejero completo 2025 (IDEM) -> clean/addresses.parquet para /location (D-04).
+
+CSV separado por comas, cp1252, coordenadas EPSG:25830. Una fila por portal (cdtipo A), punto kilometrico (K)
+o vial sin numero (V). Se quedan los portales con numero (A + tiponumero N) y los viales (V) para la precision «calle».
+"""
+import re
+import unicodedata
+
+import pandas as pd
+
+from common import RAW, ine_code, to_wgs84, write
+from normalize import normalizer
+
+SOURCE = RAW / "callejero" / "gdie_callejero_completo.csv"
+COLUMNS = ["cdtipo", "cdmuni", "dsmuni", "cdtvia", "cdvial", "dspart", "dsvial", "tiponumero", "numero", "calif",
+           "coord_x", "coord_y"]
+
+
+def plain(text):
+    # misma regla que api/geocoding.py: minusculas, sin tildes, solo letras y numeros
+    s = unicodedata.normalize("NFKD", str(text)).encode("ascii", "ignore").decode().lower()
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", s).split())
+
+
+def build(path):
+    df = pd.read_csv(path, sep=",", dtype=str, encoding="cp1252", usecols=COLUMNS, keep_default_na=False)
+    numbered = (df["cdtipo"] == "A") & (df["tiponumero"] == "N") & df["numero"].str.strip().str.isdigit()
+    df = df[numbered | (df["cdtipo"] == "V")].copy()
+    x = pd.to_numeric(df["coord_x"].str.replace(",", "."), errors="coerce")
+    y = pd.to_numeric(df["coord_y"].str.replace(",", "."), errors="coerce")
+    df, x, y = df[x.notna() & y.notna()], x[x.notna() & y.notna()], y[x.notna() & y.notna()]
+    lon, lat = to_wgs84(x.to_numpy(), y.to_numpy())
+    street = (df["dspart"].str.strip() + " " + df["dsvial"].str.strip()).str.strip()
+    number = [int(n) if t == "A" else None for n, t in zip(df["numero"], df["cdtipo"])]
+    out = pd.DataFrame({
+        "ine_code": df["cdmuni"].map(ine_code).to_numpy(),
+        "municipality": df["dsmuni"].str.strip().to_numpy(),
+        "street_code": df["cdvial"].str.strip().to_numpy(),
+        "street_type": df["cdtvia"].str.strip().to_numpy(),
+        "street": street.to_numpy(),
+        "street_norm": street.map(plain).to_numpy(),
+        "number": pd.array(number, dtype="Int64"),
+        "letter": df["calif"].str.strip().to_numpy(),
+        "lon": lon, "lat": lat})
+    return out[out["ine_code"].notna()].reset_index(drop=True)
+
+
+@normalizer("addresses")
+def run():
+    return write(build(SOURCE), "addresses")
+```
+
+- [ ] **Paso 4:** Run: `.venv/bin/pytest tests/test_addresses.py -q -m "not slow"` → Esperado: `2 passed`. Si falta el CSV real: `.venv/bin/python scripts/download_sources.py --only callejero --include-heavy`. Después `.venv/bin/python -m normalize addresses` y `.venv/bin/pytest tests/test_addresses.py -q` → Esperado: `3 passed` (apuntar filas y segundos).
+- [ ] **Paso 5: commit** — `git -C ../.. add app/ingest/normalize/addresses.py app/ingest/tests/test_addresses.py app/ingest/tests/data/callejero_sample.csv && git -C ../.. commit -m "Datos: callejero normalizado para /location (V-D2)"`
+
+**Terminado cuando:** `clean/addresses.parquet` existe con los 179 municipios y «Calle Madrid 10, Getafe» en lon −3,7314934 / lat 40,3056775.
+
+---
+
+### Task 27: V-M2 · Explicaciones con plantillas
+
+**Rol:** Motor · **Servicio:** `app/api/` · **Depende de:** Tasks 12–14 · **Duración:** 1 h
+
+**Ficheros:** Crear `engine/explanation.py`, `tests/engine/test_explanation.py`.
+
+**Interfaces:**
+- Consume: `engine.rules.CATEGORY_LABEL`; objetos con `.hour`, `.score`, `.outdoor_ok`, `.reasons` (`engine.slots.HourResult`).
+- Produce: `fmt_number(value, decimals=1) -> str` («8,7»), `fmt_distance(m) -> str` («850 m», «1,2 km»), `fmt_minutes(min) -> str` («16 min»), `fmt_hour(dt) -> str` («20:00»), `fmt_date(dt) -> str` («16/10 a las 12:01»); `factor_text(factor, value, *, distance_m=None, green=None, aqi_category=None, precip_prob=None, covered=False) -> str`; `@dataclass ExplanationInput(name, distance_m, duration_min, score, factors: list[tuple[str, float|None, float]], first, best, indoor_alternative=False, activity_label=None, own_criterion_rule=False, sources: list[tuple[str, datetime|None]] = [], approximate_distance=False)`; `explain(x: ExplanationInput) -> str`; `route_description(distance_m, duration_min, green_pct, traffic_m, counts: dict[str, int], approximate=False) -> str`.
+
+- [ ] **Paso 1: pruebas que fallan** — `tests/engine/test_explanation.py`:
+
+```python
+import re
+from datetime import datetime
+
+from engine.explanation import (ExplanationInput, explain, factor_text, fmt_distance, fmt_minutes, fmt_number,
+                                route_description)
+from engine.slots import HourResult
+
+H = lambda h: datetime(2026, 7, 15, h)
+
+
+def carmen(**kw):
+    first = HourResult(H(17), None, False, ["Calor: sensación térmica de 36 °C"])
+    best = HourResult(H(20), 8.2, True)
+    base = dict(name="Parque Uno", distance_m=1234.0, duration_min=16.4, score=8.26,
+                factors=[("proximity", 7.0, 0.3), ("green", 8.0, 0.2), ("air", 10.0, 0.15), ("weather", None, 0.0)],
+                first=first, best=best)
+    return ExplanationInput(**{**base, **kw})
+
+
+def test_formats():
+    assert fmt_number(8.26) == "8,3" and fmt_distance(840) == "840 m" and fmt_distance(1234) == "1,2 km"
+    assert fmt_minutes(16.4) == "16 min" and fmt_minutes(0.2) == "1 min"
+
+
+def test_carmen_now_no_better_later():
+    text = explain(carmen())
+    assert text.startswith("Ahora no: mejor a las 20:00 (calor: sensación térmica de 36 °C)")
+
+
+def test_numbers_in_sentence_come_from_object():
+    text = explain(carmen())
+    assert set(re.findall(r"\d+(?:,\d+)?", text)) == {"20", "00", "36", "1,2", "16", "8,3", "10"}
+    assert "Destaca por zona verde y cercanía" in text or "Destaca por cercanía y zona verde" in text
+
+
+def test_best_hour_now():
+    text = explain(carmen(first=HourResult(H(20), 8.2, True), best=HourResult(H(20), 8.2, True)))
+    assert text.startswith("Mejor hora: 20:00")
+
+
+def test_no_viable_hour():
+    text = explain(carmen(best=None))
+    assert text.startswith("Ahora no se recomienda al aire libre en toda la ventana elegida (calor")
+
+
+def test_own_criterion_is_marked():
+    assert "(umbral de criterio propio)" in explain(carmen(own_criterion_rule=True))
+    assert "criterio propio" not in explain(carmen())
+
+
+def test_surprise_activity_indoor_and_sources():
+    text = explain(carmen(activity_label="Nadar", indoor_alternative=True,
+                          sources=[("Previsión horaria (AEMET)", datetime(2026, 7, 15, 12, 1)), ("Aire", None)],
+                          approximate_distance=True))
+    assert "Para nadar: Parque Uno, a 1,2 km aprox. (16 min a pie)" in text
+    assert "Es un sitio cubierto" in text
+    assert text.endswith("Fuentes: Previsión horaria (AEMET) (15/07 a las 12:01); Aire.")
+
+
+def test_factor_texts():
+    assert factor_text("proximity", 7.0, distance_m=850) == "Cercanía: a 850 m"
+    assert factor_text("green", None, green=None) == "Verde: sin datos en este municipio"
+    assert factor_text("green", 6.5, green=0.65) == "Verde: 65 % de zona verde alrededor"
+    assert factor_text("air", 8.0, aqi_category="fair") == "Aire: razonablemente buena"
+    assert factor_text("air", None) == "Aire: sin medición reciente"
+    assert factor_text("air", None, covered=True) == "Aire: no cuenta en un sitio cubierto"
+    assert factor_text("weather", 7.0, precip_prob=30) == "Lluvia: 30 % de probabilidad"
+    assert factor_text("suitability", 9.0) == "Adecuación a la actividad: 9,0 sobre 10"
+
+
+def test_route_description():
+    text = route_description(2430, 32.4, 68.2, 350, {"fountain": 2, "bench": 1, "aed": 0})
+    assert text == "2,4 km, 32 min a pie, 68 % por zona verde, 350 m junto a tráfico, 2 fuentes, 1 banco"
+    assert "sin datos de zona verde" in route_description(500, 7, None, 0, {})
+    assert "sin tramos con tráfico" in route_description(500, 7, None, 0, {})
+    assert route_description(800, 11, None, 0, {}, approximate=True).startswith("Línea recta de 800 m")
+```
+
+- [ ] **Paso 2:** Run: `.venv/bin/pytest tests/engine/test_explanation.py -q` → Esperado: FAIL con `ModuleNotFoundError: No module named 'engine.explanation'`.
+- [ ] **Paso 3: implementación** — `engine/explanation.py`:
+
+```python
+"""Explicaciones en lenguaje llano con plantillas (RF-10, V-M2). Sin IA: solo cifras que ya estan en la respuesta."""
+from dataclasses import dataclass, field
+from datetime import datetime
+
+from engine.rules import CATEGORY_LABEL
+
+FACTOR_LABEL = {"proximity": "cercanía", "suitability": "adecuación a la actividad", "green": "zona verde",
+                "air": "calidad del aire", "weather": "tiempo"}
+
+
+def fmt_number(value, decimals=1):
+    return f"{value:.{decimals}f}".replace(".", ",")
+
+
+def fmt_distance(meters):
+    if meters < 1000:
+        return f"{round(meters / 10) * 10:.0f} m"
+    return f"{fmt_number(meters / 1000)} km"
+
+
+def fmt_minutes(minutes):
+    return f"{max(1, round(minutes))} min"
+
+
+def fmt_hour(dt):
+    return dt.strftime("%H:%M")
+
+
+def fmt_date(dt):
+    return dt.strftime("%d/%m a las %H:%M")
+
+
+def factor_text(factor, value, *, distance_m=None, green=None, aqi_category=None, precip_prob=None, covered=False):
+    if factor == "proximity":
+        return f"Cercanía: a {fmt_distance(distance_m)}"
+    if factor == "suitability":
+        return f"Adecuación a la actividad: {fmt_number(value)} sobre 10"
+    if factor == "green":
+        return "Verde: sin datos en este municipio" if green is None else f"Verde: {round(green * 100)} % de zona verde alrededor"
+    if factor == "air":
+        if covered:
+            return "Aire: no cuenta en un sitio cubierto"
+        return "Aire: sin medición reciente" if aqi_category is None else f"Aire: {CATEGORY_LABEL[aqi_category].lower()}"
+    if factor == "weather":
+        if covered:
+            return "Tiempo: no cuenta en un sitio cubierto"
+        return "Tiempo: sin previsión" if precip_prob is None else f"Lluvia: {round(precip_prob)} % de probabilidad"
+    raise ValueError(f"Factor desconocido: {factor}")
+
+
+@dataclass
+class ExplanationInput:
+    name: str
+    distance_m: float
+    duration_min: float
+    score: float
+    factors: list                      # [(factor, valor 0-10 o None, peso efectivo)]
+    first: object | None               # HourResult de la primera hora de la ventana
+    best: object | None                # HourResult de la mejor hora
+    indoor_alternative: bool = False
+    activity_label: str | None = None  # «Sorprendeme»: actividad propuesta
+    own_criterion_rule: bool = False   # la regla que bloquea la primera hora no tiene fuente oficial
+    sources: list = field(default_factory=list)   # [(etiqueta, fecha o None)]
+    approximate_distance: bool = False
+
+
+def _lower_first(text):
+    return text[:1].lower() + text[1:]
+
+
+def explain(x):
+    parts = []
+    blocked = x.first is not None and x.first.outdoor_ok is False
+    reasons = "; ".join(_lower_first(r) for r in x.first.reasons) if blocked else ""
+    mark = " (umbral de criterio propio)" if blocked and x.own_criterion_rule else ""
+    if x.best is None:
+        parts.append(f"Ahora no se recomienda al aire libre en toda la ventana elegida ({reasons}{mark})" if blocked
+                     else "Sin datos para elegir la mejor hora")
+    elif blocked and x.best.hour != x.first.hour:
+        parts.append(f"Ahora no: mejor a las {fmt_hour(x.best.hour)} ({reasons}{mark})")
+    else:
+        parts.append(f"Mejor hora: {fmt_hour(x.best.hour)}")
+    approx = " aprox." if x.approximate_distance else ""
+    where = f"{x.name}, a {fmt_distance(x.distance_m)}{approx} ({fmt_minutes(x.duration_min)} a pie)"
+    if x.activity_label:
+        where = f"Para {x.activity_label.lower()}: {where}"
+    parts.append(f"{where}; nota {fmt_number(x.score)} sobre 10")
+    ranked = sorted(((w * v, f) for f, v, w in x.factors if v is not None and w > 0), reverse=True)
+    dominant = [f for contribution, f in ranked[:2] if contribution > 0]
+    if dominant:
+        parts.append("Destaca por " + " y ".join(FACTOR_LABEL[f] for f in dominant))
+    if x.indoor_alternative:
+        parts.append("Es un sitio cubierto: alternativa por lluvia, calor o mal aire")
+    if x.sources:
+        parts.append("Fuentes: " + "; ".join(f"{label} ({fmt_date(d)})" if d else label for label, d in x.sources))
+    return ". ".join(parts) + "."
+
+
+def route_description(distance_m, duration_min, green_pct, traffic_m, counts, approximate=False):
+    if approximate:
+        return (f"Línea recta de {fmt_distance(distance_m)} ({fmt_minutes(duration_min)} a pie, aproximada): "
+                "no hay red peatonal cargada para este trayecto.")
+    parts = [fmt_distance(distance_m), f"{fmt_minutes(duration_min)} a pie",
+             "sin datos de zona verde" if green_pct is None else f"{round(green_pct)} % por zona verde",
+             f"{fmt_distance(traffic_m)} junto a tráfico" if traffic_m > 0 else "sin tramos con tráfico"]
+    for key, one, many in (("fountain", "fuente", "fuentes"), ("bench", "banco", "bancos"),
+                           ("aed", "desfibrilador", "desfibriladores")):
+        n = counts.get(key, 0)
+        if n:
+            parts.append(f"{n} {one if n == 1 else many}")
+    return ", ".join(parts)
+```
+
+- [ ] **Paso 4:** Run: `.venv/bin/pytest tests/engine/test_explanation.py -q` → Esperado: `9 passed`.
+- [ ] **Paso 5: commit** — `git -C ../.. add app/api/engine/explanation.py app/api/tests/engine/test_explanation.py && git -C ../.. commit -m "Motor: explicaciones en lenguaje llano con plantillas (V-M2)"`
+
+**Terminado cuando:** las cifras de cada frase salen del objeto y Carmen recibe «Ahora no: mejor a las …».
+
+---
+
+### Task 28: V-M1 (1/2) · `repository.py`, datos de prueba y configuración de `/recommend`
+
+**Rol:** Motor · **Servicio:** `app/api/` · **Depende de:** Tasks 19, 26 · **Duración:** 1,5 h
+
+**Ficheros:** Crear `repository.py`, `tests/mini_data.py`, `tests/test_repository.py`, `../config/recommend.yaml`, `../config/sources.yaml`. Modificar `../config/ica_thresholds.yaml`, `../config/routing.yaml`, `../config/rules.yaml`, `../config/README.md`, `engine/rules.py` (`AIR_META_KEYS`), `tests/engine/test_rules.py`.
+
+**Interfaces:**
+- Consume: tablas reales de `gomad.duckdb` y `realtime.duckdb` (ver «Datos reales» arriba); `clean/addresses.parquet` (Task 26); `engine.rules.aqi_category`.
+- Produce (`repository.py`): `class DataUnavailable(Exception)`; `haversine_m(lon1, lat1, lon2, lat2) -> ndarray` (vectorizado); `parse_date(text) -> datetime | None` (ISO o RFC 1123 → hora local de Madrid sin zona); `category_at(readings: list[tuple[datetime, str]], hour, valid_h) -> str | None`; `@dataclass Candidate(id, source, name, type, covered, ine_code, lon, lat, green, activity, suitability, straight_m)`; `@dataclass Station(id, network, name, lon, lat)`; `class Repository(data_dir)` con `candidates(lon, lat, radius_m, activities, setting, per_activity) -> list[Candidate]`, `forecast(ine_codes, start, end) -> (dict[ine, dict[datetime, (temp, feels, prob)]], dict[ine, datetime|None])`, `stations() -> list[Station]`, `air_categories(start, end, ica, valid_h) -> dict[station_id, list[(ts, category)]]`, `source_dates() -> dict[str, datetime|None]`, `municipality_names() -> dict[ine, str]`, `route_pois(min_lon, min_lat, max_lon, max_lat) -> list[tuple(id, type, source, lon, lat)]`. `tests/mini_data.py`: `NOW`, `ORIGIN`, `build_mini_data(base, *, forecast=True, precip=0.0, feels=20.0, air=True, graph=False) -> Path` (lo usan Tasks 29–31).
+
+- [ ] **Paso 1: configuración** — `../config/recommend.yaml`:
+
+```yaml
+# Parametros de /recommend sin fuente oficial (V-M1, 16/10/2026). CRITERIO PROPIO: la app lo dice.
+own_criterion: true
+straight_line_detour: 1.3        # distancia a pie ~ linea recta x 1,3 donde no hay grafo peatonal cargado
+dedupe_radius_m: 50              # mismo nombre a menos de 50 m = mismo sitio en dos fuentes (Ruling I7 de Task 19)
+max_candidates: 400              # por actividad, los mas cercanos en linea recta (latencia < 3 s)
+indoor_fallback_activity: gym    # RF-09: alternativa cubierta si la actividad no tiene destinos cubiertos
+air_reading_valid_h: 3           # sin patron horario (V-D3), la ultima medicion vale estas horas; despues, aire null
+```
+
+`../config/sources.yaml`:
+
+```yaml
+# Texto de cada fuente para la persona (DataSource.label). S-D1 anadira editor, licencia y URL.
+labels:
+  eiel_deporte: "Instalaciones deportivas (EIEL 2023, Comunidad de Madrid)"
+  eiel_parques: "Parques (EIEL 2023, Comunidad de Madrid)"
+  nmc_deporte: "Instalaciones deportivas (Nomecalles, Comunidad de Madrid)"
+  nmc_parques: "Parques (Nomecalles, Comunidad de Madrid)"
+  vpla_redes: "Zonas verdes del planeamiento (Comunidad de Madrid)"
+  areas_recreativas: "Áreas recreativas (Comunidad de Madrid)"
+  ay_idb: "Instalaciones deportivas básicas (Ayuntamiento de Madrid)"
+  ay_piscinas: "Piscinas públicas (Ayuntamiento de Madrid)"
+  ay_polideportivos: "Polideportivos (Ayuntamiento de Madrid)"
+  ay_parques: "Parques y jardines (Ayuntamiento de Madrid)"
+  aire_dia: "Calidad del aire (Comunidad de Madrid)"
+  ay_aire: "Calidad del aire (Ayuntamiento de Madrid)"
+  aemet: "Previsión horaria (AEMET)"
+  osm: "Red peatonal y mobiliario (© colaboradores de OpenStreetMap)"
+  ay_fuentes: "Fuentes de agua (Ayuntamiento de Madrid)"
+  ay_bancos: "Bancos (Ayuntamiento de Madrid)"
+  ay_areas_caninas: "Áreas caninas (Ayuntamiento de Madrid)"
+  desfibriladores: "Desfibriladores (Comunidad de Madrid)"
+  callejero: "Callejero (Comunidad de Madrid)"
+  "config:weights": "Pesos por defecto de la nota (criterio propio)"
+  "config:routing": "Pesos de la ruta saludable (criterio propio)"
+```
+
+Añadir al final de `../config/ica_thresholds.yaml`:
+
+```yaml
+# Cobertura minima de las medias moviles para dar categoria (O3 8 h -> 6 h, PM 24 h -> 18 h; NO2/SO2 1 h).
+# CRITERIO PROPIO (Ruling I2 de Task 19): una hora suelta de O3 o PM no es el ICA.
+min_coverage: 0.75
+min_coverage_own_criterion: true
+```
+
+En `../config/routing.yaml`, tras `poi_radius_m`: `snap_max_m: 300        # distancia maxima de un punto a la red peatonal (criterio propio)`. En `../config/rules.yaml`, dentro de `air`, tras `own_criterion`: `own_criterion_profiles: [senior]   # perfiles cuyo umbral no sale del BOE`. En `../config/README.md`, filas nuevas: `recommend.yaml` (parámetros de `/recommend`, criterio propio, V-M1) y `sources.yaml` (etiquetas de fuentes; S-D1 lo amplía).
+
+- [ ] **Paso 2: prueba de la regla de aire** — en `tests/engine/test_rules.py` añadir:
+
+```python
+def test_air_meta_key_own_criterion_profiles_is_not_a_profile():
+    rules = {"air": {"general": "poor", "own_criterion": True, "own_criterion_profiles": ["senior"]}}
+    validate_rules(rules)                      # no debe tomarlo por un perfil con categoria invalida
+    ctx = HourContext(datetime(2026, 7, 15, 10), 20, 20, 0, "poor")
+    assert evaluate_outdoor(ctx, "own_criterion_profiles", rules).outdoor_ok is False   # cae a general
+```
+
+Run: `.venv/bin/pytest tests/engine/test_rules.py -q` → Esperado: FAIL (`ValueError: rules.yaml: air.own_criterion_profiles = ['senior'] no es una categoría`). Implementación: `AIR_META_KEYS = ("source", "own_criterion", "own_criterion_profiles")` en `engine/rules.py`. Run de nuevo → Esperado: PASS.
+
+- [ ] **Paso 3: datos de prueba** — `tests/mini_data.py`:
+
+```python
+"""Datos minimos con el mismo esquema que app/data (comprobado el 16/10) para pruebas rapidas sin datos reales."""
+from datetime import datetime, timedelta
+
+import duckdb
+import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
+import shapely
+from shapely.geometry import LineString, box
+
+NOW = datetime(2026, 10, 16, 10, 0)            # hora local de Madrid sin zona
+ORIGIN = {"lat": 40.3050, "lon": -3.7300}      # nodo 0 del grafo mini
+
+# id, source, name, type, covered, ine_code, lon, lat, green, {actividad: suitability}
+DESTINATIONS = [
+    ("eiel_parques:1", "eiel_parques", "Parque Uno", "park", False, "28065", -3.7289, 40.3050, 0.8, {"walk": 1.0, "run": 0.8}),
+    ("nmc_parques:1", "nmc_parques", "PARQUE UNO", "park", False, "28065", -3.72893, 40.30503, 0.8, {"walk": 1.0}),
+    ("nmc_parques:2", "nmc_parques", "Parque Dos", "park", False, "28065", -3.7300, 40.3100, None, {"walk": 1.0}),
+    ("eiel_deporte:1", "eiel_deporte", "Polideportivo Cubierto", "facility", True, "28065", -3.7250, 40.3050, 0.1, {"gym": 1.0}),
+    ("ay_parques:1", "ay_parques", "Parque Capital", "park", False, "28079", -3.7300, 40.3080, None, {"walk": 0.9}),
+    ("nmc_parques:3", "nmc_parques", "Parque Lejano", "park", False, "28065", -3.7300, 40.3500, 0.5, {"walk": 1.0}),
+    ("eiel_deporte:2", "eiel_deporte", "Pista de Atletismo", "facility", False, "28065", -3.7310, 40.3055, 0.3, {"run": 1.0}),
+]
+ADDRESSES = [   # ine_code, municipality, street_code, street_type, street, street_norm, number, letter, lon, lat
+    ("28065", "Getafe", "065A0460", "Calle", "Madrid", "madrid", 10, "", -3.7314934, 40.3056775),
+    ("28065", "Getafe", "065A0460", "Calle", "Madrid", "madrid", 12, "", -3.7314000, 40.3057500),
+    ("28065", "Getafe", "065A0460", "Calle", "Madrid", "madrid", None, "", -3.7316000, 40.3050000),
+    ("28065", "Getafe", "065A0100", "Calle", "de la Constitución", "de la constitucion", 5, "", -3.7290000, 40.3060000),
+    ("28079", "Madrid", "079A0001", "Calle", "Gran Vía", "gran via", 1, "", -3.7019000, 40.4196000),
+]
+MUNICIPALITY_BOXES = {"28065": ("GETAFE", box(-3.80, 40.25, -3.65, 40.34)),
+                      "28079": ("MADRID", box(-3.85, 40.34, -3.55, 40.55))}
+
+
+def _graph(directory):
+    """   0 --(100 m, avenida)-- 1          0 = ORIGIN, 1 = Parque Uno
+          |                      |
+       (80 m, parque)        (80 m, parque)      4 -- 5 aislados (fuera de la componente principal)
+          |                      |
+          2 --(60 m, parque)---- 3"""
+    directory.mkdir(parents=True)
+    nodes = pd.DataFrame({"node": range(6), "osm_id": range(6),
+                          "lon": [-3.7300, -3.7289, -3.7300, -3.7289, -3.7000, -3.6990],
+                          "lat": [40.3050, 40.3050, 40.3043, 40.3043, 40.3100, 40.3100]})
+    rows = [(0, 1, 100, 1.0, 0.0), (0, 2, 80, 0.0, 1.0), (2, 3, 60, 0.0, 1.0), (3, 1, 80, 0.0, 1.0), (4, 5, 85, 0.0, 0.0)]
+    edges = pd.DataFrame(rows, columns=["u", "v", "length_m", "traffic", "green_pct"])
+    edges["highway"] = "footway"
+    for k in ("near_fountain", "near_bench", "near_aed"):
+        edges[k] = False
+    edges["geom"] = [LineString([(nodes.lon[u], nodes.lat[u]), (nodes.lon[v], nodes.lat[v])]).wkb
+                     for u, v in zip(edges.u, edges.v)]
+    nodes.to_parquet(directory / "nodes.parquet")
+    edges.to_parquet(directory / "edges.parquet")
+
+
+def build_mini_data(base, *, forecast=True, precip=0.0, feels=20.0, air=True, graph=False):
+    """precip: numero o funcion hora_relativa -> probabilidad (para simular lluvia solo a ciertas horas)."""
+    base.mkdir(parents=True, exist_ok=True)
+    con = duckdb.connect(str(base / "gomad.duckdb"))
+    con.execute("""CREATE TABLE destination (id VARCHAR, source VARCHAR, name VARCHAR, type VARCHAR, covered BOOLEAN,
+                   accessible BOOLEAN, condition VARCHAR, owner VARCHAR, water BOOLEAN, url VARCHAR, ine_code VARCHAR,
+                   lon DOUBLE, lat DOUBLE, green DOUBLE, updated TIMESTAMP)""")
+    con.execute("CREATE TABLE destination_activity (destination_id VARCHAR, activity VARCHAR, suitability DOUBLE)")
+    for d in DESTINATIONS:
+        con.execute("INSERT INTO destination VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, ?, ?, ?, ?, ?)", [*d[:9], NOW])
+        for activity, suitability in d[9].items():
+            con.execute("INSERT INTO destination_activity VALUES (?, ?, ?)", [d[0], activity, suitability])
+    con.execute("CREATE TABLE municipality (ine_code VARCHAR, name VARCHAR, population BIGINT, in_eiel BOOLEAN, in_vpla BOOLEAN)")
+    con.execute("INSERT INTO municipality VALUES ('28065', 'GETAFE', 193238, false, true), ('28079', 'MADRID', 3506730, false, false)")
+    con.execute("CREATE TABLE air_station (id VARCHAR, network VARCHAR, name VARCHAR, ine_code VARCHAR, area_type VARCHAR, lon DOUBLE, lat DOUBLE)")
+    con.execute("INSERT INTO air_station VALUES ('28065014', 'CM', 'Getafe', '28065', 'Urbana', -3.7310, 40.3060)")
+    con.execute("""CREATE TABLE route_poi (id VARCHAR, type VARCHAR, source VARCHAR, ine_code VARCHAR, status VARCHAR,
+                   working BOOLEAN, lon DOUBLE, lat DOUBLE)""")
+    con.execute("""INSERT INTO route_poi VALUES
+        ('ay_fuentes:1', 'fountain', 'ay_fuentes', '28065', NULL, true, -3.7300, 40.30465),
+        ('ay_fuentes:2', 'fountain', 'ay_fuentes', '28065', 'CERRADA_TEMPORALMENT', false, -3.72945, 40.3043),
+        ('osm:node/1', 'bench', 'osm', '28065', NULL, NULL, -3.72945, 40.30435)""")
+    con.execute("CREATE TABLE source_date (source VARCHAR, downloaded VARCHAR, modified VARCHAR)")
+    con.execute("""INSERT INTO source_date VALUES ('eiel_parques', '2026-10-14T15:51:38', NULL),
+        ('aire_dia', '2026-10-16T09:10:00', '2026-10-16T09:05:00.123456'),
+        ('osm', '2026-10-14T15:42:30', 'Tue, 13 Oct 2026 23:55:22 GMT')""")
+    con.close()
+    rt = duckdb.connect(str(base / "realtime.duckdb"))
+    rt.execute("""CREATE TABLE forecast (ine_code VARCHAR, ts TIMESTAMP_NS, temp DOUBLE, feels_like DOUBLE,
+                  precip_prob DOUBLE, precip DOUBLE, wind INTEGER, sky VARCHAR, issued VARCHAR)""")
+    if forecast:
+        for h in range(6):
+            p = precip(h) if callable(precip) else precip
+            rt.execute("INSERT INTO forecast VALUES ('28065', ?, ?, ?, ?, 0, 5, 'Despejado', '2026-10-16T08:00:00')",
+                       [NOW + timedelta(hours=h), feels, feels, p])
+    rt.execute("CREATE TABLE aqi_hourly (station_id VARCHAR, ts TIMESTAMP_NS, pollutant VARCHAR, mean DOUBLE, n_hours BIGINT)")
+    if air:
+        # NO2 30 -> buena; PM10 45 seria «regular», pero con 15 de 24 h no llega a la cobertura minima
+        rt.execute("INSERT INTO aqi_hourly VALUES ('28065014', ?, 'NO2', 30.0, 1), ('28065014', ?, 'PM10', 45.0, 15)",
+                   [NOW - timedelta(hours=1)] * 2)
+    rt.close()
+    clean = base / "clean"
+    clean.mkdir(exist_ok=True)
+    pd.DataFrame(ADDRESSES, columns=["ine_code", "municipality", "street_code", "street_type", "street", "street_norm",
+                                     "number", "letter", "lon", "lat"]).astype({"number": "Int64"}).to_parquet(
+        clean / "addresses.parquet", index=False)
+    pq.write_table(pa.table({"ine_code": list(MUNICIPALITY_BOXES),
+                             "name": [n for n, _ in MUNICIPALITY_BOXES.values()],
+                             "geometry": [shapely.to_wkb(g) for _, g in MUNICIPALITY_BOXES.values()]}),
+                   clean / "municipality.parquet")
+    if graph:
+        _graph(base / "graph" / "mini")
+    return base
+```
+
+- [ ] **Paso 4: pruebas que fallan** — `tests/test_repository.py`:
+
+```python
+from datetime import datetime, timedelta
+
+import pytest
+
+from mini_data import NOW, ORIGIN, build_mini_data
+from repository import DataUnavailable, Repository, category_at, haversine_m, parse_date
+import settings
+
+ICA = settings.load("ica_thresholds")
+
+
+@pytest.fixture
+def repo(tmp_path):
+    return Repository(build_mini_data(tmp_path / "data"))
+
+
+def test_haversine():
+    assert float(haversine_m(-3.7300, 40.3050, -3.7289, 40.3050)) == pytest.approx(93, abs=1)
+
+
+def test_candidates_by_box_distance_and_activity(repo):
+    found = repo.candidates(ORIGIN["lon"], ORIGIN["lat"], 1000, ["walk"], "any", 400)
+    assert {c.id for c in found} == {"eiel_parques:1", "nmc_parques:1", "nmc_parques:2", "ay_parques:1"}
+    first = min(found, key=lambda c: c.straight_m)
+    assert first.activity == "walk" and first.suitability == 1.0 and first.straight_m == pytest.approx(93, abs=1)
+    assert next(c for c in found if c.id == "nmc_parques:2").green is None
+
+
+def test_candidates_setting_and_limit(repo):
+    assert [c.id for c in repo.candidates(ORIGIN["lon"], ORIGIN["lat"], 1000, ["walk", "gym"], "indoor", 400)] == ["eiel_deporte:1"]
+    assert "eiel_deporte:1" not in {c.id for c in repo.candidates(ORIGIN["lon"], ORIGIN["lat"], 1000, ["gym"], "outdoor", 400)}
+    assert len(repo.candidates(ORIGIN["lon"], ORIGIN["lat"], 1000, ["walk"], "any", 2)) == 2
+
+
+def test_forecast_in_window(repo):
+    by, issued = repo.forecast(["28065", "28079"], NOW, NOW + timedelta(hours=2))
+    assert sorted(by["28065"]) == [NOW + timedelta(hours=h) for h in range(3)]
+    assert by["28065"][NOW] == (20.0, 20.0, 0.0)
+    assert "28079" not in by and issued["28065"] == datetime(2026, 10, 16, 8, 0)
+
+
+def test_air_categories_require_coverage(repo):
+    cats = repo.air_categories(NOW, NOW + timedelta(hours=2), ICA, 3)
+    assert cats == {"28065014": [(NOW - timedelta(hours=1), "good")]}    # PM10 con 15 h no cuenta
+
+
+def test_category_at_uses_last_reading_within_valid_hours():
+    readings = [(NOW - timedelta(hours=1), "good"), (NOW, "moderate")]
+    assert category_at(readings, NOW - timedelta(hours=1), 3) == "good"
+    assert category_at(readings, NOW + timedelta(hours=3), 3) == "moderate"
+    assert category_at(readings, NOW + timedelta(hours=4), 3) is None
+    assert category_at(readings, NOW - timedelta(hours=2), 3) is None
+
+
+def test_parse_date():
+    assert parse_date("2026-10-16T09:05:00.123456") == datetime(2026, 10, 16, 9, 5, 0, 123456)
+    assert parse_date("Tue, 13 Oct 2026 23:55:22 GMT") == datetime(2026, 10, 14, 1, 55, 22)
+    assert parse_date(None) is None and parse_date("ayer") is None
+
+
+def test_source_dates_prefer_modified(repo):
+    dates = repo.source_dates()
+    assert dates["aire_dia"] == datetime(2026, 10, 16, 9, 5, 0, 123456)
+    assert dates["eiel_parques"] == datetime(2026, 10, 14, 15, 51, 38)
+
+
+def test_municipality_names_prefer_callejero(repo):
+    assert repo.municipality_names() == {"28065": "Getafe", "28079": "Madrid"}
+
+
+def test_route_pois_skip_not_working(repo):
+    ids = {r[0] for r in repo.route_pois(-3.74, 40.30, -3.72, 40.31)}
+    assert ids == {"ay_fuentes:1", "osm:node/1"}
+
+
+def test_missing_realtime_is_empty_and_missing_main_raises(tmp_path):
+    base = build_mini_data(tmp_path / "data")
+    (base / "realtime.duckdb").unlink()
+    repo = Repository(base)
+    assert repo.forecast(["28065"], NOW, NOW) == ({}, {})
+    assert repo.air_categories(NOW, NOW, ICA, 3) == {}
+    (base / "gomad.duckdb").unlink()
+    with pytest.raises(DataUnavailable):
+        repo.candidates(ORIGIN["lon"], ORIGIN["lat"], 1000, ["walk"], "any", 400)
+```
+
+- [ ] **Paso 5:** Run: `.venv/bin/pytest tests/test_repository.py -q` → Esperado: FAIL con `ModuleNotFoundError: No module named 'repository'`.
+- [ ] **Paso 6: implementación** — `repository.py`:
+
+```python
+"""Unico punto que conoce DuckDB (arquitectura §4.3). Solo lectura: cada consulta abre y cierra su conexion, asi
+una sustitucion atomica de gomad.duckdb o realtime.duckdb (ingest) se ve en la peticion siguiente."""
+import email.utils
+import math
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
+import duckdb
+import numpy as np
+
+from engine.rules import aqi_category
+
+EARTH_RADIUS_M = 6_371_008.8
+M_PER_DEG_LAT = 111_320.0
+LOCAL_TZ = ZoneInfo("Europe/Madrid")
+
+
+class DataUnavailable(Exception):
+    pass
+
+
+def haversine_m(lon1, lat1, lon2, lat2):
+    lon1, lat1, lon2, lat2 = (np.radians(np.asarray(a, dtype=float)) for a in (lon1, lat1, lon2, lat2))
+    a = np.sin((lat2 - lat1) / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin((lon2 - lon1) / 2) ** 2
+    return 2 * EARTH_RADIUS_M * np.arcsin(np.sqrt(a))
+
+
+def parse_date(text):
+    """Fecha de source_date/forecast (ISO o RFC 1123 de las cabeceras HTTP) en hora local de Madrid sin zona."""
+    if not text:
+        return None
+    try:
+        d = datetime.fromisoformat(text)
+    except ValueError:
+        try:
+            d = email.utils.parsedate_to_datetime(text)
+        except (TypeError, ValueError):
+            return None
+    return d.astimezone(LOCAL_TZ).replace(tzinfo=None) if d.tzinfo else d
+
+
+def _number(v):
+    return None if v is None or (isinstance(v, float) and math.isnan(v)) else float(v)
+
+
+def _naive(ts):
+    # TIMESTAMP_NS llega como datetime o pandas.Timestamp segun la version: siempre datetime
+    return ts.to_pydatetime() if hasattr(ts, "to_pydatetime") else ts
+
+
+def category_at(readings, hour, valid_h):
+    """Ultima categoria medida en o antes de `hour` con como mucho valid_h horas de antiguedad; None si no hay."""
+    last = None
+    for ts, category in readings:
+        if ts > hour:
+            break
+        last = (ts, category)
+    if last is None or hour - last[0] > timedelta(hours=valid_h):
+        return None
+    return last[1]
+
+
+@dataclass
+class Candidate:
+    id: str
+    source: str
+    name: str
+    type: str
+    covered: bool | None
+    ine_code: str
+    lon: float
+    lat: float
+    green: float | None
+    activity: str
+    suitability: float
+    straight_m: float
+
+
+@dataclass
+class Station:
+    id: str
+    network: str
+    name: str
+    lon: float
+    lat: float
+
+
+class Repository:
+    def __init__(self, data_dir):
+        self.main = data_dir / "gomad.duckdb"
+        self.realtime = data_dir / "realtime.duckdb"
+        self.addresses = data_dir / "clean" / "addresses.parquet"
+        self._names = None
+
+    def _query(self, path, sql, params=(), required=False):
+        if not path.exists():
+            if required:
+                raise DataUnavailable("Los datos todavía no están cargados en el servidor.")
+            return []
+        con = duckdb.connect(str(path), read_only=True)
+        try:
+            return con.execute(sql, list(params)).fetchall()
+        finally:
+            con.close()
+
+    def candidates(self, lon, lat, radius_m, activities, setting, per_activity):
+        dlat = radius_m / M_PER_DEG_LAT
+        dlon = radius_m / (M_PER_DEG_LAT * math.cos(math.radians(lat)))
+        covered = {"indoor": "AND d.covered", "outdoor": "AND d.covered IS DISTINCT FROM TRUE"}.get(setting, "")
+        marks = ", ".join("?" for _ in activities)
+        sql = f"""
+            SELECT * FROM (
+              SELECT d.id, d.source, d.name, d.type, d.covered, d.ine_code, d.lon, d.lat, d.green,
+                     a.activity, a.suitability,
+                     2 * {EARTH_RADIUS_M} * asin(sqrt(pow(sin(radians(d.lat - ?) / 2), 2)
+                       + cos(radians(?)) * cos(radians(d.lat)) * pow(sin(radians(d.lon - ?) / 2), 2))) AS straight_m
+              FROM destination d JOIN destination_activity a ON a.destination_id = d.id
+              WHERE a.activity IN ({marks}) AND d.lat BETWEEN ? AND ? AND d.lon BETWEEN ? AND ? {covered})
+            WHERE straight_m <= ?
+            QUALIFY row_number() OVER (PARTITION BY activity ORDER BY straight_m, id) <= ?
+            ORDER BY straight_m, id"""
+        params = [lat, lat, lon, *activities, lat - dlat, lat + dlat, lon - dlon, lon + dlon, radius_m, per_activity]
+        rows = self._query(self.main, sql, params, required=True)
+        return [Candidate(*r[:8], _number(r[8]), *r[9:]) for r in rows]
+
+    def forecast(self, ine_codes, start, end):
+        if not ine_codes:
+            return {}, {}
+        marks = ", ".join("?" for _ in ine_codes)
+        rows = self._query(self.realtime, f"""SELECT ine_code, ts, temp, feels_like, precip_prob, issued FROM forecast
+                                              WHERE ine_code IN ({marks}) AND ts BETWEEN ? AND ? ORDER BY ts""",
+                           [*ine_codes, start, end])
+        by, issued = {}, {}
+        for ine, ts, temp, feels, prob, iss in rows:
+            by.setdefault(ine, {})[_naive(ts)] = (_number(temp), _number(feels), _number(prob))
+            issued[ine] = parse_date(iss)
+        return by, issued
+
+    def stations(self):
+        return [Station(*r) for r in self._query(self.main, "SELECT id, network, name, lon, lat FROM air_station",
+                                                 required=True)]
+
+    def air_categories(self, start, end, ica, valid_h):
+        """{estacion: [(hora, categoria)]} ordenado, con las medias que cumplen la cobertura minima del ICA."""
+        rows = self._query(self.realtime, """SELECT station_id, ts, pollutant, mean, n_hours FROM aqi_hourly
+                                             WHERE ts BETWEEN ? AND ? ORDER BY station_id, ts""",
+                           [start - timedelta(hours=valid_h), end])
+        needed = {p: math.ceil(ica["min_coverage"] * h) for p, h in ica["period_hours"].items()}
+        measured = {}
+        for station, ts, pollutant, mean, n_hours in rows:
+            if _number(mean) is None or pollutant not in needed or n_hours is None or n_hours < needed[pollutant]:
+                continue
+            measured.setdefault(station, {}).setdefault(_naive(ts), {})[pollutant] = float(mean)
+        out = {}
+        for station, by_ts in measured.items():
+            cats = [(ts, aqi_category(values, ica["bands"])) for ts, values in sorted(by_ts.items())]
+            cats = [(ts, c) for ts, c in cats if c is not None]
+            if cats:
+                out[station] = cats
+        return out
+
+    def source_dates(self):
+        rows = self._query(self.main, "SELECT source, downloaded, modified FROM source_date")
+        return {source: parse_date(modified) or parse_date(downloaded) for source, downloaded, modified in rows}
+
+    def municipality_names(self):
+        """Nombre para mostrar: el del callejero («Las Rozas de Madrid»); si falta, el de municipality (MAYUSCULAS)."""
+        if self._names is None:
+            names = dict(self._query(self.main, "SELECT ine_code, name FROM municipality", required=True))
+            if self.addresses.exists():
+                con = duckdb.connect()
+                try:
+                    names.update(dict(con.execute("SELECT DISTINCT ine_code, municipality FROM read_parquet(?)",
+                                                  [str(self.addresses)]).fetchall()))
+                finally:
+                    con.close()
+            self._names = names
+        return self._names
+
+    def route_pois(self, min_lon, min_lat, max_lon, max_lat):
+        return self._query(self.main, """SELECT id, type, source, lon, lat FROM route_poi
+                                         WHERE working IS NOT FALSE AND lon BETWEEN ? AND ? AND lat BETWEEN ? AND ?""",
+                           [min_lon, max_lon, min_lat, max_lat], required=True)
+```
+
+- [ ] **Paso 7:** Run: `.venv/bin/pytest tests/test_repository.py tests/engine -q` → Esperado: todo PASS (`11 passed` en `test_repository.py`).
+- [ ] **Paso 8: commit** — `git -C ../.. add app/api/repository.py app/api/tests/mini_data.py app/api/tests/test_repository.py app/api/engine/rules.py app/api/tests/engine/test_rules.py app/config && git -C ../.. commit -m "Motor: repository de solo lectura y configuración de /recommend (V-M1)"`
+
+**Terminado cuando:** las consultas devuelven candidatos, previsión, aire con cobertura mínima, fechas y nombres; sin `realtime.duckdb` no falla y sin `gomad.duckdb` lanza `DataUnavailable`.
+
+---
+
+### Task 29: V-M1 (2/2) · `/activities`, `/recommend`, grafos al arrancar y log sin ubicación
+
+**Rol:** Motor · **Servicio:** `app/api/` · **Depende de:** Tasks 21, 27, 28 · **Duración:** 3 h
+
+**Ficheros:** Crear `routing/store.py`, `services/__init__.py`, `services/common.py`, `services/recommend.py`, `tests/services/test_recommend.py`, `tests/test_endpoints.py`. Modificar `routing/graph.py` (`nearest_nodes`), `tests/routing/test_routing.py`, `main.py`, `../../docs/arquitectura.md` §4.2.
+
+**Interfaces:**
+- Consume: `Repository` y `category_at`, `haversine_m` (Task 28); `explanation` (Task 27); `engine.slots`, `engine.scoring`, `engine.rules`; `routing.graph.load_graph`, `bounded_distances`.
+- Produce: `routing.graph.nearest_nodes(g, lons, lats, max_m) -> (nodes ndarray int64 [-1 si > max_m], dist ndarray m)`; `routing.store.Zone(name, graph, bbox)`, `GraphStore(zones=())`, `GraphStore.load(directory)`, `GraphStore.locate(points: list[(lon, lat)], max_m) -> (Zone, nodes, dists) | None` (zona más pequeña que contiene todos los puntos); `services.common.walking_speed_kmh(profile, weights_cfg)`, `services.common.data_source(source, labels, date, own_criterion=False) -> schemas.DataSource`; `services.recommend.recommend(req, repo, graphs, now=None) -> RecommendResponse`, `UnknownActivity`, `MEDICAL_DISCLAIMER`; en `main.py`: `lifespan` (valida config, crea `app.state.repo`, `app.state.graphs`), dependencias `get_repo`, `get_graphs` (sin `lifespan`: repositorio sobre `settings.DATA_DIR` y `GraphStore()` vacío), middleware de log `gomad.api`.
+
+- [ ] **Paso 1: `nearest_nodes`** — en `tests/routing/test_routing.py` añadir (usa la fixture `graph` del fichero):
+
+```python
+def test_nearest_nodes_vectorized(graph):
+    nodes, dist = nearest_nodes(graph, [-3.7300, -3.7289, -3.7000], [40.3050, 40.30505, 40.3100], max_m=300)
+    assert nodes.tolist() == [0, 1, -1]                # el tercero cae en la componente aislada: fuera
+    assert dist[0] == pytest.approx(0) and dist[1] == pytest.approx(5.6, abs=0.5)
+```
+
+(añadir `nearest_nodes` al `import` de `routing.graph`). Run: `.venv/bin/pytest tests/routing/test_routing.py -q` → Esperado: FAIL (`ImportError: cannot import name 'nearest_nodes'`). Implementación en `routing/graph.py`, tras `nearest_node`:
+
+```python
+def nearest_nodes(g, lons, lats, max_m=300):
+    """Nodo mas cercano (componente principal) de cada punto y su distancia en metros; -1 si esta a mas de max_m."""
+    d, i = g.tree.query(_xy(lons, lats, g.cos_lat0))
+    nodes = g.tree_nodes[i] if g.tree_nodes is not None else i
+    return np.where(d <= max_m, nodes, -1).astype(np.int64), d
+```
+
+Run → Esperado: PASS.
+
+- [ ] **Paso 2: pruebas del servicio que fallan** — `tests/services/test_recommend.py`:
+
+```python
+from datetime import timedelta
+
+import pytest
+
+import schemas as s
+from mini_data import NOW, ORIGIN, build_mini_data
+from repository import Repository
+from routing.store import GraphStore
+from services.recommend import MEDICAL_DISCLAIMER, UnknownActivity, recommend
+
+
+def request(**kw):
+    base = dict(origin=ORIGIN, activity="walk", window_start=NOW, window_end=NOW + timedelta(hours=3),
+                duration_min=45, max_distance_m=1000)
+    return s.RecommendRequest(**{**base, **kw})
+
+
+def run(tmp_path, req=None, graph=False, **data):
+    base = build_mini_data(tmp_path / "data", graph=graph, **data)
+    graphs = GraphStore.load(base / "graph") if graph else GraphStore()
+    return recommend(req or request(), Repository(base), graphs, now=NOW)
+
+
+def test_ranking_pagination_and_disclaimer(tmp_path):
+    first = run(tmp_path, request(limit=1))
+    assert first.medical_disclaimer == MEDICAL_DISCLAIMER and first.has_more
+    assert first.results[0].destination.id == "eiel_parques:1"
+    assert first.results[0].destination.municipality == "Getafe"
+    second = run(tmp_path / "b", request(limit=1, offset=1))
+    assert second.results[0].destination.id != "eiel_parques:1"
+
+
+def test_dedupe_same_name_close(tmp_path):
+    ids = [r.destination.id for r in run(tmp_path, request(limit=10)).results]
+    assert "eiel_parques:1" in ids and "nmc_parques:1" not in ids        # «PARQUE UNO» a 3 m: el mismo sitio
+
+
+def test_missing_factors_renormalize_with_warnings(tmp_path):
+    res = run(tmp_path, request(limit=10))
+    capital = next(r for r in res.results if r.destination.id == "ay_parques:1")
+    green = next(f for f in capital.factors if f.factor == "green")
+    assert green.value is None and green.weight == 0
+    assert sum(f.weight for f in capital.factors) == pytest.approx(1)
+    assert "Verde: sin datos en Getafe, Madrid." in res.warnings
+    assert "Previsión: sin datos para Madrid." in res.warnings
+    assert any(w.startswith("Calor:") for w in res.warnings)              # DEC-06 pendiente (heat null)
+
+
+def test_air_from_nearest_station_with_coverage(tmp_path):
+    rec = run(tmp_path, request(window_end=NOW + timedelta(hours=4))).results[0]
+    assert rec.hours[0].aqi_category == "good"                             # NO2 30; PM10 sin cobertura no cuenta
+    assert rec.hours[-1].aqi_category is None                              # mas de 3 h tras la medicion: sin dato
+    assert any(d.source == "aire_dia" and "Getafe" in d.label for d in rec.sources)
+
+
+def test_rain_now_better_later_explains(tmp_path):
+    res = run(tmp_path, precip=lambda h: 90.0 if h == 0 else 0.0)
+    rec = res.results[0]
+    assert rec.hours[0].outdoor_ok is False and rec.best_hour == NOW + timedelta(hours=1)
+    assert rec.explanation.startswith("Ahora no: mejor a las 11:00 (lluvia: 90 % de probabilidad (umbral de criterio propio))")
+
+
+def test_rain_all_window_proposes_covered(tmp_path):
+    res = run(tmp_path, precip=90.0)
+    assert res.results[0].indoor_alternative and res.results[0].destination.id == "eiel_deporte:1"
+    assert any("sitios cubiertos" in w for w in res.warnings)
+
+
+def test_surprise_me_distinct_activities(tmp_path):
+    res = run(tmp_path, request(activity=None, limit=3))
+    labels = [r.explanation.split("Para ")[1].split(":")[0] for r in res.results]
+    assert len(set(labels)) == len(labels) == 3                          # caminar, correr y gimnasio
+    assert not res.has_more                                              # no hay una cuarta actividad a 1 km
+
+
+def test_distance_graph_or_approximate(tmp_path):
+    res = run(tmp_path, request(limit=10), graph=True)
+    by_id = {r.destination.id: r for r in res.results}
+    assert by_id["eiel_parques:1"].distance_m == pytest.approx(100, abs=1)          # por la red: 100 m
+    assert not any(d.source == "config:recommend" for d in by_id["eiel_parques:1"].sources)
+    assert any(d.source == "config:recommend" and d.own_criterion for d in by_id["nmc_parques:2"].sources)
+    assert by_id["nmc_parques:2"].distance_m == pytest.approx(555.9 * 1.3, rel=0.01)
+
+
+def test_window_in_past_warns(tmp_path):
+    res = run(tmp_path, request(window_start=NOW - timedelta(hours=5), window_end=NOW - timedelta(hours=3)))
+    assert "La ventana horaria elegida ya ha pasado: elige otra." in res.warnings
+    assert all(r.hours == [] and r.best_hour is None for r in res.results)
+
+
+def test_unknown_activity(tmp_path):
+    with pytest.raises(UnknownActivity):
+        run(tmp_path, request(activity="parapente"))
+
+
+def test_explanation_numbers_match_object(tmp_path):
+    rec = run(tmp_path).results[0]
+    from engine.explanation import fmt_distance, fmt_number
+    assert fmt_distance(rec.distance_m) in rec.explanation and fmt_number(rec.score) in rec.explanation
+```
+
+- [ ] **Paso 3:** Run: `.venv/bin/pytest tests/services -q` → Esperado: FAIL con `ModuleNotFoundError: No module named 'routing.store'`.
+- [ ] **Paso 4: implementación** — `routing/store.py`:
+
+```python
+"""Grafos peatonales en memoria, cargados una vez al arrancar (lifespan): uno por zona en data/graph/<zona>/."""
+from dataclasses import dataclass
+
+import numpy as np
+
+from routing.graph import Graph, load_graph, nearest_nodes
+
+
+@dataclass
+class Zone:
+    name: str
+    graph: Graph
+    bbox: tuple                # (lon_min, lat_min, lon_max, lat_max) de sus nodos
+
+
+class GraphStore:
+    def __init__(self, zones=()):
+        # la zona mas pequena primero: mas rapida (Getafe antes que la caja de la capital)
+        self.zones = sorted(zones, key=lambda z: len(z.graph.lon))
+
+    @classmethod
+    def load(cls, directory):
+        zones = []
+        for d in sorted(directory.glob("*")) if directory.exists() else []:
+            if (d / "nodes.parquet").exists() and (d / "edges.parquet").exists():
+                g = load_graph(d)
+                zones.append(Zone(d.name, g, (g.lon.min(), g.lat.min(), g.lon.max(), g.lat.max())))
+        return cls(zones)
+
+    def locate(self, points, max_m):
+        lons = np.array([p[0] for p in points], dtype=float)
+        lats = np.array([p[1] for p in points], dtype=float)
+        for z in self.zones:
+            x0, y0, x1, y1 = z.bbox
+            if not ((lons >= x0) & (lons <= x1) & (lats >= y0) & (lats <= y1)).all():
+                continue
+            nodes, dist = nearest_nodes(z.graph, lons, lats, max_m)
+            if (nodes >= 0).all():
+                return z, nodes, dist
+        return None
+```
+
+`services/__init__.py` vacío. `services/common.py`:
+
+```python
+"""Piezas compartidas por los servicios de la API."""
+import schemas as s
+
+
+def walking_speed_kmh(profile, weights_cfg):
+    # velocidad a pie del perfil (weights.yaml -> speeds_kmh); general y sensible caminan a la de «walk»
+    speeds = weights_cfg["speeds_kmh"]
+    return speeds.get(profile, speeds["walk"])
+
+
+def data_source(source, labels, date, own_criterion=False):
+    return s.DataSource(source=source, label=labels.get(source, source), date=date, own_criterion=own_criterion)
+```
+
+`services/recommend.py`:
+
+```python
+"""POST /recommend (arquitectura §4.2): candidatos -> distancia a pie -> contexto por hora -> reglas -> nota.
+
+Determinista y sin IA. Pesos, umbrales, actividades, velocidades y criterios propios salen de config/."""
+import unicodedata
+from dataclasses import dataclass
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+import numpy as np
+
+import schemas as s
+import settings
+from engine import explanation as ex
+from engine.rules import HourContext
+from engine.scoring import FACTORS, air_factor, compute_score, normalize_weights, proximity_factor, weather_factor
+from engine.slots import best_hour, evaluate_hours, needs_indoor, window_hours
+from repository import category_at, haversine_m
+from routing.graph import bounded_distances, nearest_nodes
+from services.common import data_source, walking_speed_kmh
+
+LOCAL_TZ = ZoneInfo("Europe/Madrid")
+MEDICAL_DISCLAIMER = "Recomendación orientativa con datos abiertos. No es consejo médico."
+CONFIG = ("activities", "weights", "rules", "ica_thresholds", "recommend", "routing", "sources")
+
+
+class UnknownActivity(ValueError):
+    pass
+
+
+@dataclass
+class Scored:
+    cand: object
+    distance_m: float
+    approximate: bool
+    covered: bool
+    hours: list
+    best: object
+    score: float
+    fixed: dict
+    indoor_alternative: bool = False
+
+    @property
+    def viable(self):
+        return self.best is not None
+
+
+def _plain(text):
+    t = unicodedata.normalize("NFKD", str(text)).encode("ascii", "ignore").decode().lower()
+    return " ".join(t.split())
+
+
+def _same_place(a, b, radius_m):
+    if a.cand.id == b.cand.id:
+        return True
+    return (_plain(a.cand.name) == _plain(b.cand.name)
+            and float(haversine_m(a.cand.lon, a.cand.lat, b.cand.lon, b.cand.lat)) <= radius_m)
+
+
+def _page(scored, req, radius_m):
+    """Pagina sin repetir sitio; en «Sorprendeme», como mucho un resultado por actividad (RF-03)."""
+    need = req.offset + req.limit
+    kept, activities = [], set()
+    for x in scored:
+        if req.activity is None and x.cand.activity in activities:
+            continue
+        if any(_same_place(k, x, radius_m) for k in kept):
+            continue
+        kept.append(x)
+        activities.add(x.cand.activity)
+        if len(kept) > need:
+            break
+    return kept[req.offset:need], len(kept) > need
+
+
+def _hour(h):
+    c = h.ctx
+    return s.HourEvaluation(hour=h.hour, score=h.score, outdoor_ok=h.outdoor_ok, reasons=h.reasons,
+                            temperature_c=c.temperature_c if c else None, feels_like_c=c.feels_like_c if c else None,
+                            precip_prob=c.precip_prob if c else None, aqi_category=c.aqi_category if c else None)
+
+
+class _Run:
+    """Estado de una peticion: contexto cargado una vez y reutilizado por todos los candidatos."""
+
+    def __init__(self, req, repo, graphs, cfg, weights, window):
+        self.req, self.repo, self.cfg, self.weights, self.window = req, repo, cfg, weights, window
+        self.catalog = {a["id"]: a for a in cfg["activities"]["activities"]}
+        self.labels = (cfg["sources"] or {}).get("labels", {})
+        self.located = graphs.locate([(req.origin.lon, req.origin.lat)], cfg["routing"]["snap_max_m"])
+        self.net = None
+        self.forecasts, self.issued, self.loaded = {}, {}, set()
+        self.air, self.stations, self.station_of, self.contexts = None, [], {}, {}
+        self.dates = repo.source_dates()
+        self.names = repo.municipality_names()
+
+    def _distances(self, cands):
+        dist = np.array([c.straight_m for c in cands], dtype=float) * self.cfg["recommend"]["straight_line_detour"]
+        approx = np.ones(len(cands), dtype=bool)
+        if self.located is not None:
+            zone, nodes, snaps = self.located
+            if self.net is None:
+                self.net = bounded_distances(zone.graph, int(nodes[0]), self.req.max_distance_m)
+            cn, cd = nearest_nodes(zone.graph, [c.lon for c in cands], [c.lat for c in cands],
+                                   self.cfg["routing"]["snap_max_m"])
+            ok = cn >= 0
+            dist[ok] = self.net[cn[ok]] + cd[ok] + snaps[0]
+            approx = ~ok
+        return dist, approx
+
+    def _load_context(self, cands):
+        if not self.window:
+            return
+        new = sorted({c.ine_code for c in cands} - self.loaded)
+        if new:
+            by, issued = self.repo.forecast(new, self.window[0], self.window[-1])
+            self.forecasts.update(by)
+            self.issued.update(issued)
+            self.loaded |= set(new)
+        if self.air is None:
+            self.air = self.repo.air_categories(self.window[0], self.window[-1], self.cfg["ica_thresholds"],
+                                                self.cfg["recommend"]["air_reading_valid_h"])
+            self.stations = [st for st in self.repo.stations() if st.id in self.air]
+        if self.stations:
+            d = haversine_m(np.array([c.lon for c in cands])[:, None], np.array([c.lat for c in cands])[:, None],
+                            np.array([st.lon for st in self.stations])[None, :],
+                            np.array([st.lat for st in self.stations])[None, :])
+            for c, i in zip(cands, d.argmin(axis=1)):
+                self.station_of[c.id] = self.stations[int(i)]
+
+    def _hour_contexts(self, c):
+        station = self.station_of.get(c.id)
+        key = (c.ine_code, station.id if station else None)
+        if key not in self.contexts:
+            fc = self.forecasts.get(c.ine_code)
+            readings = self.air.get(station.id, []) if station else []
+            valid_h = self.cfg["recommend"]["air_reading_valid_h"]
+            out = {}
+            for h in self.window:
+                f = fc.get(h) if fc else None
+                if fc and f is None:
+                    continue          # hay prevision del municipio, pero no para esta hora: «Sin prevision»
+                temp, feels, prob = f if f else (None, None, None)
+                out[h] = HourContext(h, temp, feels, prob, category_at(readings, h, valid_h))
+            self.contexts[key] = out
+        return self.contexts[key]
+
+    def score(self, cands):
+        if not cands:
+            return []
+        dist, approx = self._distances(cands)
+        keep = dist <= self.req.max_distance_m
+        cands = [c for c, k in zip(cands, keep) if k]
+        dist, approx = dist[keep], approx[keep]
+        self._load_context(cands)
+        out = []
+        for c, d, a in zip(cands, dist, approx):
+            covered = self.catalog[c.activity].get("outdoor") is False or bool(c.covered)
+            fixed = {"proximity": proximity_factor(d, self.req.max_distance_m), "suitability": c.suitability,
+                     "green": c.green}
+            hours = evaluate_hours(self._hour_contexts(c), self.window, covered, self.req.profile, self.cfg["rules"],
+                                   fixed, self.weights)
+            best = best_hour(hours)
+            score = best.score if best else compute_score({**fixed, "air": None, "weather": None}, self.weights).value
+            out.append(Scored(c, float(d), bool(a), covered, hours, best, score, fixed))
+        return out
+
+    def _own_rule(self, first):
+        if first is None or first.outdoor_ok is not False:
+            return False
+        rules = self.cfg["rules"]
+        for r in first.reasons:
+            if r.startswith("Lluvia") and (rules.get("rain") or {}).get("own_criterion"):
+                return True
+            if r.startswith("Calor") and (rules.get("heat") or {}).get("own_criterion"):
+                return True
+            if r.startswith("Calidad del aire") and self.req.profile in (rules.get("air") or {}).get(
+                    "own_criterion_profiles", []):
+                return True
+        return False
+
+    def _sources(self, x):
+        c = x.cand
+        out = [data_source(c.source, self.labels, self.dates.get(c.source))]
+        if c.green is not None:
+            out.append(data_source("vpla_redes", self.labels, self.dates.get("vpla_redes")))
+        if c.ine_code in self.issued:
+            out.append(data_source("aemet", self.labels, self.issued[c.ine_code]))
+        station = self.station_of.get(c.id)
+        if station and not x.covered:
+            sid = "aire_dia" if station.network == "CM" else "ay_aire"
+            out.append(s.DataSource(source=sid, label=f"{self.labels.get(sid, sid)} · estación {station.name}",
+                                    date=self.air[station.id][-1][0]))
+        if self.req.weights is None:
+            out.append(data_source("config:weights", self.labels, None,
+                                   bool(self.cfg["weights"].get("own_criterion"))))
+        if x.approximate:
+            detour = ex.fmt_number(self.cfg["recommend"]["straight_line_detour"])
+            out.append(s.DataSource(source="config:recommend", label=f"Distancia aproximada: línea recta × {detour}",
+                                    date=None, own_criterion=True))
+        return out
+
+    def recommendation(self, x, surprise):
+        c, req = x.cand, self.req
+        duration = x.distance_m / 1000 / walking_speed_kmh(req.profile, self.cfg["weights"]) * 60
+        ref = x.best.ctx if x.best else None
+        shown = ref or next((h.ctx for h in x.hours if h.ctx is not None), None)
+        factors = {**x.fixed,
+                   "air": None if x.covered or ref is None else air_factor(ref.aqi_category),
+                   "weather": None if x.covered or ref is None else weather_factor(ref.precip_prob)}
+        score = compute_score(factors, self.weights)
+        factor_scores = [
+            s.FactorScore(factor=f, value=None if factors[f] is None else round(10 * factors[f], 1),
+                          weight=round(score.effective_weights.get(f, 0.0), 4),
+                          text=ex.factor_text(f, None if factors[f] is None else 10 * factors[f],
+                                              distance_m=x.distance_m, green=c.green,
+                                              aqi_category=shown.aqi_category if shown else None,
+                                              precip_prob=shown.precip_prob if shown else None, covered=x.covered))
+            for f in FACTORS]
+        sources = self._sources(x)
+        first = x.hours[0] if x.hours else None
+        text = ex.explain(ex.ExplanationInput(
+            name=c.name, distance_m=x.distance_m, duration_min=duration, score=x.score,
+            factors=[(f.factor, f.value, f.weight) for f in factor_scores], first=first, best=x.best,
+            indoor_alternative=x.indoor_alternative,
+            activity_label=self.catalog[c.activity]["label"] if surprise else None,
+            own_criterion_rule=self._own_rule(first),
+            sources=[(d.label, d.date) for d in sources if d.source in ("aemet", "aire_dia", "ay_aire")],
+            approximate_distance=x.approximate))
+        return s.Recommendation(
+            destination=s.DestinationSummary(id=c.id, name=c.name, type=c.type, covered=True if x.covered else c.covered,
+                                             municipality=self.names.get(c.ine_code, c.ine_code), ine_code=c.ine_code,
+                                             coordinate=s.Coordinate(lat=c.lat, lon=c.lon), source=sources[0]),
+            distance_m=round(x.distance_m, 1), duration_min=round(duration, 1),
+            score=round(min(10.0, max(0.0, x.score)), 2), factors=factor_scores,
+            best_hour=x.best.hour if x.best else None, hours=[_hour(h) for h in x.hours],
+            indoor_alternative=x.indoor_alternative, explanation=text, sources=sources)
+
+    def warnings(self, picked):
+        out = []
+        name = lambda x: self.names.get(x.cand.ine_code, x.cand.ine_code)
+        no_green = sorted({name(x) for x in picked if x.cand.green is None})
+        if no_green:
+            out.append(f"Verde: sin datos en {', '.join(no_green)}.")
+        if self.window:
+            no_fc = sorted({name(x) for x in picked if x.cand.ine_code not in self.forecasts})
+            if no_fc:
+                out.append(f"Previsión: sin datos para {', '.join(no_fc)}.")
+            if any(not x.covered and all(h.ctx is None or h.ctx.aqi_category is None for h in x.hours) for x in picked):
+                out.append("Aire: sin medición reciente cerca; la nota no lo tiene en cuenta.")
+        if (self.cfg["rules"].get("heat") or {}).get("max_feels_like_c") is None:
+            out.append("Calor: todavía no hay un umbral oficial cargado; no se evalúa.")
+        if any(x.approximate for x in picked):
+            detour = ex.fmt_number(self.cfg["recommend"]["straight_line_detour"])
+            out.append(f"Distancias aproximadas donde no hay red peatonal cargada (línea recta × {detour}, criterio propio).")
+        return out
+
+
+def recommend(req, repo, graphs, now=None):
+    cfg = {name: settings.load(name) for name in CONFIG}
+    catalog = {a["id"] for a in cfg["activities"]["activities"]}
+    if req.activity is not None and req.activity not in catalog:
+        raise UnknownActivity(f"Actividad desconocida: {req.activity}")
+    weights, warnings = normalize_weights(req.weights.model_dump() if req.weights else None,
+                                          cfg["weights"]["defaults"])
+    window = window_hours(req.window_start, req.window_end, now or datetime.now(LOCAL_TZ))
+    if not window:
+        warnings.append("La ventana horaria elegida ya ha pasado: elige otra.")
+    run = _Run(req, repo, graphs, cfg, weights, window)
+    rc = cfg["recommend"]
+    activities = [req.activity] if req.activity else [a["id"] for a in cfg["activities"]["activities"]]
+    scored = run.score(repo.candidates(req.origin.lon, req.origin.lat, req.max_distance_m, activities, req.setting,
+                                       rc["max_candidates"]))
+    outdoor = [x for x in scored if not x.covered]
+    if outdoor and all(needs_indoor(x.hours) for x in outdoor):
+        for x in scored:
+            x.indoor_alternative = x.covered
+        fallback = rc.get("indoor_fallback_activity")
+        if req.setting != "outdoor" and not any(x.covered for x in scored) and fallback in catalog:
+            extra = run.score(repo.candidates(req.origin.lon, req.origin.lat, req.max_distance_m, [fallback],
+                                              "indoor", rc["max_candidates"]))
+            for x in extra:
+                x.indoor_alternative = True
+            scored += extra
+        warnings.append("Ahora no se recomienda actividad al aire libre en la ventana elegida: te proponemos sitios cubiertos."
+                        if any(x.covered for x in scored) else
+                        "Ahora no se recomienda actividad al aire libre en la ventana elegida: prueba otra franja.")
+    scored.sort(key=lambda x: (not x.viable, -x.score, x.distance_m))
+    picked, has_more = _page(scored, req, rc["dedupe_radius_m"])
+    results = [run.recommendation(x, surprise=req.activity is None) for x in picked]
+    warnings += run.warnings(picked)
+    if not scored:
+        warnings.append(f"No hay destinos para esta actividad a menos de {ex.fmt_distance(req.max_distance_m)}.")
+    return s.RecommendResponse(results=results, has_more=has_more, warnings=list(dict.fromkeys(warnings)),
+                               medical_disclaimer=MEDICAL_DISCLAIMER)
+```
+
+- [ ] **Paso 5:** Run: `.venv/bin/pytest tests/services -q` → Esperado: `11 passed`.
+- [ ] **Paso 6: pruebas de los endpoints que fallan** — `tests/test_endpoints.py`:
+
+```python
+import logging
+import time
+from datetime import datetime, timedelta
+
+import pytest
+from fastapi.testclient import TestClient
+
+import main
+from main import app, get_graphs, get_repo
+from mini_data import build_mini_data
+from repository import Repository
+from routing.store import GraphStore
+from settings import DATA_DIR
+
+GETAFE = {"lat": 40.3057, "lon": -3.7329}
+SOL = {"lat": 40.4169, "lon": -3.7035}
+
+
+def body(origin, activity="walk", hours=3, **kw):
+    now = datetime.now().replace(second=0, microsecond=0)
+    return {"origin": origin, "activity": activity, "window_start": now.isoformat(),
+            "window_end": (now + timedelta(hours=hours)).isoformat(), "duration_min": 45, "max_distance_m": 3000, **kw}
+
+
+@pytest.fixture
+def mini(tmp_path):
+    base = build_mini_data(tmp_path / "data")
+    app.dependency_overrides[get_repo] = lambda: Repository(base)
+    app.dependency_overrides[get_graphs] = lambda: GraphStore()
+    yield TestClient(app)
+    app.dependency_overrides.clear()
+
+
+def test_activities_from_config():
+    data = TestClient(app).get("/activities").json()
+    assert [a["id"] for a in data["activities"]] == ["walk", "run", "swim", "padel", "tennis", "football", "basketball", "gym"]
+    assert data["profiles"] == ["general", "senior", "stroller", "sensitive"] and data["companions"] == ["dog", "kids"]
+    assert data["default_weights"]["proximity"] == 0.3
+
+
+def test_unknown_activity_is_422(mini):
+    assert mini.post("/recommend", json=body(GETAFE, activity="parapente")).status_code == 422
+
+
+def test_recommend_without_data_is_503_not_500(tmp_path):
+    app.dependency_overrides[get_repo] = lambda: Repository(tmp_path)
+    app.dependency_overrides[get_graphs] = lambda: GraphStore()
+    try:
+        r = TestClient(app, raise_server_exceptions=False).post("/recommend", json=body(GETAFE))
+    finally:
+        app.dependency_overrides.clear()
+    assert r.status_code == 503
+
+
+def test_logs_without_location(mini, caplog):
+    caplog.set_level(logging.INFO, logger="gomad.api")
+    mini.post("/recommend", json=body(GETAFE))
+    mini.get("/location", params={"text": "calle madrid 10 getafe"})
+    text = caplog.text
+    assert "POST /recommend 200" in text and "GET /location" in text
+    for secret in ("40.30", "-3.73", "madrid 10", "calle", "getafe"):
+        assert secret not in text.lower()
+
+
+@pytest.fixture(scope="module")
+def real():
+    if not (DATA_DIR / "gomad.duckdb").exists():
+        pytest.skip("sin app/data/gomad.duckdb")
+    with TestClient(app) as client:          # lifespan: carga los grafos de data/graph/
+        yield client
+
+
+@pytest.mark.slow
+def test_recommend_getafe(real):
+    t0 = time.perf_counter()
+    r = real.post("/recommend", json=body(GETAFE))
+    elapsed = time.perf_counter() - t0
+    assert r.status_code == 200, r.text
+    data = r.json()
+    print(f"\n/recommend Getafe: {elapsed:.2f} s, avisos: {data['warnings']}")
+    assert elapsed < 3.0
+    assert len(data["results"]) == 3 and data["has_more"]
+    for rec in data["results"]:
+        assert rec["destination"]["ine_code"] == "28065" or rec["distance_m"] <= 3000
+        assert rec["explanation"] and rec["sources"] and 0 <= rec["score"] <= 10
+
+
+@pytest.mark.slow
+def test_recommend_capital_without_vpla(real):
+    t0 = time.perf_counter()
+    r = real.post("/recommend", json=body(SOL))
+    elapsed = time.perf_counter() - t0
+    assert r.status_code == 200, r.text
+    data = r.json()
+    print(f"\n/recommend capital: {elapsed:.2f} s, avisos: {data['warnings']}")
+    assert elapsed < 3.0
+    assert data["results"]
+    capital = [x for x in data["results"] if x["destination"]["ine_code"] == "28079"]
+    assert capital and all(next(f for f in x["factors"] if f["factor"] == "green")["value"] is None for x in capital)
+    assert any(w.startswith("Verde: sin datos en") and "Madrid" in w for w in data["warnings"])
+
+
+@pytest.mark.slow
+def test_surprise_me_three_distinct_activities(real):
+    t0 = time.perf_counter()
+    data = real.post("/recommend", json=body(GETAFE, activity=None)).json()
+    print(f"\n/recommend Sorpréndeme: {time.perf_counter() - t0:.2f} s")
+    labels = [r["explanation"].split("Para ")[1].split(":")[0] for r in data["results"]]
+    assert len(labels) == 3 and len(set(labels)) == 3
+```
+
+- [ ] **Paso 7:** Run: `.venv/bin/pytest tests/test_endpoints.py -q -m "not slow"` → Esperado: FAIL (`ImportError: cannot import name 'get_graphs' from 'main'`).
+- [ ] **Paso 8: implementación** — `main.py` (sustituye las versiones 501 de `/activities` y `/recommend`; el resto sigue en 501):
+
+```python
+"""API de GoMad. Sin estado: sin sesiones ni registro; la ubicacion nunca se escribe en los logs."""
+import logging
+import time
+from contextlib import asynccontextmanager
+from typing import get_args
+
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
+
+import schemas as s
+import settings
+from engine.rules import validate_rules
+from engine.scoring import validate_weights
+from repository import DataUnavailable, Repository
+from routing.store import GraphStore
+from services import recommend as recommend_service
+
+log = logging.getLogger("gomad.api")
+if not log.handlers:
+    # uvicorn no configura este logger: sin handler propio, los INFO se perderian
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+    log.addHandler(handler)
+    log.setLevel(logging.INFO)
+    log.propagate = False
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # un error de configuracion para el arranque, no sale como 500 en una peticion
+    validate_rules(settings.load("rules"))
+    validate_weights(settings.load("weights")["defaults"])
+    app.state.repo = Repository(settings.DATA_DIR)
+    t0 = time.perf_counter()
+    app.state.graphs = GraphStore.load(settings.DATA_DIR / "graph")
+    log.info("grafos cargados: %s en %.1f s", [z.name for z in app.state.graphs.zones], time.perf_counter() - t0)
+    yield
+
+
+app = FastAPI(title="GoMad API", version="0.1.0", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    # solo metodo, ruta, codigo y milisegundos: ni cuerpo ni query (la query de /location es una direccion)
+    t0 = time.perf_counter()
+    status = 500
+    try:
+        response = await call_next(request)
+        status = response.status_code
+        return response
+    finally:
+        log.info("%s %s %d %.0f ms", request.method, request.url.path, status, (time.perf_counter() - t0) * 1000)
+
+
+def get_repo(request: Request) -> Repository:
+    return getattr(request.app.state, "repo", None) or Repository(settings.DATA_DIR)
+
+
+def get_graphs(request: Request) -> GraphStore:
+    return getattr(request.app.state, "graphs", None) or GraphStore()
+
+
+def _not_implemented():
+    raise HTTPException(status_code=501, detail="Pendiente de implementar")
+
+
+@app.get("/health")
+def health() -> dict:
+    return {"status": "ok"}
+
+
+@app.get("/activities", response_model=s.ActivitiesResponse)
+def activities():
+    catalog = settings.load("activities")["activities"]
+    return s.ActivitiesResponse(
+        activities=[s.Activity(id=a["id"], label=a["label"], icon=a["icon"], outdoor=a.get("outdoor")) for a in catalog],
+        profiles=list(get_args(s.Profile)), companions=list(get_args(s.Companion)),
+        default_weights=s.Weights(**settings.load("weights")["defaults"]))
+
+
+@app.post("/recommend", response_model=s.RecommendResponse)
+def recommend(request: s.RecommendRequest, repo: Repository = Depends(get_repo),
+              graphs: GraphStore = Depends(get_graphs)):
+    try:
+        return recommend_service.recommend(request, repo, graphs)
+    except recommend_service.UnknownActivity as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except DataUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e))
+```
+
+(`/location`, `/route`, `/municipality`, `/assistant/*`, `/sources` se quedan como estaban, con `_not_implemented()`.)
+
+- [ ] **Paso 9:** Run: `.venv/bin/pytest tests/test_endpoints.py tests/test_contract.py -q -m "not slow"` → Esperado: PASS (el contrato no cambia: `test_versioned_openapi_is_up_to_date` en verde).
+- [ ] **Paso 10: datos frescos y pruebas reales** — en `../ingest`: `AEMET_MUNICIPALITIES=28065,28079 .venv/bin/python scripts/download_sources.py --refresh hourly` (si AEMET falla, seguir: la previsión saldrá `null` con aviso), `.venv/bin/python -m normalize air_reading forecast` y `.venv/bin/python -m build_db realtime`. Después, en `app/api`: `.venv/bin/pytest tests/test_endpoints.py -q -s -m slow` → Esperado: `3 passed`, cada `/recommend` < 3 s (apuntar tiempos y avisos).
+- [ ] **Paso 11: docs** — en `../../docs/arquitectura.md` §4.2, al final de la lista: «**Implementado el 16/10 (Tasks 28–29):** distancia por el grafo de la zona más pequeña que contiene el origen (Dijkstra con límite) y, si no, línea recta × `straight_line_detour`; aire de la estación más cercana con medición válida (cobertura `min_coverage`), que vale `air_reading_valid_h` horas; sin previsión del municipio, los factores de tiempo van a `null` con aviso; mismo nombre a < `dedupe_radius_m` = mismo sitio; «Sorpréndeme» = un resultado por actividad. Parámetros en `config/recommend.yaml` (criterio propio).»
+- [ ] **Paso 12: commit** — `git -C ../.. add app/api docs/arquitectura.md && git -C ../.. commit -m "Motor: /activities y /recommend reales, grafos al arrancar y log sin ubicación (V-M1)"`
+
+**Terminado cuando:** `/recommend` responde < 3 s en Getafe y en la capital, con `warnings` cuando falta un factor, «Sorpréndeme» da 3 actividades distintas y el log no tiene ubicación.
+
+---
+
+### Task 30: V-R1 · `/route` con directa y saludable en paralelo
+
+**Rol:** Rutas · **Servicio:** `app/api/` · **Depende de:** Tasks 21, 27, 28, 29 · **Duración:** 2 h
+
+**Ficheros:** Crear `services/route.py`, `tests/services/test_route.py`. Modificar `schemas.py` (`LineString`), `main.py`, `tests/test_endpoints.py`, `../frontend/src/api/openapi.json` (regenerado), `../frontend/src/api/schema.d.ts` (regenerado), `../frontend/src/lib/geometry.ts` (si deja de compilar).
+
+**Interfaces:**
+- Consume: `GraphStore.locate`, `routing.graph.edge_costs`, `shortest_path`, `summarize`, `RouteNotFound`; `Repository.route_pois`, `source_dates`; `explanation.route_description`; `services.common`.
+- Produce: `schemas.LineString(type: Literal["LineString"], coordinates: list[list[float]])` y `RouteVariant.geometry: LineString` (contrato; pedido en `pendientes.md` B); `services.route.path_coordinates(g, origin_node, edges) -> list[[lon, lat]]`; `services.route.pois_along(repo, coords, radius_m) -> list[RoutePoi]`; `services.route.route(req, repo, graphs) -> RouteResponse` (nunca lanza `RouteNotFound`).
+
+- [ ] **Paso 1: pruebas que fallan** — `tests/services/test_route.py`:
+
+```python
+import pytest
+
+import schemas as s
+from mini_data import ORIGIN, build_mini_data
+from repository import Repository
+from routing.store import GraphStore
+from services.route import path_coordinates, route
+
+PARK = {"lat": 40.3050, "lon": -3.7289}         # nodo 1
+
+
+@pytest.fixture
+def setup(tmp_path):
+    base = build_mini_data(tmp_path / "data", graph=True)
+    return Repository(base), GraphStore.load(base / "graph")
+
+
+def test_direct_and_healthy_on_graph(setup):
+    repo, graphs = setup
+    res = route(s.RouteRequest(origin=ORIGIN, destination=PARK), repo, graphs)
+    assert res.direct.distance_m == pytest.approx(100) and res.healthy.distance_m == pytest.approx(220)
+    assert res.healthy.green_pct > res.direct.green_pct and res.direct.traffic_m == pytest.approx(100)
+    assert res.healthy.geometry.coordinates[0] == [ORIGIN["lon"], ORIGIN["lat"]]
+    assert res.healthy.geometry.coordinates[-1] == [PARK["lon"], PARK["lat"]]
+    assert {(p.type, p.source) for p in res.healthy.pois} == {("fountain", "ay_fuentes"), ("bench", "osm")}
+    assert res.direct.pois == []                                    # la fuente queda a 39 m de la avenida
+    assert "1 fuente" in res.healthy.description and "1 banco" in res.healthy.description
+    assert res.healthy.duration_min == pytest.approx(220 / 4500 * 60, abs=0.1)   # walk 4,5 km/h
+    assert not res.healthy.approximate and any(d.source == "osm" for d in res.sources)
+
+
+def test_path_coordinates_follow_direction(setup):
+    _, graphs = setup
+    g = graphs.zones[0].graph
+    # de 1 a 0 por el parque: tramos 3-1, 2-3 y 0-2 recorridos al reves
+    coords = path_coordinates(g, 1, [3, 2, 1])
+    assert coords == [[-3.7289, 40.3050], [-3.7289, 40.3043], [-3.7300, 40.3043], [-3.7300, 40.3050]]
+
+
+def test_senior_walks_slower(setup):
+    repo, graphs = setup
+    res = route(s.RouteRequest(origin=ORIGIN, destination=PARK, profile="senior"), repo, graphs)
+    assert res.direct.duration_min == pytest.approx(100 / 3500 * 60, abs=0.1)
+
+
+def test_route_outside_graph_is_approximate(setup):
+    repo, graphs = setup
+    far = {"lat": 40.9500, "lon": -3.4700}                          # Patones: sin grafo
+    res = route(s.RouteRequest(origin=ORIGIN, destination=far), repo, graphs)
+    assert res.direct.approximate and res.healthy.approximate
+    assert res.direct.geometry.coordinates == [[ORIGIN["lon"], ORIGIN["lat"]], [far["lon"], far["lat"]]]
+    assert res.direct.description.startswith("Línea recta de")
+    assert any("línea recta" in w for w in res.warnings)
+```
+
+- [ ] **Paso 2:** Run: `.venv/bin/pytest tests/services/test_route.py -q` → Esperado: FAIL con `ModuleNotFoundError: No module named 'services.route'`.
+- [ ] **Paso 3: contrato** — en `schemas.py`, antes de `RouteVariant`:
+
+```python
+class LineString(Strict):
+    """GeoJSON LineString en EPSG:4326: [[lon, lat], ...]."""
+    type: Literal["LineString"]
+    coordinates: list[list[float]] = Field(min_length=2)
+```
+
+y en `RouteVariant`: `geometry: LineString`. Después: `.venv/bin/python scripts/export_openapi.py`, `(cd ../frontend && npm run contract)` (si `tsc -b` falla en `src/lib/geometry.ts` o en `src/data/mock/route.ts`, ajustar los tipos sin cambiar comportamiento) y `.venv/bin/pytest tests/test_contract.py -q` → Esperado: PASS.
+
+- [ ] **Paso 4: implementación** — `services/route.py`:
+
+```python
+"""POST /route (arquitectura §4.4): directa y saludable en paralelo sobre el grafo de la zona.
+
+Fuera de la red o desconectado: linea recta marcada approximate y aviso. Nunca un 500 por una ruta imposible."""
+import math
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
+
+import numpy as np
+import shapely
+
+import schemas as s
+import settings
+from engine.explanation import route_description
+from repository import M_PER_DEG_LAT, haversine_m
+from routing.graph import RouteNotFound, edge_costs, shortest_path, summarize
+from services.common import data_source, walking_speed_kmh
+
+POOL = ThreadPoolExecutor(max_workers=4)
+POI_TYPES = set(s.RoutePoi.model_fields["type"].annotation.__args__)
+NO_NETWORK = "No hay red peatonal cargada para este trayecto: se muestra la línea recta (aproximada)."
+DISCONNECTED = "Origen y destino no están conectados por la red peatonal: se muestra la línea recta (aproximada)."
+
+
+def path_coordinates(g, origin_node, edges):
+    """[lon, lat] de la ruta en orden; cada tramo se gira segun el nodo por el que se entra (su geom va de u a v)."""
+    coords = [[float(g.lon[origin_node]), float(g.lat[origin_node])]]
+    current = origin_node
+    for e in edges:
+        line = list(g.geom(e).coords)
+        if g.u[e] == current:
+            current = int(g.v[e])
+        else:
+            line.reverse()
+            current = int(g.u[e])
+        coords.extend([float(x), float(y)] for x, y in line[1:])
+    return coords
+
+
+def pois_along(repo, coords, radius_m):
+    """Puntos de route_poi (solo working IS NOT FALSE) a menos de radius_m de la linea de la ruta."""
+    lons, lats = np.array([c[0] for c in coords]), np.array([c[1] for c in coords])
+    cos0 = math.cos(math.radians(float(lats.mean())))
+    pad_lat = radius_m / M_PER_DEG_LAT
+    pad_lon = pad_lat / cos0
+    rows = repo.route_pois(lons.min() - pad_lon, lats.min() - pad_lat, lons.max() + pad_lon, lats.max() + pad_lat)
+    rows = [r for r in rows if r[1] in POI_TYPES]
+    if not rows:
+        return []
+    xy = lambda lo, la: np.column_stack([np.asarray(lo) * M_PER_DEG_LAT * cos0, np.asarray(la) * M_PER_DEG_LAT])
+    line = shapely.LineString(xy(lons, lats))
+    points = shapely.points(xy([r[3] for r in rows], [r[4] for r in rows]))
+    near = shapely.distance(line, points) <= radius_m
+    return [s.RoutePoi(type=t, coordinate=s.Coordinate(lat=lat, lon=lon), source=src)
+            for (_, t, src, lon, lat), ok in zip(rows, near) if ok]
+
+
+def _straight(kind, origin, destination, speed):
+    d = float(haversine_m(origin.lon, origin.lat, destination.lon, destination.lat))
+    minutes = d / 1000 / speed * 60
+    return s.RouteVariant(kind=kind, geometry=s.LineString(type="LineString", coordinates=[
+        [origin.lon, origin.lat], [destination.lon, destination.lat]]), distance_m=round(d, 1),
+        duration_min=round(minutes, 1), green_pct=None, traffic_m=0.0, pois=[], approximate=True,
+        description=route_description(d, minutes, None, 0, {}, approximate=True))
+
+
+def _variant(kind, g, req, nodes, snaps, edges, routing, speed, repo):
+    coords = [[req.origin.lon, req.origin.lat], *path_coordinates(g, int(nodes[0]), edges),
+              [req.destination.lon, req.destination.lat]]
+    summary = summarize(g, edges, routing["traffic_display_threshold"])
+    distance = summary["distance_m"] + float(snaps[0]) + float(snaps[1])
+    minutes = distance / 1000 / speed * 60
+    pois = pois_along(repo, coords, routing["poi_radius_m"])
+    green = summary["green_pct"]
+    return s.RouteVariant(kind=kind, geometry=s.LineString(type="LineString", coordinates=coords),
+                          distance_m=round(distance, 1), duration_min=round(minutes, 1),
+                          green_pct=None if green is None else round(green, 1),
+                          traffic_m=round(summary["traffic_m"], 1), pois=pois,
+                          description=route_description(distance, minutes, green, summary["traffic_m"],
+                                                        Counter(p.type for p in pois)))
+
+
+def route(req, repo, graphs):
+    routing, weights_cfg = settings.load("routing"), settings.load("weights")
+    labels = (settings.load("sources") or {}).get("labels", {})
+    speed = walking_speed_kmh(req.profile, weights_cfg)
+    located = graphs.locate([(req.origin.lon, req.origin.lat), (req.destination.lon, req.destination.lat)],
+                            routing["snap_max_m"])
+    straight = lambda warning: s.RouteResponse(direct=_straight("direct", req.origin, req.destination, speed),
+                                               healthy=_straight("healthy", req.origin, req.destination, speed),
+                                               warnings=[warning], sources=[])
+    if located is None:
+        return straight(NO_NETWORK)
+    zone, nodes, snaps = located
+    g = zone.graph
+    weights = req.weights.model_dump() if req.weights else routing["default_route_weights"]
+    costs = edge_costs(g, weights, routing["cost_floor"])
+    futures = [POOL.submit(shortest_path, g, int(nodes[0]), int(nodes[1]), c) for c in (g.length, costs)]
+    try:
+        direct_edges, healthy_edges = (f.result() for f in futures)
+    except RouteNotFound:
+        return straight(DISCONNECTED)
+    direct = _variant("direct", g, req, nodes, snaps, direct_edges, routing, speed, repo)
+    healthy = _variant("healthy", g, req, nodes, snaps, healthy_edges, routing, speed, repo)
+    warnings = []
+    if direct.green_pct is None or healthy.green_pct is None:
+        warnings.append("Zona verde: sin datos en parte del recorrido.")
+    dates = repo.source_dates()
+    sources = [data_source("osm", labels, dates.get("osm"))]
+    if healthy.green_pct is not None:
+        sources.append(data_source("vpla_redes", labels, dates.get("vpla_redes")))
+    for src in sorted({p.source for p in direct.pois + healthy.pois} - {"osm"}):
+        sources.append(data_source(src, labels, dates.get(src)))
+    if req.weights is None:
+        sources.append(data_source("config:routing", labels, None, bool(routing.get("own_criterion"))))
+    return s.RouteResponse(direct=direct, healthy=healthy, warnings=warnings, sources=sources)
+```
+
+En `main.py`: `from services import route as route_service` y
+
+```python
+@app.post("/route", response_model=s.RouteResponse)
+def route(request: s.RouteRequest, repo: Repository = Depends(get_repo), graphs: GraphStore = Depends(get_graphs)):
+    try:
+        return route_service.route(request, repo, graphs)
+    except DataUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e))
+```
+
+- [ ] **Paso 5:** Run: `.venv/bin/pytest tests/services/test_route.py -q` → Esperado: `4 passed`.
+- [ ] **Paso 6: endpoints** — en `tests/test_endpoints.py` añadir:
+
+```python
+def test_route_outside_graph_is_approximate(mini):
+    r = mini.post("/route", json={"origin": GETAFE, "destination": {"lat": 40.95, "lon": -3.47}})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["direct"]["approximate"] and data["healthy"]["approximate"]
+    assert data["direct"]["geometry"]["type"] == "LineString"
+
+
+@pytest.mark.slow
+def test_route_getafe(real):
+    payload = {"origin": GETAFE, "destination": {"lat": 40.3120, "lon": -3.7230}}
+    t0 = time.perf_counter()
+    r = real.post("/route", json=payload)
+    elapsed = time.perf_counter() - t0
+    assert r.status_code == 200, r.text
+    data = r.json()
+    print(f"\n/route Getafe: {elapsed:.2f} s · {data['direct']['description']} · {data['healthy']['description']}")
+    assert elapsed < 5.0
+    assert not data["direct"]["approximate"] and not data["healthy"]["approximate"]
+    assert data["healthy"]["distance_m"] >= data["direct"]["distance_m"] - 1
+    assert len(data["healthy"]["geometry"]["coordinates"]) > 2
+
+
+@pytest.mark.slow
+def test_route_capital(real):
+    t0 = time.perf_counter()
+    r = real.post("/route", json={"origin": SOL, "destination": {"lat": 40.4153, "lon": -3.6845}})   # Sol -> Retiro
+    elapsed = time.perf_counter() - t0
+    print(f"\n/route capital: {elapsed:.2f} s · {r.json()['healthy']['description']}")
+    assert r.status_code == 200 and elapsed < 5.0
+```
+
+Run: `.venv/bin/pytest tests/test_endpoints.py -q -s` → Esperado: todo PASS (apuntar tiempos de las rutas).
+
+- [ ] **Paso 7: commit** — `git -C ../.. add app/api app/frontend/src/api app/frontend/src/lib app/frontend/src/data/mock && git -C ../.. commit -m "Rutas: /route con directa y saludable en paralelo y geometría LineString en el contrato (V-R1)"`
+
+**Terminado cuando:** `/route` < 5 s en Getafe y capital; fuera de grafo o desconectado, línea recta `approximate` con aviso; `geometry` tipada como `LineString` en el front.
+
+---
+
+### Task 31: V-D2 (2/2) · `/location` con el callejero y el buscador de Nomecalles
+
+**Rol:** Datos · **Servicio:** `app/api/` · **Depende de:** Tasks 26, 28, 29 · **Duración:** 1,5 h
+
+**Ficheros:** Crear `geocoding.py`, `tests/test_location.py`. Modificar `main.py`.
+
+**Interfaces:**
+- Consume: `clean/addresses.parquet` (Task 26), `clean/municipality.parquet` (Task 17); buscador `https://apiscm.comunidad.madrid/t/ciudadanos.comunidad.madrid/sector-publico/nomecalles-buscador/v1/direcciones?busqueda=…` (sin clave).
+- Produce: `geocoding.plain(text)` (igual que `ingest/normalize/addresses.plain`); `class Geocoder(data_dir, client: httpx.Client | None = None, ttl_s=3600, timeout_s=3.0)` con `search(text) -> list[dict]` (campos de `LocationCandidate`); en `main.py`: `get_geocoder` y `GET /location`.
+
+- [ ] **Paso 1: pruebas que fallan** — `tests/test_location.py`:
+
+```python
+import httpx
+import pytest
+from fastapi.testclient import TestClient
+
+from geocoding import Geocoder, plain
+from main import app, get_geocoder
+from mini_data import build_mini_data
+from settings import DATA_DIR
+
+NOMECALLES = {"data": {"direcciones": [
+    {"id": 5187835, "direccion": "Calle Madrid 10", "tipo": "app", "municipio": "065", "nombreMunicipio": "Getafe",
+     "cdVial": "065A0460"},
+    {"id": 289285, "direccion": "Calle Madrid", "tipo": "calle", "municipio": "065", "nombreMunicipio": "Getafe",
+     "cdVial": "065A0460"},
+    {"id": 291492, "direccion": "Calle de Camino de Getafe", "tipo": "calle", "municipio": "058",
+     "nombreMunicipio": "Fuenlabrada", "cdVial": "058A0201"}]}}
+
+
+@pytest.fixture
+def data(tmp_path):
+    return build_mini_data(tmp_path / "data")
+
+
+def client_with(handler):
+    calls = []
+
+    def wrapped(request):
+        calls.append(request)
+        return handler(request)
+    return httpx.Client(transport=httpx.MockTransport(wrapped)), calls
+
+
+def test_plain():
+    assert plain("  GETAFÉ, C/ Madrid nº10 ") == "getafe c madrid n 10"
+
+
+def test_location_address_with_number_local(data):
+    out = Geocoder(data).search("calle madrid 10 getafe")
+    assert out[0] == {"label": "Calle Madrid 10, Getafe", "municipality": "Getafe", "ine_code": "28065",
+                      "coordinate": {"lat": 40.3056775, "lon": -3.7314934}, "precision": "address"}
+    assert out[-1]["precision"] == "municipality" and out[-1]["ine_code"] == "28065"
+
+
+def test_location_street_without_number(data):
+    out = Geocoder(data).search("Calle de la Constitución, Getafe")
+    assert out[0]["precision"] == "street" and out[0]["label"] == "Calle de la Constitución, Getafe"
+
+
+def test_location_municipality_by_name_without_accents(data):
+    for text in ("MADRID", "getafé", "Getafe"):
+        out = Geocoder(data).search(text)
+        assert out[0]["precision"] == "municipality"
+    assert Geocoder(data).search("GETAFÉ")[0]["coordinate"] == {"lat": pytest.approx(40.295), "lon": pytest.approx(-3.725)}
+    assert Geocoder(data).search("geta")[0]["municipality"] == "Getafe"     # parcial, sin numero ni calle
+
+
+def test_location_uses_nomecalles_and_caches(data):
+    client, calls = client_with(lambda r: httpx.Response(200, json=NOMECALLES))
+    g = Geocoder(data, client)
+    out = g.search("calle madrid 10 getafe")
+    assert out[0]["precision"] == "address" and out[0]["coordinate"]["lon"] == pytest.approx(-3.7314934)
+    assert all(c["ine_code"] == "28065" for c in out)                      # Fuenlabrada no: el texto dice Getafe
+    g.search("Calle Madrid 10 Getafe")
+    assert len(calls) == 1 and calls[0].url.params["busqueda"] == "calle madrid 10 getafe"
+
+
+def test_location_nomecalles_down_falls_back_local(data):
+    def down(request):
+        raise httpx.ConnectError("caido")
+    client, _ = client_with(down)
+    out = Geocoder(data, client).search("calle madrid 10 getafe")
+    assert out[0]["label"] == "Calle Madrid 10, Getafe"
+    client, _ = client_with(lambda r: httpx.Response(500))
+    assert Geocoder(data, client).search("calle madrid 10 getafe")[0]["precision"] == "address"
+
+
+def test_location_nothing_found(data):
+    assert Geocoder(data).search("zzzzzz") == []
+
+
+def test_location_text_bounds_422(data):
+    app.dependency_overrides[get_geocoder] = lambda: Geocoder(data)
+    try:
+        c = TestClient(app)
+        assert c.get("/location", params={"text": "ab"}).status_code == 422
+        assert c.get("/location", params={"text": "x" * 201}).status_code == 422
+        r = c.get("/location", params={"text": "calle madrid 10 getafe"})
+        assert r.status_code == 200 and r.json()["candidates"][0]["precision"] == "address"
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.slow
+def test_location_real_calle_madrid_10_getafe():
+    if not (DATA_DIR / "clean" / "addresses.parquet").exists():
+        pytest.skip("sin clean/addresses.parquet (python -m normalize addresses en ingest)")
+    out = Geocoder(DATA_DIR).search("calle madrid 10 getafe")          # D-04, solo callejero local
+    assert out[0]["precision"] == "address" and out[0]["ine_code"] == "28065"
+    assert out[0]["coordinate"]["lon"] == pytest.approx(-3.7314934, abs=1e-6)
+    assert out[0]["coordinate"]["lat"] == pytest.approx(40.3056775, abs=1e-6)
+```
+
+- [ ] **Paso 2:** Run: `.venv/bin/pytest tests/test_location.py -q -m "not slow"` → Esperado: FAIL con `ModuleNotFoundError: No module named 'geocoding'`.
+- [ ] **Paso 3: implementación** — `geocoding.py`:
+
+```python
+"""GET /location (RF-01, D-04): direccion con numero o municipio por nombre.
+
+Orden: municipio por nombre -> buscador de Nomecalles (sin clave, cache 1 h), resuelto con el callejero normalizado
+(clean/addresses.parquet) -> si el buscador cae o no aporta, busqueda local en el callejero.
+El texto es la ubicacion de la persona: nunca se escribe en los logs."""
+import re
+import time
+import unicodedata
+
+import duckdb
+import httpx
+import pyarrow.parquet as pq
+import shapely
+
+SEARCH_URL = ("https://apiscm.comunidad.madrid/t/ciudadanos.comunidad.madrid/sector-publico/"
+              "nomecalles-buscador/v1/direcciones")
+STREET_TYPES = {"calle", "c", "cl", "avenida", "avda", "av", "plaza", "pza", "pl", "paseo", "po", "camino", "cmno",
+                "carretera", "ctra", "glorieta", "gta", "travesia", "trva", "ronda", "pasaje", "psaje", "urbanizacion",
+                "urb", "callejon", "cllon", "costanilla", "cstan", "bulevar", "bulev", "cuesta", "custa", "canada",
+                "cnada", "vereda", "vreda", "colonia", "col", "lugar", "rotonda", "rtda"}
+STOP_WORDS = {"de", "del", "la", "las", "el", "los", "y", "en", "n", "no", "num", "numero"}
+MAX_CANDIDATES = 6
+CACHE_MAX = 1000
+
+
+def plain(text):
+    # misma regla que ingest/normalize/addresses.py: minusculas, sin tildes, solo letras y numeros
+    s = unicodedata.normalize("NFKD", str(text)).encode("ascii", "ignore").decode().lower()
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", s).split())
+
+
+def _candidate(label, municipality, ine_code, lon, lat, precision):
+    return {"label": label, "municipality": municipality, "ine_code": ine_code,
+            "coordinate": {"lat": round(float(lat), 7), "lon": round(float(lon), 7)}, "precision": precision}
+
+
+class Geocoder:
+    def __init__(self, data_dir, client=None, ttl_s=3600, timeout_s=3.0):
+        self.addresses = data_dir / "clean" / "addresses.parquet"
+        self.municipality_file = data_dir / "clean" / "municipality.parquet"
+        self.client, self.ttl_s, self.timeout_s = client, ttl_s, timeout_s
+        self._cache = {}
+        self._municipalities = None
+
+    # --- municipios -------------------------------------------------------------------------------------------
+    def municipalities(self):
+        """[(ine_code, nombre, nombre llano, lon, lat)]: centro del contorno y nombre del callejero."""
+        if self._municipalities is None:
+            names = {}
+            if self.addresses.exists():
+                con = duckdb.connect()
+                try:
+                    names = dict(con.execute("SELECT DISTINCT ine_code, municipality FROM read_parquet(?)",
+                                             [str(self.addresses)]).fetchall())
+                finally:
+                    con.close()
+            t = pq.read_table(self.municipality_file, columns=["ine_code", "name", "geometry"]).to_pydict()
+            out = []
+            for ine, name, wkb in zip(t["ine_code"], t["name"], t["geometry"]):
+                poly = shapely.from_wkb(wkb)
+                center = poly.centroid if poly.contains(poly.centroid) else poly.point_on_surface()
+                display = names.get(ine) or name.title()
+                out.append((ine, display, plain(display), center.x, center.y))
+            self._municipalities = out
+        return self._municipalities
+
+    def _municipality_in(self, q):
+        """Municipio nombrado en el texto (palabras completas); si hay varios, el que acaba mas tarde y mas largo."""
+        best = None
+        padded = f" {q} "
+        for m in self.municipalities():
+            names = {m[2]}
+            first, _, rest = m[2].partition(" ")
+            if first in ("el", "la", "los", "las") and rest:
+                names.add(rest)                  # «rozas de madrid» = «Las Rozas de Madrid»
+            for n in names:
+                i = padded.rfind(f" {n} ")
+                if i >= 0 and (best is None or (i + len(n), len(n)) > (best[1] + len(best[2]), len(best[2]))):
+                    best = (m, i, n)
+        return best
+
+    def _muni_candidate(self, m):
+        return _candidate(m[1], m[1], m[0], m[3], m[4], "municipality")
+
+    # --- busqueda ---------------------------------------------------------------------------------------------
+    def search(self, text):
+        q = plain(text)
+        if not q:
+            return []
+        found = self._municipality_in(q)
+        rest = q
+        if found:
+            _, i, n = found
+            rest = (f" {q} "[:i] + " " + f" {q} "[i + len(n) + 2:]).strip()
+        tokens = rest.split()
+        while tokens and tokens[0] in STREET_TYPES:
+            tokens = tokens[1:]
+        numbers = [int(t) for t in tokens if t.isdigit()]
+        words = [t for t in tokens if not t.isdigit() and t not in STOP_WORDS]
+        muni = found[0] if found else None
+        if not words:
+            if muni:
+                return [self._muni_candidate(muni)]
+            return [self._muni_candidate(m) for m in self.municipalities() if q in m[2]][:MAX_CANDIDATES]
+        number = numbers[-1] if numbers else None
+        out = self._remote(text, muni) or self._local(words, number, muni)
+        if not out and not muni and not numbers:
+            # «geta», «rozas»: parte del nombre de un municipio
+            return [self._muni_candidate(m) for m in self.municipalities() if q in m[2]][:MAX_CANDIDATES]
+        if muni:
+            out.append(self._muni_candidate(muni))      # respaldo: el centro del municipio
+        unique = list({(c["label"], c["ine_code"]): c for c in out}.values())
+        return unique[:MAX_CANDIDATES]
+
+    def _rows(self, where, params):
+        if not self.addresses.exists():
+            return []
+        con = duckdb.connect()
+        try:
+            return con.execute(f"""SELECT ine_code, municipality, street_code, street_type, street, street_norm,
+                                          number, lon, lat FROM read_parquet(?) WHERE {where}""",
+                               [str(self.addresses), *params]).fetchall()
+        finally:
+            con.close()
+
+    @staticmethod
+    def _resolve_street(rows, number):
+        """De las filas de un vial: el portal pedido (precision address) o un punto del vial (precision street)."""
+        ine, muni, _, stype, street = rows[0][:5]
+        if number is not None:
+            exact = [r for r in rows if r[6] == number]
+            if exact:
+                r = exact[0]
+                return _candidate(f"{stype} {street} {number}, {muni}", muni, ine, r[7], r[8], "address")
+        vial = [r for r in rows if r[6] is None]
+        numbered = sorted((r for r in rows if r[6] is not None), key=lambda r: r[6])
+        r = vial[0] if vial else numbered[len(numbered) // 2]
+        return _candidate(f"{stype} {street}, {muni}", muni, ine, r[7], r[8], "street")
+
+    def _local(self, words, number, muni):
+        where = " AND ".join("(' ' || street_norm || ' ') LIKE ?" for _ in words)
+        params = [f"% {w} %" for w in words]
+        if muni:
+            where += " AND ine_code = ?"
+            params.append(muni[0])
+        streets = {}
+        for r in self._rows(where, params):
+            streets.setdefault((r[0], r[2]), []).append(r)
+        target = " ".join(words)
+        # primero el vial cuyo nombre (sin «de la») es exactamente lo buscado, luego el mas corto
+        ranked = sorted(streets.values(), key=lambda rows: (
+            " ".join(t for t in rows[0][5].split() if t not in STOP_WORDS) != target, len(rows[0][5])))
+        return [self._resolve_street(rows, number) for rows in ranked[:MAX_CANDIDATES]]
+
+    def _remote(self, text, muni):
+        if self.client is None:
+            return []
+        key = plain(text)
+        hit = self._cache.get(key)
+        if hit and time.monotonic() - hit[0] < self.ttl_s:
+            items = hit[1]
+        else:
+            try:
+                r = self.client.get(SEARCH_URL, params={"busqueda": key}, timeout=self.timeout_s)
+                r.raise_for_status()
+                items = r.json()["data"]["direcciones"]
+            except (httpx.HTTPError, ValueError, KeyError, TypeError):
+                return []
+            if len(self._cache) >= CACHE_MAX:
+                self._cache.clear()
+            self._cache[key] = (time.monotonic(), items)
+        wanted = []
+        for item in items:
+            ine = "28" + str(item.get("municipio", "")).zfill(3)
+            if item.get("tipo") not in ("app", "calle") or (muni and ine != muni[0]) or not item.get("cdVial"):
+                continue
+            m = re.search(r"(\d+)\s*$", item.get("direccion", ""))
+            wanted.append((ine, item["cdVial"], int(m.group(1)) if item["tipo"] == "app" and m else None))
+        if not wanted:
+            return []
+        codes = sorted({w[1] for w in wanted})
+        rows = self._rows(f"street_code IN ({', '.join('?' for _ in codes)})", codes)
+        by_street = {}
+        for r in rows:
+            by_street.setdefault((r[0], r[2]), []).append(r)
+        out = []
+        for ine, code, number in wanted:
+            street = by_street.get((ine, code))
+            if street:
+                out.append(self._resolve_street(street, number))
+        return out[:MAX_CANDIDATES]
+```
+
+En `main.py`: `import httpx`, `from geocoding import Geocoder`; en `lifespan`, antes del `yield`: `app.state.geocoder = Geocoder(settings.DATA_DIR, httpx.Client())`; después del `yield`: `app.state.geocoder.client.close()`. Y:
+
+```python
+def get_geocoder(request: Request) -> Geocoder:
+    return getattr(request.app.state, "geocoder", None) or Geocoder(settings.DATA_DIR)
+
+
+@app.get("/location", response_model=s.LocationResponse)
+def location(text: str = Query(min_length=3, max_length=200), geocoder: Geocoder = Depends(get_geocoder)):
+    return s.LocationResponse(candidates=[s.LocationCandidate(**c) for c in geocoder.search(text)])
+```
+
+- [ ] **Paso 4:** Run: `.venv/bin/pytest tests/test_location.py -q` → Esperado: `9 passed` (la `slow` con `clean/addresses.parquet` real de Task 26).
+- [ ] **Paso 5:** Run: `.venv/bin/pytest -q` → Esperado: toda la suite de `app/api` en verde (incluido `test_logs_without_location`, que ahora pasa por `/location` real).
+- [ ] **Paso 6: commit** — `git -C ../.. add app/api && git -C ../.. commit -m "Datos: /location con callejero local y buscador de Nomecalles con caché (V-D2)"`
+
+**Terminado cuando:** «calle madrid 10 getafe» → lon −3,7314934 / lat 40,3056775 (D-04); municipio por nombre sin tildes ni mayúsculas; buscador caído → callejero local; texto < 3 o > 200 → 422.
+
+---
+
+### Task 32: Conexión del front a la API (cliente HTTP, `/activities`, `/recommend`, `/route`, `/location`, GPS)
+
+**Rol:** Front (a petición de la persona, 16/10) · **Servicio:** `app/frontend/` · **Depende de:** Tasks 29–31 · **Duración:** 2 h
+
+**Ficheros:** Crear `src/data/http.ts`, `src/data/http.test.ts`, `src/data/mode.ts`, `src/data/geolocation.ts`, `src/data/geolocation.test.ts`. Modificar `src/data/activities.ts`, `src/data/recommend.ts`, `src/data/route.ts`, `src/data/location.ts`, `vite.config.ts`, `src/components/LocationPicker.tsx`, `src/components/Results.tsx` (subtítulo), `src/components/Sources.tsx` y `src/components/Sources.test.tsx` (quitar el selector de escenarios), `docs/pendientes.md` (§B), `docs/pantallas.md` (Rulings).
+
+**Interfaces:**
+- Consume: contrato (`src/api/types.ts`); `ApiError` (`src/data/errors.ts`); `MUNICIPALITIES` (`src/data/mock/municipalities.ts`, lista estática de P-09).
+- Produce: `http.ts` → `API_BASE = "/api"`, `getJson<T>(path, timeoutMs?)`, `postJson<T>(path, body, timeoutMs?)`, `ApiError(status, mensaje)` con `status` HTTP o `0` (sin conexión o tiempo agotado); `mode.ts` → `sampleDataMode(): boolean` (`MODE === "test"`); `geolocation.ts` → `LocationError`, `LOCATION_MESSAGES`, `nearestMunicipality(lat, lon)`, `locateWithBrowser(geo, secure, timeoutMs?) -> Promise<LocationCandidate>`; `location.ts` → `currentLocation(): Promise<LocationCandidate>`.
+
+- [ ] **Paso 1: pruebas que fallan** — `src/data/http.test.ts`:
+
+```ts
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { RecommendRequest } from "../api/types";
+import { ApiError } from "./errors";
+import { getJson, postJson } from "./http";
+
+const json = (status: number, body: unknown) =>
+    new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+
+afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+});
+
+describe("cliente HTTP", () => {
+    it("hace GET a /api y devuelve el JSON", async () => {
+        const fetchMock = vi.fn().mockResolvedValue(json(200, { status: "ok" }));
+        vi.stubGlobal("fetch", fetchMock);
+        await expect(getJson("/health")).resolves.toEqual({ status: "ok" });
+        expect(fetchMock.mock.calls[0][0]).toBe("/api/health");
+    });
+
+    it("hace POST con el cuerpo en JSON", async () => {
+        const fetchMock = vi.fn().mockResolvedValue(json(200, { ok: true }));
+        vi.stubGlobal("fetch", fetchMock);
+        await postJson("/route", { a: 1 });
+        const init = fetchMock.mock.calls[0][1] as RequestInit;
+        expect(init.method).toBe("POST");
+        expect(init.body).toBe('{"a":1}');
+        expect((init.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
+    });
+
+    it("convierte un 422 de validación en ApiError legible", async () => {
+        vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json(422, { detail: [{ msg: "x" }] })));
+        const error = await getJson("/location?text=ab").catch((e) => e);
+        expect(error).toBeInstanceOf(ApiError);
+        expect(error.status).toBe(422);
+        expect(error.message).toMatch(/no es válido/);
+    });
+
+    it("usa el detail de texto de la API", async () => {
+        vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json(503, { detail: "Los datos todavía no están cargados." })));
+        const error = await getJson("/recommend").catch((e) => e);
+        expect(error).toMatchObject({ status: 503, message: "Los datos todavía no están cargados." });
+    });
+
+    it("un 500 sin JSON da un mensaje de servidor", async () => {
+        vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("boom", { status: 500 })));
+        const error = await getJson("/x").catch((e) => e);
+        expect(error).toMatchObject({ status: 500 });
+        expect(error.message).toMatch(/servidor/);
+    });
+
+    it("sin conexión da ApiError con estado 0", async () => {
+        vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+        const error = await getJson("/x").catch((e) => e);
+        expect(error).toMatchObject({ status: 0 });
+        expect(error.message).toMatch(/conectar/);
+    });
+
+    it("corta la petición si tarda demasiado", async () => {
+        vi.stubGlobal(
+            "fetch",
+            vi.fn((_url: string, init: RequestInit) =>
+                new Promise((_resolve, reject) => {
+                    init.signal!.addEventListener("abort", () =>
+                        reject(new DOMException("aborted", "AbortError")),
+                    );
+                }),
+            ),
+        );
+        const error = await getJson("/x", 10).catch((e) => e);
+        expect(error).toMatchObject({ status: 0 });
+        expect(error.message).toMatch(/tarda demasiado/);
+    });
+
+    it("fuera de las pruebas, recommend llama a POST /api/recommend", async () => {
+        vi.stubEnv("MODE", "production");
+        const fetchMock = vi.fn().mockResolvedValue(json(200, { results: [], has_more: false, warnings: [], medical_disclaimer: "" }));
+        vi.stubGlobal("fetch", fetchMock);
+        const { recommend } = await import("./recommend");
+        const req = { origin: { lat: 40.3, lon: -3.7 } } as RecommendRequest;
+        await recommend(req);
+        expect(fetchMock.mock.calls[0][0]).toBe("/api/recommend");
+        expect(JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)).toEqual(req);
+    });
+});
+```
+
+`src/data/geolocation.test.ts`:
+
+```ts
+import { describe, expect, it } from "vitest";
+import { LOCATION_MESSAGES, locateWithBrowser, nearestMunicipality } from "./geolocation";
+
+function fakeGeo(result: { lat: number; lon: number } | { code: number }): Geolocation {
+    return {
+        getCurrentPosition: (ok: PositionCallback, fail?: PositionErrorCallback | null) => {
+            if ("code" in result) fail?.({ code: result.code, message: "", PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 });
+            else ok({ coords: { latitude: result.lat, longitude: result.lon } } as GeolocationPosition);
+        },
+    } as unknown as Geolocation;
+}
+
+describe("geolocalización", () => {
+    it("devuelve la posición con el municipio más cercano", async () => {
+        const c = await locateWithBrowser(fakeGeo({ lat: 40.3057, lon: -3.7329 }), true);
+        expect(c).toMatchObject({ label: "Tu ubicación", municipality: "Getafe", ine_code: "28065", precision: "address" });
+        expect(c.coordinate).toEqual({ lat: 40.3057, lon: -3.7329 });
+    });
+
+    it("sin HTTPS lo explica", async () => {
+        await expect(locateWithBrowser(fakeGeo({ lat: 40.3, lon: -3.7 }), false)).rejects.toThrow(LOCATION_MESSAGES.insecure);
+    });
+
+    it("permiso denegado", async () => {
+        await expect(locateWithBrowser(fakeGeo({ code: 1 }), true)).rejects.toThrow(LOCATION_MESSAGES.denied);
+    });
+
+    it("sin posición o sin API", async () => {
+        await expect(locateWithBrowser(fakeGeo({ code: 3 }), true)).rejects.toThrow(LOCATION_MESSAGES.unavailable);
+        await expect(locateWithBrowser(undefined, true)).rejects.toThrow(LOCATION_MESSAGES.unavailable);
+    });
+
+    it("fuera de la Comunidad", async () => {
+        await expect(locateWithBrowser(fakeGeo({ lat: 41.39, lon: 2.17 }), true)).rejects.toThrow(LOCATION_MESSAGES.outside);
+        expect(nearestMunicipality(40.4169, -3.7035)?.municipality.ine_code).toBe("28079");
+    });
+});
+```
+
+- [ ] **Paso 2:** Run: `npx vitest run src/data/http.test.ts src/data/geolocation.test.ts` → Esperado: FAIL (`Failed to resolve import "./http"`).
+- [ ] **Paso 3: implementación** — `src/data/mode.ts`:
+
+```ts
+// En las pruebas (MODE=test) las funciones de src/data usan los datos de ejemplo: nunca la red.
+// Se lee en cada llamada para que una prueba pueda simular otro modo con vi.stubEnv.
+export function sampleDataMode(): boolean {
+    return import.meta.env.MODE === "test";
+}
+```
+
+`src/data/http.ts`:
+
+```ts
+import { ApiError } from "./errors";
+
+// Cliente de la API: misma maquina, prefijo /api (Caddy en produccion, proxy de Vite en desarrollo)
+export const API_BASE = "/api";
+const TIMEOUT_MS = 15_000;
+
+async function errorMessage(response: Response): Promise<string> {
+    let detail: unknown = null;
+    try {
+        detail = ((await response.json()) as { detail?: unknown })?.detail;
+    } catch {
+        // sin cuerpo JSON
+    }
+    if (typeof detail === "string" && detail) return detail;
+    if (response.status === 422) return "Hay un dato que no es válido. Revisa lo que has escrito.";
+    if (response.status === 404) return "No lo hemos encontrado.";
+    if (response.status >= 500) return "El servidor no responde ahora. Inténtalo de nuevo en unos minutos.";
+    return "No se pudo completar la petición.";
+}
+
+async function request<T>(path: string, init: RequestInit, timeoutMs: number): Promise<T> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const response = await fetch(`${API_BASE}${path}`, { ...init, signal: controller.signal });
+        if (!response.ok) throw new ApiError(response.status, await errorMessage(response));
+        return (await response.json()) as T;
+    } catch (error) {
+        if (error instanceof ApiError) throw error;
+        if (controller.signal.aborted) {
+            throw new ApiError(0, "La respuesta tarda demasiado. Inténtalo de nuevo.");
+        }
+        throw new ApiError(0, "No se pudo conectar con el servidor. Comprueba tu conexión.");
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+export function getJson<T>(path: string, timeoutMs = TIMEOUT_MS): Promise<T> {
+    return request<T>(path, { method: "GET", headers: { Accept: "application/json" } }, timeoutMs);
+}
+
+export function postJson<T>(path: string, body: unknown, timeoutMs = TIMEOUT_MS): Promise<T> {
+    return request<T>(
+        path,
+        {
+            method: "POST",
+            headers: { Accept: "application/json", "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        },
+        timeoutMs,
+    );
+}
+```
+
+`src/data/geolocation.ts`:
+
+```ts
+import type { LocationCandidate } from "../api/types";
+import { MUNICIPALITIES, type MunicipalityItem } from "./mock/municipalities";
+
+// «Usar mi ubicacion» (RF-01): GPS del navegador tras el gesto; la posicion no se guarda en ningun sitio.
+export const LOCATION_MESSAGES = {
+    insecure:
+        "Tu navegador solo comparte la ubicación en páginas seguras (HTTPS). Escribe una dirección o un municipio.",
+    denied: "No has dado permiso para usar tu ubicación. Escribe una dirección o un municipio.",
+    unavailable: "No hemos podido saber dónde estás. Escribe una dirección o un municipio.",
+    outside:
+        "Tu ubicación está fuera de la Comunidad de Madrid. Escribe una dirección o un municipio de la Comunidad.",
+};
+// a mas de esto del centro de cualquier municipio, fuera de la Comunidad (criterio propio)
+const MAX_KM_FROM_CENTER = 40;
+
+export class LocationError extends Error {}
+
+function km(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const rad = Math.PI / 180;
+    const a =
+        Math.sin(((lat2 - lat1) * rad) / 2) ** 2 +
+        Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(((lon2 - lon1) * rad) / 2) ** 2;
+    return 2 * 6371 * Math.asin(Math.sqrt(a));
+}
+
+export function nearestMunicipality(lat: number, lon: number): { municipality: MunicipalityItem; km: number } | null {
+    let best: { municipality: MunicipalityItem; km: number } | null = null;
+    for (const m of MUNICIPALITIES) {
+        const d = km(lat, lon, m.lat, m.lon);
+        if (!best || d < best.km) best = { municipality: m, km: d };
+    }
+    return best;
+}
+
+export function locateWithBrowser(
+    geo: Geolocation | undefined,
+    secure: boolean,
+    timeoutMs = 10_000,
+): Promise<LocationCandidate> {
+    if (!secure) return Promise.reject(new LocationError(LOCATION_MESSAGES.insecure));
+    if (!geo) return Promise.reject(new LocationError(LOCATION_MESSAGES.unavailable));
+    return new Promise((resolve, reject) => {
+        geo.getCurrentPosition(
+            (position) => {
+                const { latitude: lat, longitude: lon } = position.coords;
+                const near = nearestMunicipality(lat, lon);
+                if (!near || near.km > MAX_KM_FROM_CENTER) {
+                    reject(new LocationError(LOCATION_MESSAGES.outside));
+                    return;
+                }
+                resolve({
+                    label: "Tu ubicación",
+                    municipality: near.municipality.name,
+                    ine_code: near.municipality.ine_code,
+                    coordinate: { lat, lon },
+                    precision: "address",
+                });
+            },
+            (error) =>
+                reject(new LocationError(error.code === 1 ? LOCATION_MESSAGES.denied : LOCATION_MESSAGES.unavailable)),
+            { enableHighAccuracy: false, timeout: timeoutMs, maximumAge: 60_000 },
+        );
+    });
+}
+```
+
+Funciones de `src/data/` (cada una conserva su comentario de endpoint; se quita la línea «paso 3: sustituir…»):
+
+```ts
+// activities.ts
+export function getActivities(): Promise<ActivitiesResponse> {
+    if (sampleDataMode()) return simulate(() => structuredClone(ACTIVITIES_MOCK));
+    return getJson<ActivitiesResponse>("/activities");
+}
+// recommend.ts
+export function recommend(req: RecommendRequest): Promise<RecommendResponse> {
+    if (sampleDataMode()) return simulate(() => recommendMock(req));
+    return postJson<RecommendResponse>("/recommend", req);
+}
+// route.ts
+export function getRoute(req: RouteRequest): Promise<RouteResponse> {
+    if (sampleDataMode()) return simulate(() => routeMock(req));
+    return postJson<RouteResponse>("/route", req);
+}
+// location.ts
+export function searchLocation(text: string): Promise<LocationResponse> {
+    if (sampleDataMode()) return simulate(() => locationMock(text));
+    return getJson<LocationResponse>(`/location?text=${encodeURIComponent(text)}`);
+}
+
+// «Usar mi ubicacion»: GPS real tras el gesto (sin guardarlo). En las pruebas, la de ejemplo;
+// en desarrollo, si el GPS falla, tambien (y la pantalla lo dice).
+export async function currentLocation(): Promise<LocationCandidate> {
+    if (sampleDataMode()) return sampleLocation();
+    try {
+        return await locateWithBrowser(navigator.geolocation, window.isSecureContext);
+    } catch (error) {
+        if (import.meta.env.DEV) return sampleLocation();
+        throw error;
+    }
+}
+```
+
+`vite.config.ts`: descomentar el bloque `server.proxy` de `/api` (destino `http://localhost:8000`, `rewrite` que quita `/api`) y borrar la línea «paso 3: …».
+
+`LocationPicker.tsx`: el botón llama a `locate` en vez de `pick(sampleLocation())`:
+
+```tsx
+const [locating, setLocating] = useState(false);
+const [locateError, setLocateError] = useState("");
+
+const locate = async () => {
+    setLocating(true);
+    setLocateError("");
+    try {
+        pick(await currentLocation());
+    } catch (error) {
+        setLocateError(error instanceof Error ? error.message : "No hemos podido saber dónde estás.");
+    } finally {
+        setLocating(false);
+    }
+};
+```
+
+el botón: `onClick={locate}` con `disabled={locating}` y texto `{locating ? "Buscando tu ubicación…" : "Usar mi ubicación"}`; en `announcement`, antes de los casos de búsqueda: `if (locating) announcement = "Buscando tu ubicación…"; if (locateError) announcement = locateError;`. La nota de `isSampleLocation(origin)` pasa a «Es una ubicación de ejemplo: el GPS no está disponible en este entorno de desarrollo.» (solo se ve en desarrollo).
+
+`Results.tsx:310`: quitar « · datos de ejemplo». `Sources.tsx`: quitar `SampleData` (y sus imports `useState`, `useNavigate`, `getActivities`, `listMunicipalities`, scenarios, `useAppState`, `ErrorMessage` si quedan sin uso) y su uso; `Sources.test.tsx`: quitar las dos pruebas del selector («avisa si falla al aplicar el escenario», «permite elegir un escenario de la demo y verlo (Carmen)»). `src/data/scenarios.ts` y `src/data/mock/` **se quedan** (solo las usan las pruebas y las pantallas que siguen en ejemplo).
+
+- [ ] **Paso 4:** Run: `npx vitest run src/data` → Esperado: PASS. Después `npm test && npm run build && npm run lint` → Esperado: todo en verde (si alguna prueba de Inicio pulsaba «Usar mi ubicación» de forma síncrona, esperar con `findBy…`).
+- [ ] **Paso 5: docs** — `docs/pendientes.md` §B: marcar `[x]` cliente (`src/data/http.ts`), proxy, «Sustituir el cuerpo» solo para `getActivities`, `recommend`, `getRoute`, `searchLocation` (anotando que el resto sigue en ejemplo porque su endpoint está en 501), la ubicación con GPS y la petición de `LineString`; borrar los datos de ejemplo queda parcial (lo conectado sí). `docs/pantallas.md`, «Decisiones tomadas al construir»: Rulings del paso 3 (GPS → municipio más cercano de la lista estática; ejemplo solo en pruebas y como respaldo del GPS en desarrollo; selector de escenarios quitado; `scenarios.ts` se queda para las pruebas).
+- [ ] **Paso 6: commit** — `git -C ../.. add app/frontend && git -C ../.. commit -m "Front: cliente HTTP y conexión de actividades, recomendación, ruta y ubicación a la API"`
+
+**Terminado cuando:** el front llama a `/api/activities`, `/api/recommend`, `/api/route` y `/api/location`; «Usar mi ubicación» usa el GPS con mensajes si se deniega o no hay HTTPS; `npm test && npm run build && npm run lint` en verde sin red.
+
+---
+
+### Prueba de punta a punta (tras la Task 32)
+`cd app && docker compose -f deploy/docker-compose.yml up -d --build` y con `curl` (midiendo tiempos con `-w '%{time_total}'`): `/api/activities`, `POST /api/recommend` (Getafe, caminar, próximas 3 h), `POST /api/route`, `/api/location?text=calle%20madrid%2010%20getafe`, `/` sirve el front; `docker compose logs api` muestra «grafos cargados» (el contenedor ve `app/data` en `/data`); `docker stats --no-stream`; `down` al terminar.
+
+
+---
 
 # SÁBADO 17/10 — tareas (rutas relativas a `app/`)
 
