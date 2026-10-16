@@ -194,6 +194,18 @@ Resuelto en `docs/arquitectura.md` §1 (D-13: Docker Compose en VM de OCI). **No
 - Descartadas: (a) solo pilotos (176 municipios sin F2), (b) solo consultados (la api tendría que avisar a la ingesta) y (c) los 179 cada 6 h (90 min por ejecución).
 - Valores y comportamiento para implementar: ficha de B2 en `docs/trabajo-paralelo.md`.
 
+## DEC-15 · Datos en tiempo real sin persistencia
+
+**Contexto:** el diseño anterior de B2 recargaba `realtime.duckdb` cada hora y, si una fuente caía, enseñaba el último dato con aviso. Eso permite mostrar aire o meteo de hace muchas horas, que no sirve para decidir «¿salgo ahora?». Medido el 16/10 a las 16:14: `aire_dia` 24 KB en 0,24 s (última hora válida, la 13: ~3 h de retraso de la propia red), `ay_aire` 19 KB en 2,1 s, `ay_meteo` 14 KB en 0,9 s, `pm.xml` 2,2 MB en 0,4 s: se pueden pedir en directo.
+
+**Decidido el 16/10:**
+- Aire, previsión y tráfico **no se guardan en disco** (salvo la caché de arranque de la previsión, que se descarta si tiene más de 12 h). La API los pide en segundo plano y los tiene en memoria (`LiveStore`, `config/realtime.yaml`).
+- **Nunca se muestra un dato más viejo que su `max_age`** (aire 3 h, previsión 12 h, tráfico 15 min; criterio propio salvo los 12 h de DEC-13). Si el portal cae, el último válido solo mientras siga dentro de `max_age`; después, «sin dato actual» y ese factor no cuenta. Sustituye a «último dato en caché + aviso» del RNF para estas fuentes.
+- **Horas futuras:** previsión horaria de AEMET (hoy y mañana; probabilidad de lluvia por franjas de 6 h) y patrón histórico del aire por estación y hora, presentado como **estimación**. Pasado mañana después de las 07:00 no hay previsión horaria: el selector de hora se limita a ~36 h.
+- **AEMET** no se pide en cada consulta (2 peticiones por municipio, 429 a ~6/min): cola en la API a 4 peticiones/min con prioridad para los municipios pedidos y los pilotos; un municipio sin previsión usa la del más cercano con previsión dentro de `forecast_fallback_km` y lo dice. Sustituye a la rotación 1/6 de DEC-13 desde la ingesta.
+- **Polen** (`mediciones_polen` y `captadores_polen` del CKAN de la Comunidad, comprobados el 16/10; dato diario con ~5 días de retraso): Could, fuente nueva que aprueba el equipo; solo aviso, no puntúa.
+- Plan: `docs/planes/tiempo-real.md`; ficha B2 en `docs/trabajo-paralelo.md`.
+
 ## D-14 · PDF de presentaciones en el repositorio (46 MB)
 
 Ya están subidos en el primer commit. Quitarlos ahora no reduce el historial. **Recomendación:** dejarlos.
