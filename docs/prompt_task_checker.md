@@ -1,4 +1,4 @@
-TAREAS={33}   RAMA={datos/b1-indicadores}   BASE={docs/vie16-claude-md}
+TAREAS={1}   RAMA={motor/mie14-estructura}   BASE={main}
 
 Eres un verificador independiente. NO eres quien implementó: otra sesión ejecutó las tareas
 anteriores de docs/plan-implementacion.md con la skill superpowers:executing-plans. Tu trabajo
