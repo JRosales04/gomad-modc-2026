@@ -1207,6 +1207,36 @@ El verificador (⚠️ APTO con observaciones) escaló un Important: «Nadar: no
 - **Pruebas clave:** `test_sources_all_have_license` (todas las fuentes usadas tienen licencia y URL); una fuente sin `manifest.json` sale con fecha nula y aviso, no 500; cada `DataSource.label` que devuelven `/recommend` y `/route` aparece en `/sources`.
 - **Terminado cuando:** `/sources` lista todas las fuentes usadas con licencia, URL y fechas.
 
+#### Detalle de la Task 38 (ejecutor de LB1-3, 16/10)
+
+**Rol:** Motor · **Servicio:** `app/api/` · **Depende de:** nada (el contrato `SourceInfo`/`SourcesResponse` ya existe en `schemas.py`) · **Duración:** 1 h
+
+**Ficheros:** Modificar `app/config/sources.yaml` (se conserva `labels`, se añaden etiquetas que faltan y la sección nueva `catalog`), la función `sources` de `main.py`. Crear `services/sources.py` y `tests/test_sources.py`.
+
+**Decisiones de esta Task:**
+- `sources.yaml` gana una sección `catalog: {<id>: {publisher, license, url}}`. **Fuentes usadas** = las claves de `labels` + los `source` de `indicators.yaml` que sean ids de descarga (no la tabla `destination_activity`) + las referencias de umbrales (`boe_ica`, `sanidad_calor`). `/sources` devuelve las de `catalog` en el orden del YAML; `name` = `labels[id]` (cada entrada de `catalog` tiene etiqueta).
+- Se añaden etiquetas que faltaban para las fuentes de los indicadores (`sanitarios`, `farmacias`, `educativos`, `atencion_social`, `padron`, `vias_pecuarias`, `nmc_busparadas`, `nmc_estmetro`, `nmc_estcerca`, `eiel_nucleos`) y para `config:recommend`, `boe_ica` y `sanidad_calor`. Efecto lateral buscado: `/municipality` deja de mostrar el id en bruto como etiqueta.
+- Licencias comprobadas el 16/10: CKAN de la Comunidad (`package_show`: «Creative Commons Attribution» 4.0), Ayuntamiento (`package_show` de `300051-0-fuentes`: CC BY 4.0), IDEM (CSW ISO de EIEL: «CC BY 4.0 Comunidad de Madrid»); OSM ODbL; AEMET aviso legal. Nomecalles: no se encontró licencia publicada (ver Ruling).
+- Fechas (`services/sources.py`): `last_refresh` = `checked` del `manifest.json` (última comprobación correcta; si falta, `downloaded`); sin manifest o sin entrada → `source_date` de `gomad.duckdb` (`Repository.source_dates()`); sin nada → `None`. `last_failure` = `manifest[id].last_failure.date` o `None`. Las fechas se pasan por `repository.parse_date` (hora local sin zona, como el resto de la API). Fuentes `config:*` y referencias: ambas `None`.
+- Un `manifest.json` ausente o ilegible y una `gomad.duckdb` ausente (`DataUnavailable`) no dan 500: fechas nulas. El «aviso» de la división es la fecha nula (el contrato `SourceInfo` no tiene campo de aviso y no se cambia en esta Task; el front escribe «sin fecha»).
+
+**Interfaces:**
+- Consume: `settings.load("sources")`, `settings.load("indicators")`, `settings.DATA_DIR`, `Repository.source_dates()`, `repository.parse_date`, `schemas.SourceInfo` / `SourcesResponse` (sin cambios).
+- Produce: `services/sources.py`: `used_ids(sources_cfg, indicators_cfg) -> set[str]`, `manifest_dates(data_dir) -> dict[str, tuple[datetime|None, datetime|None]]`, `sources(repo, data_dir) -> s.SourcesResponse`; `GET /sources` con `get_repo`.
+
+- [ ] **Paso 1: pruebas que fallan** — `tests/test_sources.py`:
+  - `test_sources_all_have_license`: con la config real, cada id de `used_ids(...)` está en `catalog` y en `labels`, con `publisher`, `license` y `url` no vacíos y `url` empezando por `https://`.
+  - `test_sources_endpoint_dates(tmp_path)`: datos mínimos (`build_mini_data`) + un `raw/manifest.json` con `eiel_parques` (`checked` 2026-10-16T11:47:46) y `aemet` solo con `last_failure.date` 2026-10-16T11:48:08 → `eiel_parques.last_refresh == "2026-10-16T11:47:46"`, `aemet.last_refresh is None` y `aemet.last_failure == "2026-10-16T11:48:08"`; respuesta 200 con todas las fuentes de `catalog`.
+  - `test_sources_without_manifest(tmp_path)`: sin `raw/manifest.json` → 200; `nmc_deporte.last_refresh == "2026-10-16T15:56:26"` (de `source_date`) y `osm.last_refresh is None`.
+  - `test_sources_without_database(tmp_path)`: directorio de datos vacío → 200 con todas las fechas nulas.
+  - `test_every_response_source_is_listed(tmp_path)`: cada `DataSource.source` de `/recommend` (Getafe, mini datos, `weights` por defecto y con línea recta) y de `/route` (sin red y con grafo mínimo) está en `/sources`; su etiqueta base (`labels[id]`) coincide con el `name` de `/sources`.
+- [ ] **Paso 2:** `.venv/bin/pytest tests/test_sources.py -v` → Esperado: FAIL (`ModuleNotFoundError: No module named 'services.sources'` en la colección).
+- [ ] **Paso 3:** ampliar `sources.yaml` e implementar `services/sources.py` y la función `sources` de `main.py` (`def sources(repo: Repository = Depends(get_repo))`).
+- [ ] **Paso 4:** `.venv/bin/pytest tests/test_sources.py -v` → Esperado: `5 passed`. `.venv/bin/pytest -q` → Esperado: solo los 2 fallos de la línea base (`test_recommend_capital_without_vpla`, `test_route_getafe`). `tests/test_contract.py` pasa sin regenerar `openapi.json` (el contrato no cambia).
+- [ ] **Paso 5: commit** `Motor: /sources con editor, licencia, URL y fechas de cada fuente (B1 Task 38)`.
+
+**Terminado cuando:** `/sources` lista todas las fuentes usadas con licencia, URL y fechas (con `uvicorn` en marcha: `curl -s localhost:8000/sources` devuelve cada fuente con `license` y `url`).
+
 ---
 
 ## Lote LB1-4 · Front (`app/frontend/`) — Task 39 (después de LB1-2 y LB1-3)
