@@ -83,6 +83,98 @@ Los datos que caducan en horas (aire medido, previsión, tráfico) **no se guard
 - **Pruebas clave:** con la muestra de Getafe, hoy de 09 a 23 h y mañana de 00 a 23 h; la hora 17 lleva la probabilidad de la franja `1420`; nunca más de `requests_per_min` peticiones por minuto (reloj falso); 429 → un reintento y sigue con el siguiente municipio; municipio pedido por un usuario pasa delante de la rotación; `issued` de hace 13 h → no se usa; sin previsión propia y Getafe a 5 km → «Previsión de Getafe»; la clave no aparece en ningún log ni excepción.
 - **Terminado cuando:** con la API en marcha y la clave en `app/.env`, a los 2 min hay previsión de los 3 pilotos en memoria y `/recommend` la usa sin `realtime.duckdb`.
 
+### Detalle del lote LB2-1 (ejecutor, 16/10)
+
+**Arquitectura (para el criterio 1.1):** integración virtual **mediador-wrapper con caché en memoria**. Cada fuente tiene un *wrapper* (`live/air.py` para las dos redes de aire y `live/forecast.py` para AEMET) que habla con su portal y lo traduce a un esquema común. El *mediador* es `LiveStore` + `Repository`, que ofrece la vista global (`air_categories`, `forecast`) con la misma firma de siempre y aplica la regla común de frescura (`max_age_h`). El motor no cambia.
+
+**Rol:** Motor · **Servicio:** `app/api/` · **Rama:** `motor/b2-vivo`
+
+**Decisiones comunes del lote:**
+- `Repository(data_dir, live=None)`: con `live` lee de memoria; sin `live` (pruebas existentes, `GOMAD_LIVE=off`) lee `realtime.duckdb` como hoy, así las pruebas de `/recommend` no cambian. `lifespan` crea el `LiveStore` salvo con `GOMAD_LIVE=off`, que `tests/conftest.py` fija para que ninguna prueba (tampoco las `slow` con `lifespan`) llame a los portales.
+- Horas: todo en hora local de Madrid sin zona, como el resto de la API. El reloj (`now`) se inyecta para las pruebas.
+- La clave de AEMET se lee de la variable de entorno `AEMET_API_KEY` (Compose la pasa con `env_file`) o, si no está, de `app/.env`. Va solo en la cabecera `api_key`. Ni los logs ni `last_error` llevan URL ni mensaje de excepción: solo el tipo de error y el código HTTP.
+
+#### Task 40 · `realtime.yaml` y `LiveStore`
+**Ficheros:** Crear `app/config/realtime.yaml`, `app/api/live/__init__.py`, `app/api/live/store.py`, `app/api/tests/live/test_store.py`. Modificar `app/config/README.md` (una fila), `main.py` (`lifespan`: validar `realtime.yaml` y crear, arrancar y parar el `LiveStore`), `repository.py` (`__init__` con `live=None`) y `tests/conftest.py` (`GOMAD_LIVE=off`).
+
+**Valores de `realtime.yaml`** (criterio propio salvo `max_issued_age_h`, de DEC-13):
+- `air_cm`: URL del manifiesto de `aire_dia`, `ttl_s: 600`, `max_age_h: 3`, `timeout_s: 10`.
+- `air_ay`: URL del manifiesto de `ay_aire` y los mismos valores.
+- `forecast`: `url` con `{ine}`, `ttl_s: 3600`, `max_age_h: 12`, `timeout_s: 15`, `requests_per_min: 4`, `retry_429_s: 120`, `refetch_after_h: 6`, `pilots: ["28065", "28079", "28131"]`, `forecast_fallback_km: 10`, `max_issued_age_h: 12`.
+- `air_buffer_h: 24`, `tick_s: 5`.
+
+**Interfaces que produce:**
+- `validate_realtime(cfg)`: lanza `ValueError` que nombra la fuente si le falta `ttl_s`, `max_age_h` o `timeout_s`.
+- `Entry(value, observed_at, fetched_at, status, last_error)`, con `status` en `ok | stale | failed`.
+- `LiveStore(cfg, client=None, now=None, snapshot_dir=None)`, con estos métodos:
+  - `register(name, fetch)`, donde `fetch(store) -> (value, observed_at)`;
+  - `refresh(name) -> bool`: no vuelve a pedir dentro del TTL y hace una sola descarga a la vez por fuente (lock sin espera);
+  - `get(name) -> Entry | None`: `None` si `observed_at < now − max_age_h`;
+  - `entry(name)`, `http_get(source, url, headers=None, key="data") -> bytes` (en modo instantánea lee `snapshot_dir/<source>/<key>` y nunca abre conexiones), `start()`, `stop()`, `snapshot` (bool).
+
+**Pasos:**
+- [ ] Escribir `tests/live/test_store.py` con estas pruebas: `test_within_ttl_does_not_refetch`, `test_portal_down_recent_value_is_stale`, `test_portal_down_old_value_is_none`, `test_slow_portal_does_not_block_get`, `test_concurrent_refresh_single_request`, `test_snapshot_mode_never_opens_connections`, `test_realtime_yaml_without_max_age_names_source` (además, el `realtime.yaml` real pasa la validación).
+- [ ] Ejecutar `.venv/bin/pytest tests/live/test_store.py -q`. Esperado: error de colección (`No module named 'live'`).
+- [ ] Implementar, ejecutar las pruebas de la Task (Esperado: 7 passed) y la suite completa (Esperado: solo los 2 fallos de la línea base).
+- [ ] Commit `Motor: LiveStore y realtime.yaml, datos en vivo en memoria con validez máxima (B2 Task 40)`.
+
+#### Task 41 · Aire en vivo
+**Ficheros:** Crear `live/air.py`, `tests/live/test_air.py`, `tests/data/aire_dia_sample.csv` y `ay_aire_sample.csv` (recortes reales de `app/data/raw/`: Getafe 28065 y una estación de la capital). Modificar el cuerpo de `Repository.air_categories`.
+
+**Interfaces que produce:**
+- `parse_air_csv(text) -> list[(station_id, magnitude, ts, value)]`, con estas reglas:
+  - se quedan `V` y `T` y se descartan `N` y los vacíos;
+  - magnitudes 1, 8, 9, 10 y 14;
+  - `station_id` = `28` + municipio con 3 cifras + estación con 3 cifras;
+  - `ts` = fin de la hora;
+  - fecha de cada fila;
+  - coma o punto decimal.
+- `AirFeed(source, url, buffer_h)`, con `fetch(store)`. Mezcla las lecturas en un búfer de 24 h y devuelve `(buffer, max ts)`.
+- `air_categories(readings_list, start, end, ica, valid_h)`: misma salida que `Repository.air_categories`. Calcula medias móviles de `period_hours` en la ventana `[ts − (h−1) h, ts]`, con la cobertura `min_coverage` y `aqi_category`.
+- `register_air(store, cfg)`.
+
+**Pasos:**
+- [ ] Escribir `tests/live/test_air.py` con estas pruebas:
+  - `test_sample_categories_match_batch_path`: los valores esperados se calculan a mano en la prueba, sin importar ingest;
+  - `test_t_counts_n_does_not`;
+  - `test_yesterday_file_after_midnight_has_no_current_reading`;
+  - `test_last_reading_3h10_is_none`;
+  - `test_repository_reads_live_air`.
+- [ ] FAIL (no existe `live.air`) → implementar → PASS. Suite: solo los 2 fallos de la línea base (las pruebas de `/recommend` no cambian).
+- [ ] Commit `Motor: aire en vivo de las dos redes en memoria (B2 Task 41)`.
+
+#### Task 42 · Previsión AEMET con cola y cuota
+**Ficheros:** Crear `live/forecast.py`, `tests/live/test_forecast.py` y `tests/data/aemet_28065.json` (copia de la muestra de ingest). Modificar el cuerpo de `Repository.forecast`. `.env.example` no cambia: `download_sources.py` usa todavía `AEMET_MUNICIPALITIES` y `AEMET_PAUSE_S`, y así se dirá en el informe.
+
+**Interfaces que produce:**
+- `decode(raw, charset=None)`.
+- `parse_forecast(doc) -> (series {ts: (temp, feels_like, precip_prob, precip)}, issued)`. Solo cuenta las horas con temperatura; `probPrecipitacion` se toma de la franja de 6 h que contiene la hora; «Ip» → 0.
+- `RateLimiter(per_min, now)`, con `allow() -> bool` (ventana de 60 s; cuenta cada petición HTTP, 2 por municipio).
+- `ForecastFeed(store, cfg, codes, centers=None, cache_path=None, key=None)`, con estos métodos:
+  - `request(ines)`: prioridad para los municipios que piden las personas;
+  - `next_due() -> ine | None`: orden pedidos → pilotos → resto por código; un municipio toca si no tiene previsión o si su `issued` tiene más de `refetch_after_h` y su último intento más de `ttl_s`;
+  - `step() -> str`: hace como mucho una descarga de dos pasos si el limitador lo permite. Un 429 se reintenta una vez tras `retry_429_s`; si vuelve a fallar, el municipio espera a la siguiente vuelta y se sigue con el siguiente;
+  - `get(ine) -> (series, issued, note) | None`: `None` si `issued` tiene más de `max_issued_age_h`. Si el municipio no tiene previsión propia, usa la del más cercano con previsión dentro de `forecast_fallback_km`, con `note = "Previsión de <nombre>"`;
+  - `load_cache()` / `save_cache()`: guarda en `data/live/forecast.json` y al leer descarta lo que tenga más de `max_issued_age_h`.
+- `aemet_key()`.
+
+**Pasos:**
+- [ ] Escribir `tests/live/test_forecast.py` con estas pruebas:
+  - `test_getafe_sample_hours`: hoy de 09 a 23 h, mañana de 00 a 23 h;
+  - `test_hour_17_uses_band_1420`;
+  - `test_ip_is_zero`;
+  - `test_rate_limit_never_exceeded` (reloj falso);
+  - `test_429_retries_once_then_moves_on`;
+  - `test_user_request_jumps_queue`;
+  - `test_issued_13h_ago_not_used`;
+  - `test_nearest_forecast_within_km`: «Previsión de Getafe» a unos 5 km;
+  - `test_key_never_in_logs_or_errors`;
+  - `test_cache_drops_old_on_load`;
+  - `test_repository_reads_live_forecast`.
+- [ ] FAIL → implementar → PASS. Suite: solo los 2 fallos de la línea base.
+- [ ] Commit `Motor: previsión de AEMET en memoria con cola, cuota y caché de arranque (B2 Task 42)`.
+- [ ] **Terminado cuando:** con la clave en `app/.env`, `uvicorn` (sin `GOMAD_LIVE=off`) tiene a los 2 min la previsión de los 3 pilotos y el aire de las dos redes, y `/recommend` en Getafe los usa con `realtime.duckdb` renombrado.
+
 ---
 
 ## Lote LB2-2 · Referencia (servicio `app/ingest/`) — Tasks 43, 44 (en paralelo con LB2-1)
