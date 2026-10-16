@@ -949,7 +949,7 @@ def municipality(ine_code: str, repo: Repository = Depends(get_repo)):
         raise HTTPException(status_code=503, detail=str(e))
 ```
 
-- [ ] **Paso 6:** Run: `.venv/bin/pytest tests/test_municipality.py -q` → Esperado: `7 passed` (ninguno saltado: hay `app/data`). Run: `.venv/bin/pytest tests/test_contract.py -q` → Esperado: `5 passed` (el contrato no cambia).
+- [ ] **Paso 6:** Run: `.venv/bin/pytest tests/test_municipality.py -q` → Esperado: `7 passed` (ninguno saltado: hay `app/data`). Run: `.venv/bin/pytest tests/test_contract.py -q` → Esperado: `6 passed` (el contrato no cambia; el plan decía 5 por error, Ruling).
 - [ ] **Paso 7:** Run: `.venv/bin/pytest -q` → Esperado: los 2 fallos de la línea base (`test_recommend_capital_without_vpla`, `test_route_getafe`) y ninguno nuevo.
 - [ ] **Paso 8: commit** — `git -C ../.. add app/api/repository.py app/api/main.py app/api/services/municipality.py app/api/tests/mini_data.py app/api/tests/test_municipality.py && git -C ../.. commit -m "Motor: /municipality/{ine_code} con indicadores DEC-09, fuente y fecha (B1 Task 36)"`
 
