@@ -434,3 +434,58 @@ Bloque B1 de `docs/trabajo-paralelo.md`, dividido en **4 lotes pequeños** (Task
 - **Comprobación rápida:** `cd app/frontend && npm test && npm run lint && npm run build`. Con `uvicorn` en `:8000` y `npm run dev`: Municipio (Getafe, Madrid, Patones) y Fuentes muestran datos reales.
 
 **Al cerrar el bloque:** desplegar (bloque D: copiar `gomad.duckdb` a la VM y hacer `restart api`) y anotar en la PR de documentación lo que el ejecutor diga que hay que cambiar en `CLAUDE.md`, `docs/arquitectura.md` y `docs/assets/requisitos_fuentes.json`.
+
+---
+
+## 8. Bloque B2 — datos en tiempo real (vie 16 → dom 18)
+
+Bloque B2 de `docs/trabajo-paralelo.md` (rediseñado el 16/10, DEC-15), dividido en **5 lotes** (Tasks 40–46 y 68–71). La división está en `docs/planes/tiempo-real.md`. Mismo ciclo que el §7: cada ejecutor detalla primero solo las Tasks de su lote, EJECUTAR en una conversación → VERIFICAR en otra → PR → fusionar.
+
+| # | Tipo | Tasks | Rama | Rol | Necesita antes |
+|---|---|---|---|---|---|
+| M-B2 | MANUAL | prerrequisitos | — | quien ejecute | — |
+| LB2-1 | EJECUTAR + VERIFICAR | 40, 41, 42 | `motor/b2-vivo` | Motor | M-B2 |
+| LB2-2 | EJECUTAR + VERIFICAR | 43, 44 | `datos/b2-referencia` | Datos | M-B2 (en paralelo con LB2-1) |
+| LB2-3 | EJECUTAR + VERIFICAR | 45, 46 | `motor/b2-motor-vivo` | Motor | **LB2-1 y LB2-2 fusionados** |
+| LB2-4 | EJECUTAR + VERIFICAR | 68, 69 | `motor/b2-condiciones` | Motor + Front | **LB2-3 fusionado** y B1 con su contrato fusionado (LB1-2) |
+| LB2-5 | EJECUTAR + VERIFICAR | 70 (y 71 si el equipo aprueba el polen) | `datos/b2-recarga` | Datos | LB2-1 fusionado; Task 71 solo antes del sábado 22:00 |
+
+**Añadido a los prompts de este bloque** (después de la primera línea; el resto de la plantilla no cambia):
+- Ejecutor: `PLAN=docs/planes/tiempo-real.md. Lee antes docs/trabajo-paralelo.md (§1 y ficha B2) y DEC-15 en docs/decisiones-pendientes.md. Primero usa superpowers:writing-plans para detallar en PLAN SOLO las Tasks de TAREAS, sin cambiar lo que fija la división, y haz commit «Plan: B2 Tasks …». Después usa superpowers:executing-plans con PLAN (no con docs/plan-implementacion.md); ledger en .superpowers/sdd/tiempo-real/progress.md. Las pruebas nunca llaman a los portales (httpx.MockTransport).`
+- Verificador: `El plan está en docs/planes/tiempo-real.md, no en docs/plan-implementacion.md. Compara con la división (alcance, «Es suyo» y pruebas clave), que escribió otra sesión antes de ejecutar, y con el detalle que añadió el ejecutor; un detalle que contradiga la división sin su Ruling es 🟠. Comprueba que la rama solo toca los ficheros «Es suyo» de sus Tasks, que ningún dato más viejo que su max_age llega a una respuesta y que la clave de AEMET no aparece en logs, pruebas ni ficheros versionados.`
+
+### M-B2 · MANUAL — Prerrequisitos del bloque
+- Lo mismo que M-B1 (§7) y además:
+  1. `AEMET_API_KEY` en `app/.env` (Task 42; sin ella, la Task 42 se prueba solo con la muestra).
+  2. Para LB2-2: `.venv/bin/python scripts/download_sources.py --only aire_historico --include-heavy` (grande: varios ficheros) y el grafo de la capital en `app/data/graph/28079/` (o el regional de B4).
+- **Listo cuando:** existen `app/data/gomad.duckdb` y `app/data/graph/`, y la línea base de pruebas está apuntada.
+
+### LB2-1 · EJECUTAR + VERIFICAR — Tasks 40, 41, 42: `LiveStore`, aire y AEMET en vivo
+- **Qué hace:** la API deja de leer aire y previsión de `realtime.duckdb`: los pide a los portales en segundo plano, los tiene en memoria y nunca enseña un dato más viejo que su `max_age`. AEMET por cola con cuota (4/min), pilotos y municipios pedidos primero.
+- **Prompt de ejecución:** `TAREAS={40,41,42}   RAMA={motor/b2-vivo}   BASE={main}   MANUALES_HECHOS={M-B2}`, más la línea de ejecutor de este §8.
+- **Prompt de verificación:** `TAREAS={40,41,42}   RAMA={motor/b2-vivo}   BASE={main}`, más la línea de verificador.
+- **Comprobación rápida:** `cd app/api && .venv/bin/pytest -q`; con `realtime.duckdb` renombrado y la API en marcha, `/recommend` en Getafe muestra aire de la última hora publicada y, a los 2 min, previsión de AEMET.
+
+### LB2-2 · EJECUTAR + VERIFICAR — Tasks 43, 44: patrón del aire y sensores de tráfico
+- **Prompt de ejecución:** `TAREAS={43,44}   RAMA={datos/b2-referencia}   BASE={main}   MANUALES_HECHOS={M-B2 con aire_historico y grafo de la capital}`, más la línea de ejecutor.
+- **Prompt de verificación:** `TAREAS={43,44}   RAMA={datos/b2-referencia}   BASE={main}`, más la línea de verificador.
+- **Comprobación rápida:** `cd app/ingest && .venv/bin/pytest -q`; `air_pattern` en `gomad.duckdb` y `data/graph/28079/traffic_sensor_edge.parquet`.
+
+### LB2-3 · EJECUTAR + VERIFICAR — Tasks 45, 46: tráfico en vivo y aire futuro
+- **Prompt de ejecución:** `TAREAS={45,46}   RAMA={motor/b2-motor-vivo}   BASE={main}   MANUALES_HECHOS={M-B2; LB2-1 y LB2-2 fusionados y build_db main reejecutado}`, más la línea de ejecutor.
+- **Prompt de verificación:** `TAREAS={45,46}   RAMA={motor/b2-motor-vivo}   BASE={main}`, más la línea de verificador.
+- **Comprobación rápida:** una ruta en capital dice «tráfico en tiempo real de las HH:MM»; `/recommend` con ventana de mañana marca el aire como «estimado».
+
+### LB2-4 · EJECUTAR + VERIFICAR — Tasks 68, 69: `/conditions` y front
+- **Ojo:** cambia el contrato. Solo cuando B1 haya fusionado el suyo; avisar al front y a los demás bloques.
+- **Prompt de ejecución:** `TAREAS={68,69}   RAMA={motor/b2-condiciones}   BASE={main}   MANUALES_HECHOS={M-B2; LB2-3 y LB1-2 fusionados}`, más la línea de ejecutor.
+- **Prompt de verificación:** `TAREAS={68,69}   RAMA={motor/b2-condiciones}   BASE={main}`, más la línea de verificador.
+- **Comprobación rápida:** `curl -s localhost:8000/conditions/28065`; `cd app/frontend && npm test && npm run lint && npm run build`.
+
+### LB2-5 · EJECUTAR + VERIFICAR — Task 70 (y 71): recarga programada y polen
+- **Antes de la Task 71:** el equipo aprueba el polen como fuente nueva (CLAUDE.md §2.12) y se actualizan `CLAUDE.md` §7 y `docs/assets/requisitos_fuentes.json` en la PR de documentación. Si no se aprueba o es sábado después de las 22:00, `TAREAS={70}`.
+- **Prompt de ejecución:** `TAREAS={70,71}   RAMA={datos/b2-recarga}   BASE={main}   MANUALES_HECHOS={M-B2; LB2-1 fusionado; polen aprobado}`, más la línea de ejecutor.
+- **Prompt de verificación:** `TAREAS={70,71}   RAMA={datos/b2-recarga}   BASE={main}`, más la línea de verificador.
+- **Comprobación rápida:** `docker compose -f app/deploy/docker-compose.yml run --rm ingest jobs/run_level.sh daily`; con polen, `/conditions/28065` trae polen con su fecha.
+
+**Al cerrar el bloque:** desplegar (bloque D) con `AEMET_API_KEY` en el `app/.env` de la VM; anotar en la PR de documentación los cambios de `CLAUDE.md` §6.4 (el nivel horario pasa a la API) y §7.1, `docs/arquitectura.md` (flujo de datos vivos) y, si entra el polen, `requisitos_fuentes.json`.

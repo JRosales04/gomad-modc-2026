@@ -216,7 +216,7 @@ Soporte: Discord https://discord.gg/ZfNFQvrRb · Web: https://datathon-mad.sel.i
 
 ### 5.1 Perspectivas
 - **Ciudadano (principal, MVP):** F1–F6.
-- **Administración (secundaria, una pantalla de demostración):** carencias por municipio; equipamiento en mal estado (EIEL: 25 instalaciones «MALO», 77 sin acceso en silla de ruedas); informe de «datos que faltan» (75 municipios casi sin mobiliario en OSM, 13 fuera del planeamiento, columna NATACION vacía…); publicar el catálogo unificado como dataset abierto CC BY. Idea: hacerla en Oracle APEX + Select AI.
+- **Administración (secundaria, una pantalla de demostración):** carencias por municipio; equipamiento en mal estado (EIEL: 25 instalaciones «MALO», 77 sin acceso en silla de ruedas); informe de «datos que faltan» (75 municipios casi sin mobiliario en OSM, 12 fuera del planeamiento, columna NATACION vacía…); publicar el catálogo unificado como dataset abierto CC BY. Idea: hacerla en Oracle APEX + Select AI.
 - **Empresa (terciaria, evolución):** huecos de oferta deportiva por habitante y renta, tejido de clubes. Regla: **la recomendación al ciudadano nunca se vende** (sin anuncios ni patrocinios).
 
 ### 5.2 Personas de la demo
@@ -327,7 +327,7 @@ No hacer: recomendador que aprende del usuario (exige guardar historial), IA que
 - `UnidadesAdministrativas:IDEM_EIEL_NUCLEOS_23`: conectividad (`CALIDADGSM`, `CALIDADUMT`, `ACCESOREDx`).
 - También: centros sanitarios, de enseñanza, culturales (`BIBLIOTECA`, `HOGARPENSI`…), asistenciales.
 
-**Planeamiento `UsoDelSuelo:VPLA_V_RED_REF_25`** (37.167 polígonos, **166 municipios** incluidos los grandes; **no** Madrid capital, Guadarrama, Torrelodones, Sevilla la Nueva, Villanueva de la Cañada y otros, 13 en total): `CD_MUNICIPIO`, `DS_USO_GENE` («Zonas Verdes y Espacios Libres» 16.867), `DS_USO_DETA` («Jardines y Plazas», «Parques Municipales y Urbanos», «Deportivos» 738…), `NM_AREA` (m²).
+**Planeamiento `UsoDelSuelo:VPLA_V_RED_REF_25`** (37.420 polígonos y **167 municipios** en la descarga del 16/10, incluidos los grandes; **no** Madrid capital, Guadarrama, Torrelodones, Sevilla la Nueva, Villanueva de la Cañada y otros, 12 en total): `CD_MUNICIPIO`, `DS_USO_GENE` («Zonas Verdes y Espacios Libres» 16.867; 17.010 el 16/10), `DS_USO_DETA` («Jardines y Plazas», «Parques Municipales y Urbanos», «Deportivos» 738…), `NM_AREA` (m²).
 
 **Otras IDEM:** áreas recreativas `IDEM_MA_AREAS_RECREA` (84; `IT_FUENTE`, `IT_BANCOS`, `IT_PAPEL`, `IT_ASEOS`, `IT_JINFANT`, `IT_CBIOSAL`…), sendas `IDEM_V_MA_SENDAS_VERDES`, vías pecuarias `IDEM_MA_VIAS_PECUARIAS`, cubierta terrestre `BTA:IDEM_BTA_CUBIERTER_POL_17` (`id_fenomeno`, p. ej. «Arbolado forestal»), viales `IDEM_GDIE_G_CALLES` (`TIPOLOGIA`), municipios `Comun:IDEM_V_MUNICIPIOS`, estaciones de aire de **ambas redes** `IDEM_MA_EST_CALIDAD_AIRE` (48), zonas de aire.
 
@@ -359,7 +359,7 @@ Municipios con al menos uno: fuentes 152, juegos 143, bancos 88, biosaludables 5
 
 ## 8. Hallazgos sobre los datos (trampas)
 - No hay censo de instalaciones deportivas en el CKAN de la Comunidad → Nomecalles + EIEL + VPLA + OSM.
-- EIEL solo 155 municipios; VPLA no tiene 13 (incl. capital).
+- EIEL solo 155 municipios; VPLA no tiene 12 (incl. capital; 13 hasta la descarga del 16/10).
 - `NATACION` vacía en EIEL → usar `TIPOINSTAL`.
 - Red de aire regional sin la capital → unir con la del Ayto. (mismo formato).
 - Nomecalles sin deporte por instalación → palabras clave (el LLM en lote de §6.5 se descartó, DEC-11).
@@ -402,5 +402,7 @@ Roles sugeridos (equipo de hasta 4): **Datos** (ingesta, modelo, licencias), **M
 - **DEC-13 · Cuota AEMET:** `AEMET_PAUSE_S=30` (4 peticiones/min); cada hora los 3 pilotos + 1/6 del resto (todos cada 6 h, ~16,5 min por ejecución); AEMET solo elabora ~3 veces al día; aviso «previsión antigua» si `elaborado` > 12 h (criterio propio).
 - **DEC-06 · Calor:** «día de calor» = Tmáx horaria del día > umbral de Sanidad de su zona (35,8 / 37,4 / 39,2 °C, `heat_zones.csv`); mayor, carrito y «con niños» sin exterior de 14 a 19 h y desempate por menor sensación térmica; resto, solo aviso. Umbrales oficiales, regla de aplicación criterio propio; sin niveles.
 - **Mapa, dominio y Getafe:** teselas de OpenFreeMap ya y PMTiles local el lunes (demo sin red) · dominio en DuckDNS · OSM filtrado como fuente de destinos deportivos (centros con `sport` y nombre; pistas y piscinas solo con nombre o acceso público), para el hueco de nadar, tenis y baloncesto en Getafe y en los municipios sin EIEL.
+
+- **DEC-15 · Datos en tiempo real (16/10, bloque B2 rediseñado, `docs/planes/tiempo-real.md`):** aire, previsión y tráfico en memoria de la API (sin `realtime.duckdb`), pedidos en segundo plano; nunca se muestra un dato más viejo que su `max_age` (`config/realtime.yaml`); horas futuras con AEMET horaria y patrón histórico del aire como estimación; AEMET por cola con cuota en la API (sustituye a la rotación de DEC-13); polen como Could, pendiente de aprobar. Cuando se implemente, actualizar §6.4 (el nivel horario pasa a la API).
 
 **Pendientes:** detalle de pantallas (con la maquetadora, al maquetar) · Select AI + APEX (§6.5 n.º 2, necesita un LLM). Lista completa en `docs/arquitectura.md` §10.

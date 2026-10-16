@@ -20,7 +20,7 @@
 | `app/api/main.py` | Cada bloque solo cambia **la función de su endpoint** (y, si hace falta, una línea en `lifespan`). Nada de reordenar ni reformatear |
 | `app/api/schemas.py` + `app/frontend/src/api/openapi.json` | **El contrato.** Un solo bloque a la vez puede cambiarlo; si lo cambia: `scripts/export_openapi.py`, `npm run contract`, `test_contract.py` y avisar a los demás. Preferible no cambiarlo |
 | `app/ingest/build_db.py` | Cada bloque añade **sus funciones y su tabla**; no cambia las existentes |
-| `app/api/repository.py` | Cada bloque añade **métodos nuevos**; no cambia los existentes salvo B2 (caché ante caídas) |
+| `app/api/repository.py` | Cada bloque añade **métodos nuevos**; no cambia los existentes salvo B2 (`forecast` y `air_categories` pasan a leer del `LiveStore`, con la misma firma) |
 | `app/deploy/docker-compose.yml` | Solo B2 (servicio `ingest`) y el despliegue (montar `~/.oci`, bloque D) |
 | `app/config/*.yaml` | Cada bloque solo su fichero (tabla de cada bloque) |
 | `app/frontend/src/data/*.ts` | Los bloques de backend cambian **solo la función de su endpoint** (sustituir datos de ejemplo por la llamada real). F no los toca |
@@ -40,14 +40,14 @@
 | **1** | Vista de municipio y fuentes (F5, RF-19) | **B1** | F5 es MVP y Fuentes da la trazabilidad que puntúa en 1.1 | Vie |
 | **1** | Mapa sincronizado con la lista (RF-11, Must) | **M** | Es Must y lo que más se ve en la demo | Vie |
 | **1** | Diseño del front | **F** | No depende de nadie; empieza ya | Vie → dom |
-| **2** | Datos vivos: recarga automática, caché ante caídas, aire futuro | **B2** | Sin esto, el aire y la previsión de la demo serán viejos | Vie → sáb |
+| **2** | Datos en tiempo real: aire, previsión y tráfico en vivo sin datos viejos, aire futuro estimado (DEC-15) | **B2** | Sin esto, el aire y la previsión de la demo serán viejos | Vie → sáb |
 | **2** | Calor y hueco de Getafe | **B3** | Carmen (36 °C) y nadar/tenis en el piloto | Sáb |
 | **→** | **🎯 MVP listo para probar** = 0 + B1 + M desplegados | — | — | **Sáb mediodía** |
 | **3** | Grafo de toda la Comunidad + desnivel | **B4** | Mejora la ruta fuera de Getafe y capital; no es Must | Sáb |
 | **3** | F6 asistente + ruta circular | **B5** | Should; primer recorte | Sáb → dom |
 | **4** | Ensayo, guion, demo sin red, accesibilidad final | **L** | Nada nuevo | Lun |
 
-**Congelación de alcance: domingo 18 a las 23:59.** Orden de recorte si falta tiempo: B5 (F6) → B4 (grafo regional, se queda Getafe + capital) → desnivel → V-D3 (aire futuro: se queda la última medición con aviso).
+**Congelación de alcance: domingo 18 a las 23:59.** Orden de recorte si falta tiempo: B2 Task 71 (polen, Could) → B5 (F6) → B4 (grafo regional, se queda Getafe + capital) → desnivel → B2 Task 46 (aire futuro: sin estimación, solo la medición actual con su hora).
 
 Simultaneidad máxima recomendada: **F + M + B1 + B2** a la vez (vie); **F + B3 + B4 + B5** (sáb).
 
@@ -55,7 +55,7 @@ Simultaneidad máxima recomendada: **F + M + B1 + B2** a la vez (vie); **F + B3 
 
 ## 3. Bloques
 
-Rangos de Task para que no choquen los números: **B1 33–39 · B2 40–46 · B3 47–51 · B4 52–57 · B5 58–64 · M 65–67**. F no usa Tasks (es diseño, por lista de comprobación).
+Rangos de Task para que no choquen los números: **B1 33–39 · B2 40–46 y 68–71 · B3 47–51 · B4 52–57 · B5 58–64 · M 65–67**. F no usa Tasks (es diseño, por lista de comprobación).
 
 ### Bloque F — Front: solo diseño
 - **Rama:** `front/diseno` · **Conversación:** una, larga (se puede retomar).
@@ -88,11 +88,11 @@ Rangos de Task para que no choquen los números: **B1 33–39 · B2 40–46 · B
 | `sport_facilities` | sport | Instalaciones deportivas | `nmc_deporte` | n.º de filas por `CMUN` | instalaciones | NULL | 178 (Patones NULL) |
 | `sport_facilities_per_1000` | sport | Instalaciones deportivas por 1.000 hab. | `nmc_deporte` + `padron` | n.º / población × 1000 | por 1.000 hab. | NULL | 178 |
 | `catalog_activities` | sport | Actividades del catálogo disponibles | `destination_activity` (todas las fuentes de destinos) | n.º de las 8 actividades de `activities.yaml` con ≥ 1 destino | de 8 | 0 | 179 |
-| `green_m2_per_inhabitant` | nature | Zonas verdes por habitante | `vpla_redes` (`clean/green.parquet`) | Σ `area_m2` / población | m²/hab. | NULL (fuera de VPLA) | 162 |
-| `drove_roads_km` | nature | Vías pecuarias | `vias_pecuarias` | Σ `NM_LONG` / 1000 por `CD_MUNI` (comprobar que `NM_LONG` está en metros); ignorar los `CD_MUNI` `289xx` que no son municipios | km | 0 | 169 |
+| `green_m2_per_inhabitant` | nature | Zonas verdes por habitante | `vpla_redes` (`clean/green.parquet`) | Σ `area_m2` / población | m²/hab. | NULL (fuera de VPLA); 0 si está en VPLA sin zonas verdes | 167 (Task 35) |
+| `drove_roads_km` | nature | Vías pecuarias | `vias_pecuarias` | Σ `NM_LONG` / 1000 por `CD_MUNI` (comprobar que `NM_LONG` está en metros); los `CD_MUNI` que no son de los 179 (`28077`, código antiguo de Lozoyuela 28901, y `28906`–`28912`, distritos de Madrid) se asignan por cruce espacial (Task 35) | km | 0 | 171 (Task 35) |
 | `recreation_areas` | nature | Áreas recreativas | `areas_recreativas` | n.º | áreas | 0 | 55 |
 | `bus_stops_per_1000` | mobility | Paradas de autobús por 1.000 hab. | `nmc_busparadas` | n.º por **cruce espacial** con `municipality.geom` (no `CMUN`: trae 209 códigos) / población × 1000 | por 1.000 hab. | 0 | 179 |
-| `rail_stations` | mobility | Estaciones de metro y cercanías | `nmc_estmetro` + `nmc_estcerca` | n.º por `CMUN` | estaciones | 0 | metro 15, cercanías 33 |
+| `rail_stations` | mobility | Estaciones de metro y cercanías | `nmc_estmetro` + `nmc_estcerca` | n.º por `CMUN` | estaciones | 0 | 39 (metro 15, cercanías 34; Task 35) |
 | `health_centres` | health | Centros de salud y consultorios | `sanitarios` | `centro_nro_registro` distintos con `centro_tipo` ∈ {«Centro de salud», «Consultorio de atención primaria»}, por `municipio_nombre` normalizado (8 no tienen coordenadas) | centros | 0 | 179 (430 el 16/10; 429 el 14/10) |
 | `pharmacies_per_1000` | health | Farmacias por 1.000 hab. | `farmacias` | n.º por cruce espacial (coma decimal) / población × 1000 | por 1.000 hab. | 0 | 160 |
 | `aed_per_1000` | health | Desfibriladores por 1.000 hab. | `desfibriladores` | n.º por cruce espacial (como `route_poi` `aed`; no `municipio_codigo`, que da 161) / población × 1000 | por 1.000 hab. | 0 | 172 |
@@ -104,31 +104,14 @@ Rangos de Task para que no choquen los números: **B1 33–39 · B2 40–46 · B
   - **Contrato:** `/municipality/{ine_code}` necesita parámetros opcionales `activities`, `profile` y `companions` para el encaje. Es un cambio de contrato: B1 lo hace como dice el §1 (`export_openapi.py`, `npm run contract`, avisar).
   - **Pruebas de V-D1 a corregir:** educativos ALTA 3.906 en **156** municipios (no 170); DEA en 172.
 
-### Bloque B2 — Datos vivos
-- **Rama:** `datos/recarga` · Tasks 40–46 en `docs/planes/recarga.md`.
-- **Qué:** S-D2 (guiones `ingest/jobs/{hourly,daily,weekly,reference}.sh` que no reconstruyen si no hay cambios), D-D1 (servicio `ingest` en Compose con cron; caché ante caídas: si `realtime.duckdb` tiene más de 2 h, la API sigue y avisa con la hora real), DEC-13 + P-13 (cuota de AEMET y `AEMET_PAUSE_S`), V-D3 (patrón horario del aire para las horas futuras).
-- **Es suyo:** `app/ingest/jobs/`, `app/ingest/Dockerfile`, el servicio `ingest` en `app/deploy/docker-compose.yml`, `app/.env.example` (AEMET), `app/ingest/normalize/air.py` y la función `air_pattern` en `build_db.py`, el aviso de datos viejos en `repository.py`.
-- **Decidido (DEC-13, 16/10; detalle en `docs/decisiones-pendientes.md` DEC-13):** pilotos cada hora + rotación. Propuesta para `app/.env.example` (lo cambia B2 con su TDD):
-
-```
-# Universo de municipios con prevision: 'todos' (179) o codigos INE separados por comas
-AEMET_MUNICIPALITIES=todos
-# Se piden en cada ejecucion horaria (pilotos de ruta)
-AEMET_HOURLY=28065,28079,28131
-# El resto se reparte en N porciones; cada hora se pide la porcion (hora % N): todos cada N horas.
-# 0 = solo AEMET_HOURLY (si hay 429 sostenido); 1 = todos en una ejecucion (~90 min, carga inicial)
-AEMET_ROTATION_SLICES=6
-# Pausa entre municipios en segundos. Cada municipio son 2 peticiones: 30 s = 4 peticiones/min.
-# Comprobado el 14/10: 7 peticiones en ~1 min dieron 429; a los ~100 s volvio a responder.
-AEMET_PAUSE_S=30
-# Tras un 429, esperar y reintentar una vez; si vuelve a fallar, se salta ese municipio
-AEMET_RETRY_429_S=120
-```
-
-  - Ejecución horaria ≈ 3 + ~30 municipios × 30 s ≈ **16,5 min** (debe acabar en < 60 min; usar `manifest.lock` para que no se solapen). ≈ 1.550 peticiones/día.
-  - `download_aemet` deja de ser todo o nada: un municipio fallido se apunta en `last_failure` del manifiesto y los demás siguen; su fichero anterior se conserva.
-  - Previsión vieja: la API usa la última previsión que cubra la hora y muestra `forecast.issued` (`elaborado` de AEMET, RF-19); aviso «previsión antigua» si `issued` tiene **más de 12 h** (criterio propio, distinto de las 2 h de aire y tráfico); si ninguna cubre la hora, «Previsión: sin datos» (ya existe en `recommend.py`) y no se evalúan lluvia ni calor.
-  - Corregir después la frase de CLAUDE.md §7.1 que remite a «la propuesta en `app/.env.example`».
+### Bloque B2 — Datos en tiempo real (aire, tiempo, tráfico; polen si da tiempo)
+- **Rama:** una por lote (`docs/guia-ejecucion.md` §8) · Tasks **40–46 y 68–71** en `docs/planes/tiempo-real.md`.
+- **Rediseñado el 16/10 (DEC-15, `docs/decisiones-pendientes.md`):** sustituye al B2 «Datos vivos» (cron horario que reescribía `realtime.duckdb` y rotación de AEMET), que no se había empezado. Aire, previsión y tráfico **no se guardan en disco**: la API los pide a los portales en segundo plano, los tiene en memoria con su TTL y **nunca enseña un dato más viejo que su `max_age`** (aire 3 h, previsión 12 h, tráfico 15 min; `config/realtime.yaml`). Para horas futuras: previsión horaria de AEMET (hoy y mañana) y patrón histórico del aire (estimación, V-D3).
+- **Qué:** `LiveStore` en la API (Task 40), aire en vivo (41), AEMET con cola y cuota en la API (42), patrón del aire (43), sensores de tráfico → tramos (44), tráfico en vivo en `/route` de la capital (45), aire futuro estimado en `/recommend` (46), `/conditions/{ine_code}` (68, cambio de contrato), conexión en el front (69), recarga programada solo de referencia/diaria/semanal (70), polen (71, Could, fuente nueva que aprueba el equipo).
+- **Es suyo:** `app/api/live/`, `app/config/realtime.yaml`, los cuerpos de `Repository.forecast` y `Repository.air_categories` (misma firma), `Repository.air_pattern`, la línea del `LiveStore` en `lifespan`, `app/api/services/conditions.py` y la función `conditions` de `main.py`, el trozo de `services/route.py` que elige el tráfico de cada tramo, el trozo de `services/recommend.py` que rellena el aire por hora, `app/ingest/traffic.py`, la función `air_pattern` en `build_db.py`, `app/ingest/jobs/`, `app/ingest/Dockerfile`, el servicio `ingest` en `app/deploy/docker-compose.yml`, `app/.env.example` (AEMET), `src/data/conditions.ts`. Detalle por Task en el plan.
+- **Sigue valiendo de DEC-13:** 4 peticiones/min a AEMET, reintento de un 429 tras 120 s, aviso «previsión antigua» con más de 12 h y pilotos primero. **Deja de valer:** la rotación horaria 1/6 desde la ingesta y `realtime.duckdb` para aire y previsión (se deja de leer; se borra tras la demo).
+- **Contrato:** solo la Task 68 lo cambia, y después de B1 (un bloque a la vez, §1).
+- **Necesita:** `AEMET_API_KEY` en `app/.env` (en la VM también) para la Task 42; nada más. LB2-1 y LB2-2 pueden empezar ya.
 
 ### Bloque B3 — Calor y hueco de Getafe
 - **Rama:** `motor/calor-getafe` · Tasks 47–51 en `docs/planes/calor-getafe.md`.
@@ -222,7 +205,7 @@ Para el **bloque F** (diseño): el mismo encabezado con `BLOQUE=F RAMA=front/dis
 
 1. **F** cuando quiera (no toca backend).
 2. **B1** y **M** (independientes entre sí).
-3. **B2** (toca `docker-compose.yml` y `repository.py`).
+3. **B2** por lotes (LB2-1 toca `repository.py` y `lifespan`; LB2-3, `route.py` y `recommend.py`; LB2-4 el contrato, después de B1; LB2-5 `docker-compose.yml`).
 4. **B3**, **B4**, **B5**, en ese orden.
 
 Cada PR: rebase sobre `main`, verificador ✅, fusionar, desplegar (bloque D) y comprobar en el móvil.

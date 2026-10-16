@@ -154,6 +154,8 @@ Además: VPLA zonas verdes (166 municipios), sendas (224), vías pecuarias (1.69
 
 **Coberturas re-medidas el 16/10** (DuckDB sobre `app/data/gomad.duckdb`, `app/data/clean/` y `app/data/raw/`). No cuadran: **educación 156** (no 170; 3.906 centros en ALTA por `CDMUNI`), **zonas verdes VPLA 162** (166 es `in_vpla`; 4 no tienen «Zonas Verdes»), **desfibriladores 172** por cruce espacial (161 por `municipio_codigo`), **áreas recreativas 55** (no 51), **cercanías 33 municipios / 92 estaciones** y metro 296 estaciones (no 34 / 297). Coinciden: salud 179 por `municipio_nombre` (429 centros; 8 sin coordenadas), farmacias 160, vías pecuarias 169 (sin los códigos `289xx` que no son municipios), bus 179 por cruce espacial (`CMUN` de `busparadas` trae 209 códigos: no usarlo), deporte Nomecalles 178, conectividad 155, social 137 (2.471 centros sin los 177 «RESERVADO»).
 
+**Cifras finales de la Task 35** (descarga del 16/10 por la tarde; mandan sobre las de arriba): zonas verdes **167** (`in_vpla` = 167; los 4 de VPLA sin «Zonas Verdes» valen 0, no «sin datos»), vías pecuarias **171** (los tramos `28077` y `28906`–`28912` se asignan por cruce espacial a Lozoyuela 28901 y Madrid 28079: ignorarlos daba «0 km» falso), estaciones **39** municipios (cercanías 34), centros de salud **430**.
+
 **Decidido el 16/10: opción A (14 indicadores) y encaje como lista de comprobación.**
 - Regla de valores: en **registros regionales completos** (farmacias, educativos, sanitarios, social, DEA, metro y cercanías, áreas recreativas) un municipio sin filas vale **0**; en **fuentes parciales** (EIEL, VPLA, Nomecalles `deporte`) vale **NULL = «sin datos»**. Tasas por 1.000 hab. con `population.parquet` (2025, 179).
 - **Encaje (RF-18):** solo del municipio consultado. Una línea Sí / No / Sin datos por cada actividad elegida («Pádel: sí, 4 sitios») y por cada necesidad del perfil (mayor: centros de salud y DEA; «con niños»: centros educativos; carrito: zonas verdes), más un resumen «Cumple N de M». Sin nota, sin orden entre municipios y sin percentiles. Qué necesidad mira cada perfil es criterio propio.
@@ -193,6 +195,18 @@ Resuelto en `docs/arquitectura.md` §1 (D-13: Docker Compose en VM de OCI). **No
 - **Sin previsión reciente:** se usa la última que cubra la hora pedida y se muestra su `elaborado` (RF-19); aviso «previsión antigua» si `elaborado` tiene **más de 12 h** (criterio propio); si ninguna cubre la hora → «Previsión: sin datos», no se evalúan lluvia ni calor.
 - Descartadas: (a) solo pilotos (176 municipios sin F2), (b) solo consultados (la api tendría que avisar a la ingesta) y (c) los 179 cada 6 h (90 min por ejecución).
 - Valores y comportamiento para implementar: ficha de B2 en `docs/trabajo-paralelo.md`.
+
+## DEC-15 · Datos en tiempo real sin persistencia
+
+**Contexto:** el diseño anterior de B2 recargaba `realtime.duckdb` cada hora y, si una fuente caía, enseñaba el último dato con aviso. Eso permite mostrar aire o meteo de hace muchas horas, que no sirve para decidir «¿salgo ahora?». Medido el 16/10 a las 16:14: `aire_dia` 24 KB en 0,24 s (última hora válida, la 13: ~3 h de retraso de la propia red), `ay_aire` 19 KB en 2,1 s, `ay_meteo` 14 KB en 0,9 s, `pm.xml` 2,2 MB en 0,4 s: se pueden pedir en directo.
+
+**Decidido el 16/10:**
+- Aire, previsión y tráfico **no se guardan en disco** (salvo la caché de arranque de la previsión, que se descarta si tiene más de 12 h). La API los pide en segundo plano y los tiene en memoria (`LiveStore`, `config/realtime.yaml`).
+- **Nunca se muestra un dato más viejo que su `max_age`** (aire 3 h, previsión 12 h, tráfico 15 min; criterio propio salvo los 12 h de DEC-13). Si el portal cae, el último válido solo mientras siga dentro de `max_age`; después, «sin dato actual» y ese factor no cuenta. Sustituye a «último dato en caché + aviso» del RNF para estas fuentes.
+- **Horas futuras:** previsión horaria de AEMET (hoy y mañana; probabilidad de lluvia por franjas de 6 h) y patrón histórico del aire por estación y hora, presentado como **estimación**. Pasado mañana después de las 07:00 no hay previsión horaria: el selector de hora se limita a ~36 h.
+- **AEMET** no se pide en cada consulta (2 peticiones por municipio, 429 a ~6/min): cola en la API a 4 peticiones/min con prioridad para los municipios pedidos y los pilotos; un municipio sin previsión usa la del más cercano con previsión dentro de `forecast_fallback_km` y lo dice. Sustituye a la rotación 1/6 de DEC-13 desde la ingesta.
+- **Polen** (`mediciones_polen` y `captadores_polen` del CKAN de la Comunidad, comprobados el 16/10; dato diario con ~5 días de retraso): Could, fuente nueva que aprueba el equipo; solo aviso, no puntúa.
+- Plan: `docs/planes/tiempo-real.md`; ficha B2 en `docs/trabajo-paralelo.md`.
 
 ## D-14 · PDF de presentaciones en el repositorio (46 MB)
 
