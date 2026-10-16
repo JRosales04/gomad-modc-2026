@@ -73,7 +73,7 @@ Hoja de ruta **operativa** para ir ejecutando `docs/plan-implementacion.md` paso
 | DEC-P04, DEC-10, DEC-11, DEC-12 | ✅ P-04 aplicado; nombre **GoMad**; IA n.º 1 descartado (palabras clave) y n.º 2 pendiente; desnivel **sí** (Should, sábado con S-R1; MDT05 comprobado por WCS) | PR #16, #17 |
 | ⚠️ Previsión AEMET | `realtime.duckdb` solo tiene Getafe y Madrid, descargadas el 14/10 (hasta el 16/10 07:00): hay que recargar antes de probar y decidir DEC-13 (cuota) para los 179 | DEC-13, S-D2 |
 | ⚠️ Hueco de Getafe | 0 destinos para nadar, tenis y baloncesto (Getafe no está en EIEL y Nomecalles no da el deporte): decidir en P1 (más palabras clave u OSM `sport=*`) | `app/config/activities.yaml` |
-| **P-13** — cuota de AEMET (`AEMET_PAUSE_S` mal calculado) | ⚠️ pendiente de decisión | `docs/PENDIENTES.md` → DEC-13 abajo |
+| **P-13** — cuota de AEMET (`AEMET_PAUSE_S` mal calculado) | ✅ decidido el 16/10 (DEC-13); lo implementa B2 | `docs/PENDIENTES.md` → DEC-13 abajo |
 
 ---
 
@@ -224,7 +224,7 @@ Si sois varios, cada rol sigue su columna en paralelo respetando «Necesita ante
 | ID | Qué | Límite | Dónde se apunta |
 |---|---|---|---|
 | DEC-P04 | Aprobar las correcciones de `docs/PENDIENTES.md` P-04 al CLAUDE.md y `requisitos_fuentes.json` | **mié 14, 18:00** | CLAUDE.md, `docs/assets/requisitos_fuentes.json` |
-| DEC-13 (P-13) | Cuota de AEMET: (a) subconjunto fijo de municipios, (b) solo los consultados recientemente, o (c) recarga cada 3–6 h para el resto. Después, corregir `AEMET_PAUSE_S` (≥ 20 s + margen) y su comentario en `app/.env.example` | **vie 16, 12:00** (antes de programar la descarga horaria del sábado) | `app/.env.example`, CLAUDE.md §7.1 |
+| DEC-13 (P-13) | Cuota de AEMET: (a) subconjunto fijo de municipios, (b) solo los consultados recientemente, o (c) recarga cada 3–6 h para el resto. Después, corregir `AEMET_PAUSE_S` (≥ 20 s + margen) y su comentario en `app/.env.example` | ✅ **Decidido el 16/10:** pilotos cada hora + rotación 1/6, `AEMET_PAUSE_S=30` (`docs/decisiones-pendientes.md`) | `app/.env.example`, CLAUDE.md §7.1 |
 | DEC-10 | Nombre (adelantarlo si se puede) | jue 15, 10:00 | CLAUDE.md §1 |
 
 ---
