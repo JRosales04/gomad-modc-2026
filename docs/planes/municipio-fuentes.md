@@ -449,6 +449,256 @@ def load(path=None):
 - **Pruebas clave** (`slow`): 179 × 14 filas; **Patones** `sport_facilities` NULL (no 0); `green_m2_per_inhabitant` NULL en los municipios sin VPLA (Madrid incluido) y con valor en Getafe; `health_centres` suma 429; coberturas de la columna «Cobertura (16/10)» de la ficha. Más una prueba rápida con datos mínimos: la regla `zero` frente a `null`.
 - **Terminado cuando:** `python -m build_db main` deja la tabla en `gomad.duckdb` y las pruebas pasan.
 
+#### Detalle de la Task 35 (ejecutor de LB1-1, 16/10)
+
+**Rol:** Datos · **Servicio:** `app/ingest/` · **Depende de:** Task 33 (`clean/service.parquet`), Task 34 (`indicators.yaml`, `indicators.load`), Task 19 (`build_main`) · **Duración:** 1 h 30 min
+
+**Ficheros:** Modificar `build_db.py` (funciones nuevas + **una línea** al final de `fill` en `build_main`). Crear `tests/test_municipality_indicator.py` (prueba propia, para no tocar `test_build_db.py`).
+
+**Datos reales comprobados el 16/10** (descarga de hoy; las coberturas de la ficha son de días antes):
+- `population.parquet`: años 2023–2025, 179 cada uno → `population_year: 2025` de `indicators.yaml`.
+- `nmc_deporte`: 1.358 filas, `CMUN` con 178 códigos (falta Patones 28107) → Patones NULL.
+- `nmc_busparadas`: `CMUN` con 209 códigos → cruce espacial de `UTM_X/UTM_Y` (25830): 179 municipios, 396 paradas fuera de la Comunidad (se descartan).
+- `nmc_estmetro` (15 municipios) + `nmc_estcerca` (**34**, no 33) por `CMUN` → 39 municipios con estación.
+- `green.parquet` (`area_m2`): **163** municipios con zonas verdes (no 162); `in_vpla` = 167, de ellos 4 sin ninguna zona verde (28016, 28039, 28063, 28146): regla `null` → NULL. Madrid sin filas → NULL; Getafe con valor.
+- `vias_pecuarias`: `NM_LONG` en **metros** (igual a la longitud de la geometría en EPSG:25830). `CD_MUNI` que no es de los 179: `28077` (código antiguo de Lozoyuela-Navas-Sieteiglesias, 28901; 11 tramos) y `28906`–`28912` (distritos de Madrid anexionados; 37 tramos, 463 km). Ni 28079 ni 28901 tienen tramos con su código. Ruling: esos tramos se asignan por **cruce espacial** de su punto representativo (→ 28079 y 28901) en vez de ignorarse; si no, Madrid saldría con «0 km» falso. Cobertura **171** (no 169).
+- `areas_recreativas`: 84, sin código de municipio → cruce espacial de `NM_COOX/NM_COOY` (como `green.py`) → 55 municipios.
+- `eiel_nucleos`: 467 núcleos en 155 municipios; `CALIDADUMT` ∈ {BUENO 434, REGULAR 28, MALA 5}.
+- `service.parquet` (Task 33): `health` 179, `pharmacy` 160, `aed` 172, `education` 156 (3.906), `social` 138 municipios; 430 centros de salud y consultorios (Ruling de la Task 33: la división decía 429).
+- `destination_activity` (en `fill`, ya creada): 8 actividades, 179 municipios con alguna.
+
+**Interfaces:**
+- Consume: `indicators.load` (Task 34), `common.RAW`, `common.CLEAN`, `common.ine_code`, `common.points`, `common.assign_municipality`; tablas `municipality`, `destination` y `destination_activity` ya creadas en la misma conexión.
+- Produce en `build_db.py`:
+  - `HEALTH_TYPES = ("Centro de salud", "Consultorio de atención primaria")` (literales del dato, DEC-09).
+  - `indicator_values(con, config) -> dict[str, pd.Series]`: valor de cada indicador **solo en los municipios con filas** en su fuente (`ine_code` → valor); las tasas, ya divididas por la población del `population_year` × 1000.
+  - `indicator_table(config, ine_codes, values) -> pd.DataFrame`: una fila por municipio e indicador, en el orden del YAML; aplica `no_rows` (`zero` → 0.0, `null` → NULL). Un indicador del YAML sin cálculo en `values` → `ValueError` que lo nombra (no se publica una tabla incompleta; `atomic` conserva la base anterior).
+  - `store_indicators(con, table)`: `CREATE TABLE municipality_indicator(ine_code VARCHAR, category VARCHAR, key VARCHAR, value DOUBLE, unit VARCHAR, year INTEGER, source VARCHAR)` con NULL de verdad (no NaN).
+  - `create_municipality_indicator(con, config=None)`: las tres anteriores; `build_main` la llama al final de `fill` (única línea que cambia en funciones existentes).
+- Columna `source`: el **primer** id de la lista `source` del YAML (la fuente del dato; `padron` va segundo en las tasas). Es lo que `DataSource.source` (un solo id) necesita para unir con `source_date` en la Task 36; la lista completa sigue en `indicators.yaml` (Ruling). `label` no va en la tabla (la división fija las columnas): la Task 36 la lee de `indicators.yaml`.
+
+- [ ] **Paso 1: prueba que falla** — `tests/test_municipality_indicator.py`:
+
+```python
+import duckdb
+import pandas as pd
+import pytest
+import yaml
+
+import build_db
+from common import CLEAN, CONFIG_DIR
+
+MINI = {"population_year": 2025, "indicators": [
+    {"key": "a_per_1000", "category": "health", "label": "A", "source": ["farmacias", "padron"], "unit": "u",
+     "no_rows": "zero", "year": None},
+    {"key": "b", "category": "sport", "label": "B", "source": ["nmc_deporte"], "unit": "u", "no_rows": "null",
+     "year": 2023}]}
+
+
+def test_zero_rule_versus_null_rule():
+    values = {"a_per_1000": pd.Series({"28065": 3.0, "28999": 1.0}), "b": pd.Series({"28065": 0.0})}
+    t = build_db.indicator_table(MINI, ["28065", "28107"], values)
+    assert list(t.columns) == ["ine_code", "category", "key", "value", "unit", "year", "source"]
+    got = {(r.ine_code, r.key): r.value for r in t.itertuples()}
+    assert len(t) == 4 and ("28999", "a_per_1000") not in got     # solo los municipios pedidos
+    assert got[("28065", "a_per_1000")] == 3.0 and got[("28107", "a_per_1000")] == 0.0   # zero: sin filas = 0
+    assert got[("28065", "b")] == 0.0 and pd.isna(got[("28107", "b")])   # null: sin filas = NULL; 0 real se queda
+    assert set(t.loc[t.key == "a_per_1000", "source"]) == {"farmacias"}   # primera fuente de la lista
+    con = duckdb.connect()
+    build_db.store_indicators(con, t)
+    assert con.execute("SELECT count(*) FROM municipality_indicator WHERE value IS NULL").fetchone()[0] == 1
+    assert con.execute("SELECT year FROM municipality_indicator WHERE key='b' AND ine_code='28065'").fetchone() == (2023,)
+    assert con.execute("SELECT year FROM municipality_indicator WHERE key='a_per_1000' LIMIT 1").fetchone() == (None,)
+
+
+def test_indicator_without_calculation_fails_readably():
+    with pytest.raises(ValueError, match=r"«b».*no se sabe calcular"):
+        build_db.indicator_table(MINI, ["28065"], {"a_per_1000": pd.Series(dtype=float)})
+
+
+@pytest.fixture(scope="module")
+def db(tmp_path_factory):
+    path = build_db.build_main(tmp_path_factory.mktemp("db") / "gomad.duckdb")   # activities.yaml real (8)
+    return duckdb.connect(str(path), read_only=True)
+
+
+def value(db, ine, key):
+    return db.execute("SELECT value FROM municipality_indicator WHERE ine_code=? AND key=?", [ine, key]).fetchone()[0]
+
+
+@pytest.mark.slow
+def test_179_by_14_in_yaml_order(db):
+    cfg = yaml.safe_load((CONFIG_DIR / "indicators.yaml").read_text(encoding="utf-8"))
+    assert db.execute("SELECT count(*), count(DISTINCT ine_code) FROM municipality_indicator").fetchone() == (179 * 14, 179)
+    keys = [k for (k,) in db.execute("SELECT key FROM municipality_indicator WHERE ine_code='28065' ORDER BY rowid").fetchall()]
+    assert keys == [i["key"] for i in cfg["indicators"]]
+    for ind in cfg["indicators"]:
+        rows = db.execute("SELECT DISTINCT category, unit, year, source FROM municipality_indicator WHERE key=?",
+                          [ind["key"]]).fetchall()
+        assert rows == [(ind["category"], ind["unit"], ind["year"], ind["source"][0])]
+    zero_keys = [i["key"] for i in cfg["indicators"] if i["no_rows"] == "zero"]
+    nulls = db.execute(f"SELECT count(*) FROM municipality_indicator WHERE value IS NULL AND key IN "
+                       f"({', '.join('?' * len(zero_keys))})", zero_keys).fetchone()[0]
+    assert nulls == 0                                              # regla zero: nunca NULL
+
+
+@pytest.mark.slow
+def test_patones_without_nomecalles_is_null(db):
+    assert value(db, "28107", "sport_facilities") is None          # Patones: NULL, no 0
+    assert value(db, "28107", "sport_facilities_per_1000") is None
+    assert value(db, "28065", "sport_facilities") > 0
+
+
+@pytest.mark.slow
+def test_green_null_outside_vpla(db):
+    assert value(db, "28079", "green_m2_per_inhabitant") is None   # Madrid, sin VPLA
+    assert value(db, "28065", "green_m2_per_inhabitant") > 0       # Getafe
+    leaked = db.execute("SELECT count(*) FROM municipality_indicator i JOIN municipality m USING (ine_code) "
+                        "WHERE i.key='green_m2_per_inhabitant' AND NOT m.in_vpla AND i.value IS NOT NULL").fetchone()[0]
+    assert leaked == 0
+
+
+@pytest.mark.slow
+def test_health_centres_total(db):
+    # division: 429; la descarga del 16/10 trae 430 (Ruling de la Task 33)
+    assert db.execute("SELECT sum(value) FROM municipality_indicator WHERE key='health_centres'").fetchone()[0] == 430
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("key, covered", [
+    ("sport_facilities", 178), ("sport_facilities_per_1000", 178), ("catalog_activities", 179),
+    ("green_m2_per_inhabitant", 163),   # ficha: 162 (Ruling: datos del 16/10)
+    ("drove_roads_km", 171),            # ficha: 169 (Ruling: 28077 y 289xx por cruce espacial)
+    ("recreation_areas", 55), ("bus_stops_per_1000", 179),
+    ("rail_stations", 39),              # ficha: metro 15, cercanías 33 (hoy 34); unión 39
+    ("health_centres", 179), ("pharmacies_per_1000", 160), ("aed_per_1000", 172), ("schools", 156),
+    ("good_3g_pct", 155), ("social_centres", 138)])
+def test_coverage(db, key, covered):
+    # cobertura = municipios con dato > 0, salvo good_3g_pct y green (con dato, aunque sea 0)
+    cond = "value IS NOT NULL" if key in ("good_3g_pct", "green_m2_per_inhabitant") else "value > 0"
+    assert db.execute(f"SELECT count(*) FROM municipality_indicator WHERE key=? AND {cond}", [key]).fetchone()[0] == covered
+
+
+@pytest.mark.slow
+def test_rates_and_units_are_plausible(db):
+    pop = pd.read_parquet(CLEAN / "population.parquet").query("year == 2025").set_index("ine_code")["population"]
+    schools_getafe = value(db, "28065", "schools")
+    assert value(db, "28065", "aed_per_1000") > 0 and value(db, "28065", "bus_stops_per_1000") > 0
+    assert 0 <= db.execute("SELECT min(value) FROM municipality_indicator WHERE key='good_3g_pct'").fetchone()[0]
+    assert db.execute("SELECT max(value) FROM municipality_indicator WHERE key='good_3g_pct'").fetchone()[0] <= 100
+    assert db.execute("SELECT max(value) FROM municipality_indicator WHERE key='catalog_activities'").fetchone()[0] <= 8
+    assert schools_getafe == int(schools_getafe) and pop["28065"] > 100_000
+    assert 400 < value(db, "28079", "drove_roads_km") < 500       # Madrid: tramos 289xx (463 km)
+```
+
+- [ ] **Paso 2:** Run: `.venv/bin/pytest tests/test_municipality_indicator.py -q` → Esperado: FAIL, `AttributeError: module 'build_db' has no attribute 'indicator_table'` en las rápidas y `municipality_indicator` inexistente (`CatalogException`) en las `slow`.
+- [ ] **Paso 3: implementación** — en `build_db.py` (imports: `import indicators`; `ine_code`, `points`, `to_float`, `assign_municipality` de `common`):
+
+```python
+HEALTH_TYPES = ("Centro de salud", "Consultorio de atención primaria")   # literales del dato (DEC-09)
+INDICATOR_COLUMNS = ["ine_code", "category", "key", "value", "unit", "year", "source"]
+
+
+def _count(codes):
+    return pd.Series(codes).dropna().value_counts()
+
+
+def _shp(source):
+    return gpd.read_file(next((RAW / source).glob("*.shp")), ignore_geometry=True)   # .prj no fiable
+
+
+def _by_space(gdf):
+    """ine_code por cruce espacial con municipality.geom (puntos fuera de la Comunidad -> sin municipio)."""
+    return assign_municipality(gdf.assign(ine_code=None))["ine_code"]
+
+
+def indicator_values(con, config):
+    """Valor de cada indicador de DEC-09, solo en los municipios con filas en su fuente."""
+    codes = {c for (c,) in con.execute("SELECT ine_code FROM municipality").fetchall()}
+    pop = pd.read_parquet(CLEAN / "population.parquet")
+    pop = pop[pop["year"] == config["population_year"]].set_index("ine_code")["population"]
+    if pop.empty:
+        raise ValueError(f"population.parquet no tiene el año {config['population_year']} (population_year)")
+
+    def per_1000(counts):
+        return counts / pop.reindex(counts.index) * 1000
+
+    sport = _count(_shp("nmc_deporte")["CMUN"].map(ine_code))
+    catalog = con.execute("SELECT d.ine_code, count(DISTINCT a.activity) AS n FROM destination_activity a "
+                          "JOIN destination d ON d.id = a.destination_id GROUP BY 1").df().set_index("ine_code")["n"]
+    green = gpd.read_parquet(CLEAN / "green.parquet").groupby("ine_code")["area_m2"].sum()
+    vp = gpd.read_file(RAW / "vias_pecuarias" / "vias_pecuarias.geojson").set_crs(25830, allow_override=True)
+    vp_code = vp["CD_MUNI"].map(ine_code).where(lambda c: c.isin(codes))
+    # 28077 (codigo antiguo de 28901) y 289xx (distritos de Madrid anexionados): por su punto representativo
+    lost = vp_code.isna()
+    vp_code[lost] = _by_space(gpd.GeoDataFrame(geometry=vp[lost].geometry.representative_point().to_crs(4326)))
+    drove = (vp["NM_LONG"].map(to_float) / 1000).groupby(vp_code).sum()
+    areas = _by_space(points(gpd.read_file(RAW / "areas_recreativas" / "areas_recreativas.geojson",
+                                           ignore_geometry=True), "NM_COOX", "NM_COOY", 25830))
+    bus = _by_space(points(_shp("nmc_busparadas"), "UTM_X", "UTM_Y", 25830))
+    rail = pd.concat([_shp(s)["CMUN"] for s in ("nmc_estmetro", "nmc_estcerca")]).map(ine_code)
+    svc = pd.DataFrame(gpd.read_parquet(CLEAN / "service.parquet").drop(columns="geometry"))
+    nuc = gpd.read_file(RAW / "eiel_nucleos" / "eiel_nucleos.geojson", ignore_geometry=True)
+    good = (nuc["CALIDADUMT"].fillna("").str.strip().str.upper() == "BUENO").groupby(nuc["MUN"].map(ine_code))
+    by = lambda cat: _count(svc.loc[svc["category"] == cat, "ine_code"])
+    return {
+        "sport_facilities": sport,
+        "sport_facilities_per_1000": per_1000(sport),
+        "catalog_activities": catalog,
+        "green_m2_per_inhabitant": green / pop.reindex(green.index),
+        "drove_roads_km": drove,
+        "recreation_areas": _count(areas),
+        "bus_stops_per_1000": per_1000(_count(bus)),
+        "rail_stations": _count(rail),
+        "health_centres": _count(svc.loc[(svc["category"] == "health") & svc["subtype"].isin(HEALTH_TYPES), "ine_code"]),
+        "pharmacies_per_1000": per_1000(by("pharmacy")),
+        "aed_per_1000": per_1000(by("aed")),
+        "schools": by("education"),
+        "good_3g_pct": good.mean() * 100,
+        "social_centres": by("social"),
+    }
+
+
+def indicator_table(config, ine_codes, values):
+    """Una fila por municipio e indicador; no_rows: zero -> sin filas = 0, null -> sin filas = NULL."""
+    rows = []
+    for ind in config["indicators"]:
+        if ind["key"] not in values:
+            raise ValueError(f"indicators.yaml cita «{ind['key']}», pero build_db no sabe calcularlo")
+        series, fill = values[ind["key"]], (0.0 if ind["no_rows"] == "zero" else None)
+        for code in ine_codes:
+            v = series.get(code)
+            rows.append((code, ind["category"], ind["key"], fill if v is None or pd.isna(v) else float(v),
+                         ind["unit"], ind["year"], ind["source"][0]))
+    t = pd.DataFrame(rows, columns=INDICATOR_COLUMNS)
+    t["value"], t["year"] = t["value"].astype("Float64"), t["year"].astype("Int64")   # NULL, no NaN
+    return t
+
+
+def store_indicators(con, table):
+    con.register("mi", table)
+    con.execute("CREATE TABLE municipality_indicator (ine_code VARCHAR, category VARCHAR, key VARCHAR, "
+                "value DOUBLE, unit VARCHAR, year INTEGER, source VARCHAR)")
+    con.execute("INSERT INTO municipality_indicator SELECT * FROM mi")
+    con.unregister("mi")
+
+
+def create_municipality_indicator(con, config=None):
+    """Tabla municipality_indicator (DEC-09, Task 35) a partir de indicators.yaml."""
+    config = config or indicators.load()
+    codes = [c for (c,) in con.execute("SELECT ine_code FROM municipality ORDER BY ine_code").fetchall()]
+    store_indicators(con, indicator_table(config, codes, indicator_values(con, config)))
+```
+
+  En `build_main`, última línea de `fill`: `create_municipality_indicator(con)`.
+
+- [ ] **Paso 4:** Run: `.venv/bin/pytest tests/test_municipality_indicator.py -q -m "not slow"` → Esperado: `2 passed`. Después `.venv/bin/pytest tests/test_municipality_indicator.py -q` → Esperado: `21 passed` (ninguno saltado).
+- [ ] **Paso 5:** Run: `.venv/bin/python -m build_db main` → Esperado: imprime la ruta de `gomad.duckdb`; y `.venv/bin/python -c "import duckdb; print(duckdb.connect('../data/gomad.duckdb', read_only=True).execute('SELECT count(*) FROM municipality_indicator').fetchone())"` → Esperado: `(2506,)`.
+- [ ] **Paso 6:** Run: `.venv/bin/pytest -q` → Esperado: los mismos 4 fallos previos de la línea base y ninguno nuevo. Y en `../api`: `.venv/bin/pytest -q` → Esperado: los mismos 2 fallos previos (la API no lee aún la tabla nueva).
+- [ ] **Paso 7: commit** — `git -C ../.. add app/ingest/build_db.py app/ingest/tests/test_municipality_indicator.py && git -C ../.. commit -m "Datos: tabla municipality_indicator en build_db (B1 Task 35)"`
+
+**Terminado cuando:** `python -m build_db main` deja `municipality_indicator` (179 × 14) en `gomad.duckdb` y `tests/test_municipality_indicator.py` pasa entero sin saltarse.
+
 ---
 
 ## Lote LB1-2 · API de municipio (servicio `app/api/`) — Tasks 36, 37
