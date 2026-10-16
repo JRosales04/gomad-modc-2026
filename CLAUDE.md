@@ -216,7 +216,7 @@ Soporte: Discord https://discord.gg/ZfNFQvrRb · Web: https://datathon-mad.sel.i
 
 ### 5.1 Perspectivas
 - **Ciudadano (principal, MVP):** F1–F6.
-- **Administración (secundaria, una pantalla de demostración):** carencias por municipio; equipamiento en mal estado (EIEL: 25 instalaciones «MALO», 77 sin acceso en silla de ruedas); informe de «datos que faltan» (75 municipios casi sin mobiliario en OSM, 13 fuera del planeamiento, columna NATACION vacía…); publicar el catálogo unificado como dataset abierto CC BY. Idea: hacerla en Oracle APEX + Select AI.
+- **Administración (secundaria, una pantalla de demostración):** carencias por municipio; equipamiento en mal estado (EIEL: 25 instalaciones «MALO», 77 sin acceso en silla de ruedas); informe de «datos que faltan» (75 municipios casi sin mobiliario en OSM, 12 fuera del planeamiento, columna NATACION vacía…); publicar el catálogo unificado como dataset abierto CC BY. Idea: hacerla en Oracle APEX + Select AI.
 - **Empresa (terciaria, evolución):** huecos de oferta deportiva por habitante y renta, tejido de clubes. Regla: **la recomendación al ciudadano nunca se vende** (sin anuncios ni patrocinios).
 
 ### 5.2 Personas de la demo
@@ -327,7 +327,7 @@ No hacer: recomendador que aprende del usuario (exige guardar historial), IA que
 - `UnidadesAdministrativas:IDEM_EIEL_NUCLEOS_23`: conectividad (`CALIDADGSM`, `CALIDADUMT`, `ACCESOREDx`).
 - También: centros sanitarios, de enseñanza, culturales (`BIBLIOTECA`, `HOGARPENSI`…), asistenciales.
 
-**Planeamiento `UsoDelSuelo:VPLA_V_RED_REF_25`** (37.167 polígonos, **166 municipios** incluidos los grandes; **no** Madrid capital, Guadarrama, Torrelodones, Sevilla la Nueva, Villanueva de la Cañada y otros, 13 en total): `CD_MUNICIPIO`, `DS_USO_GENE` («Zonas Verdes y Espacios Libres» 16.867), `DS_USO_DETA` («Jardines y Plazas», «Parques Municipales y Urbanos», «Deportivos» 738…), `NM_AREA` (m²).
+**Planeamiento `UsoDelSuelo:VPLA_V_RED_REF_25`** (37.420 polígonos y **167 municipios** en la descarga del 16/10, incluidos los grandes; **no** Madrid capital, Guadarrama, Torrelodones, Sevilla la Nueva, Villanueva de la Cañada y otros, 12 en total): `CD_MUNICIPIO`, `DS_USO_GENE` («Zonas Verdes y Espacios Libres» 16.867; 17.010 el 16/10), `DS_USO_DETA` («Jardines y Plazas», «Parques Municipales y Urbanos», «Deportivos» 738…), `NM_AREA` (m²).
 
 **Otras IDEM:** áreas recreativas `IDEM_MA_AREAS_RECREA` (84; `IT_FUENTE`, `IT_BANCOS`, `IT_PAPEL`, `IT_ASEOS`, `IT_JINFANT`, `IT_CBIOSAL`…), sendas `IDEM_V_MA_SENDAS_VERDES`, vías pecuarias `IDEM_MA_VIAS_PECUARIAS`, cubierta terrestre `BTA:IDEM_BTA_CUBIERTER_POL_17` (`id_fenomeno`, p. ej. «Arbolado forestal»), viales `IDEM_GDIE_G_CALLES` (`TIPOLOGIA`), municipios `Comun:IDEM_V_MUNICIPIOS`, estaciones de aire de **ambas redes** `IDEM_MA_EST_CALIDAD_AIRE` (48), zonas de aire.
 
@@ -359,7 +359,7 @@ Municipios con al menos uno: fuentes 152, juegos 143, bancos 88, biosaludables 5
 
 ## 8. Hallazgos sobre los datos (trampas)
 - No hay censo de instalaciones deportivas en el CKAN de la Comunidad → Nomecalles + EIEL + VPLA + OSM.
-- EIEL solo 155 municipios; VPLA no tiene 13 (incl. capital).
+- EIEL solo 155 municipios; VPLA no tiene 12 (incl. capital; 13 hasta la descarga del 16/10).
 - `NATACION` vacía en EIEL → usar `TIPOINSTAL`.
 - Red de aire regional sin la capital → unir con la del Ayto. (mismo formato).
 - Nomecalles sin deporte por instalación → palabras clave (el LLM en lote de §6.5 se descartó, DEC-11).

@@ -88,11 +88,11 @@ Rangos de Task para que no choquen los números: **B1 33–39 · B2 40–46 y 68
 | `sport_facilities` | sport | Instalaciones deportivas | `nmc_deporte` | n.º de filas por `CMUN` | instalaciones | NULL | 178 (Patones NULL) |
 | `sport_facilities_per_1000` | sport | Instalaciones deportivas por 1.000 hab. | `nmc_deporte` + `padron` | n.º / población × 1000 | por 1.000 hab. | NULL | 178 |
 | `catalog_activities` | sport | Actividades del catálogo disponibles | `destination_activity` (todas las fuentes de destinos) | n.º de las 8 actividades de `activities.yaml` con ≥ 1 destino | de 8 | 0 | 179 |
-| `green_m2_per_inhabitant` | nature | Zonas verdes por habitante | `vpla_redes` (`clean/green.parquet`) | Σ `area_m2` / población | m²/hab. | NULL (fuera de VPLA) | 162 |
-| `drove_roads_km` | nature | Vías pecuarias | `vias_pecuarias` | Σ `NM_LONG` / 1000 por `CD_MUNI` (comprobar que `NM_LONG` está en metros); ignorar los `CD_MUNI` `289xx` que no son municipios | km | 0 | 169 |
+| `green_m2_per_inhabitant` | nature | Zonas verdes por habitante | `vpla_redes` (`clean/green.parquet`) | Σ `area_m2` / población | m²/hab. | NULL (fuera de VPLA); 0 si está en VPLA sin zonas verdes | 167 (Task 35) |
+| `drove_roads_km` | nature | Vías pecuarias | `vias_pecuarias` | Σ `NM_LONG` / 1000 por `CD_MUNI` (comprobar que `NM_LONG` está en metros); los `CD_MUNI` que no son de los 179 (`28077`, código antiguo de Lozoyuela 28901, y `28906`–`28912`, distritos de Madrid) se asignan por cruce espacial (Task 35) | km | 0 | 171 (Task 35) |
 | `recreation_areas` | nature | Áreas recreativas | `areas_recreativas` | n.º | áreas | 0 | 55 |
 | `bus_stops_per_1000` | mobility | Paradas de autobús por 1.000 hab. | `nmc_busparadas` | n.º por **cruce espacial** con `municipality.geom` (no `CMUN`: trae 209 códigos) / población × 1000 | por 1.000 hab. | 0 | 179 |
-| `rail_stations` | mobility | Estaciones de metro y cercanías | `nmc_estmetro` + `nmc_estcerca` | n.º por `CMUN` | estaciones | 0 | metro 15, cercanías 33 |
+| `rail_stations` | mobility | Estaciones de metro y cercanías | `nmc_estmetro` + `nmc_estcerca` | n.º por `CMUN` | estaciones | 0 | 39 (metro 15, cercanías 34; Task 35) |
 | `health_centres` | health | Centros de salud y consultorios | `sanitarios` | `centro_nro_registro` distintos con `centro_tipo` ∈ {«Centro de salud», «Consultorio de atención primaria»}, por `municipio_nombre` normalizado (8 no tienen coordenadas) | centros | 0 | 179 (430 el 16/10; 429 el 14/10) |
 | `pharmacies_per_1000` | health | Farmacias por 1.000 hab. | `farmacias` | n.º por cruce espacial (coma decimal) / población × 1000 | por 1.000 hab. | 0 | 160 |
 | `aed_per_1000` | health | Desfibriladores por 1.000 hab. | `desfibriladores` | n.º por cruce espacial (como `route_poi` `aed`; no `municipio_codigo`, que da 161) / población × 1000 | por 1.000 hab. | 0 | 172 |
