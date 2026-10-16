@@ -15,7 +15,7 @@
 - Código en inglés; comentarios en español **sin tildes**; textos visibles en español **con tildes** (CLAUDE.md §2.1).
 - **Solo los ficheros del bloque M** (`docs/trabajo-paralelo.md` §3): `src/components/MapView.tsx`, `src/styles/map.css` (nuevo), `package.json`/`package-lock.json` (solo `maplibre-gl` y `react-map-gl`), las pruebas del mapa. Nuevos y solo del mapa: `src/components/MapCanvas.tsx`, `src/components/MapView.test.tsx`, `src/components/MapSync.test.tsx`. En `Results.tsx`, solo el cableado de la selección (Task 67), avisando a F.
 - Sin cambios de contrato (`schemas.py`, `openapi.json`, `src/api/*`).
-- Teselas de **OpenFreeMap** (decidido 16/10): estilo `https://tiles.openfreemap.org/styles/liberty`, sin clave. Atribución visible: «© OpenStreetMap · OpenFreeMap» (CLAUDE.md §2.11; ODbL). El PMTiles local es del lunes (L-4), fuera de este bloque.
+- Teselas de **OpenFreeMap** (decidido 16/10): estilo `https://tiles.openfreemap.org/styles/liberty`, sin clave. Atribución visible: «© OpenStreetMap · OpenMapTiles · OpenFreeMap» (CLAUDE.md §2.11; ODbL; la de su TileJSON, añadida OpenMapTiles tras el verificador). El PMTiles local es del lunes (L-4), fuera de este bloque.
 - La lista es el equivalente completo (RF-11): el mapa es `aria-hidden="true"`, sin elementos enfocables (`keyboard={false}`, lienzo con `tabindex="-1"`, marcadores sin botón).
 - Pruebas deterministas: nunca la red; `react-map-gl/maplibre` simulado con `vi.mock`; WebGL simulado con `vi.spyOn(HTMLCanvasElement.prototype, "getContext")`.
 - Sin push, sin merge, sin PR; no conectarse a la VM. Comandos desde `app/frontend`: `npm ci`, `npm test`, `npm run lint`, `npm run build`.
