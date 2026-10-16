@@ -718,6 +718,243 @@ def create_municipality_indicator(con, config=None):
 - **Pruebas clave:** `test_municipality_179_respond` (`slow`), `test_municipality_missing_is_null`, `test_municipality_unknown_404`, y una sin base de datos → 503.
 - **Terminado cuando:** los 179 códigos responden y el contrato actual no cambia.
 
+#### Detalle de la Task 36 (ejecutor de LB1-2, 16/10)
+
+**Rol:** Motor · **Servicio:** `app/api/` · **Depende de:** Task 35 (`municipality_indicator` en `gomad.duckdb`), Task 34 (`indicators.yaml`) · **Duración:** 1 h
+
+**Ficheros:** Crear `services/municipality.py`, `tests/test_municipality.py`. Modificar `repository.py` (solo métodos nuevos), `main.py` (solo la función `municipality` y la línea de `import` de su servicio), `tests/mini_data.py` (solo añadir: tabla `municipality_indicator`, una fila de `source_date` y un área canina en Madrid para la Task 37).
+
+**Comprobado el 16/10 en `gomad.duckdb` (tras `build_db main` con `main` en `ff86912`):**
+- `municipality(ine_code, name, population, in_eiel, in_vpla, geom)`: 179 filas, `population` sin nulos; `name` en MAYÚSCULAS («GETAFE»): el nombre que se muestra sale de `Repository.municipality_names()` (callejero), como en `/recommend`.
+- `municipality_indicator(ine_code, category, key, value, unit, year, source)`: 2.506 filas (179 × 14), sin `label` (Ruling de la Task 35): `label` y el orden salen de `indicators.yaml`. `source` = primer id de la lista del YAML; `source_date` tiene fecha para todos salvo `destination_activity` (no es una descarga: `date` nulo).
+- `sources.yaml` → `labels` no tiene todavía `padron`, `nmc_busparadas`, `nmc_estmetro`, `nmc_estcerca`, `sanitarios`, `farmacias`, `educativos`, `eiel_nucleos`, `atencion_social`, `vias_pecuarias` ni `destination_activity`: `data_source` cae en el id. Las etiquetas las añade la Task 38 (dueña de `sources.yaml`); aquí no se toca.
+- `route_poi` de tipo `dog_area`: solo `ay_areas_caninas` (112, Madrid); el extracto OSM no está descargado en este equipo.
+
+**Interfaces:**
+- Consume: `settings.load("indicators")`, `settings.load("sources")["labels"]`, `Repository.source_dates()`, `Repository.municipality_names()`, `services.common.data_source`.
+- Produce:
+  - `Repository.municipality(ine_code) -> tuple[str, int | None] | None` (nombre de la tabla y población; `None` si el código no es de los 179; sin base → `DataUnavailable`).
+  - `Repository.municipality_indicators(ine_code) -> dict[str, tuple[float | None, str, int | None, str]]` (`key` → `value`, `unit`, `year`, `source`); base sin la tabla (anterior a la Task 35) → `DataUnavailable` (503), no 500.
+  - `services/municipality.py`: `UnknownMunicipality(LookupError)` y `municipality(ine_code, repo) -> s.MunicipalityResponse`: un `Indicator` por cada entrada de `indicators.yaml`, **en su orden** (ya agrupado por categoría); `value` NULL → `None` («sin datos»); un indicador del YAML sin fila → también `None` (no desaparece); `source` = `DataSource` con la fecha de `source_date` (RF-19). Sin ranking, nota ni comparación con otros municipios. `fit = []` (lo rellena la Task 37).
+  - `main.municipality(ine_code, repo=Depends(get_repo))`: `UnknownMunicipality` → 404 con el mensaje; `DataUnavailable` → 503. **El contrato no cambia** (`Depends` no añade parámetros a OpenAPI): `test_contract.py` sigue en verde sin regenerar.
+
+- [ ] **Paso 1: datos de prueba** — en `tests/mini_data.py`, una constante nueva y cuatro sentencias al final de la base principal (antes de `con.close()`):
+
+```python
+# ine_code, category, key, value, unit, year, source (Task 35). Getafe con valores; Madrid sin VPLA -> green NULL;
+# health_centres 0 en Madrid es inventado (solo para probar «no hay» en el encaje de la Task 37)
+INDICATORS = [
+    ("28065", "sport", "sport_facilities", 19.0, "instalaciones", None, "nmc_deporte"),
+    ("28065", "nature", "green_m2_per_inhabitant", 172.788, "m²/hab.", 2025, "vpla_redes"),
+    ("28065", "health", "health_centres", 9.0, "centros", None, "sanitarios"),
+    ("28065", "health", "aed_per_1000", 1.366, "por 1.000 hab.", None, "desfibriladores"),
+    ("28065", "education", "schools", 105.0, "centros", None, "educativos"),
+    ("28065", "connectivity", "good_3g_pct", None, "%", 2023, "eiel_nucleos"),
+    ("28079", "nature", "green_m2_per_inhabitant", None, "m²/hab.", 2025, "vpla_redes"),
+    ("28079", "health", "health_centres", 0.0, "centros", None, "sanitarios"),
+]
+```
+
+```python
+    con.execute("""CREATE TABLE municipality_indicator (ine_code VARCHAR, category VARCHAR, key VARCHAR, value DOUBLE,
+                   unit VARCHAR, year INTEGER, source VARCHAR)""")
+    con.executemany("INSERT INTO municipality_indicator VALUES (?, ?, ?, ?, ?, ?, ?)", INDICATORS)
+    con.execute("INSERT INTO source_date VALUES ('nmc_deporte', '2026-10-16T15:56:26', NULL)")
+    con.execute("""INSERT INTO route_poi VALUES
+        ('ay_areas_caninas:1', 'dog_area', 'ay_areas_caninas', '28079', NULL, NULL, -3.7019, 40.4196)""")
+```
+
+- [ ] **Paso 2: prueba que falla** — `tests/test_municipality.py`:
+
+```python
+"""GET /municipality/{ine_code} (B1 Tasks 36 y 37): indicadores DEC-09 con fuente y fecha, sin ranking."""
+import json
+
+import duckdb
+import pytest
+from fastapi.testclient import TestClient
+
+import settings
+from main import app, get_repo
+from mini_data import build_mini_data
+from repository import Repository
+from settings import DATA_DIR
+
+KEYS = [i["key"] for i in settings.load("indicators")["indicators"]]
+
+
+@pytest.fixture
+def mini(tmp_path):
+    base = build_mini_data(tmp_path / "data")
+    app.dependency_overrides[get_repo] = lambda: Repository(base)
+    yield TestClient(app)
+    app.dependency_overrides.clear()
+
+
+def _status(base, code="28065"):
+    app.dependency_overrides[get_repo] = lambda: Repository(base)
+    try:
+        return TestClient(app, raise_server_exceptions=False).get(f"/municipality/{code}")
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_municipality_getafe_indicators(mini):
+    r = mini.get("/municipality/28065")
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["ine_code"] == "28065" and data["name"] == "Getafe" and data["population"] == 193238
+    assert [i["key"] for i in data["indicators"]] == KEYS          # orden de indicators.yaml, agrupado por categoria
+    sport = next(i for i in data["indicators"] if i["key"] == "sport_facilities")
+    assert sport == {"category": "sport", "key": "sport_facilities", "label": "Instalaciones deportivas",
+                     "value": 19.0, "unit": "instalaciones", "year": None,
+                     "source": {"source": "nmc_deporte", "label": "Instalaciones deportivas (Nomecalles, Comunidad de Madrid)",
+                                "date": "2026-10-16T15:56:26", "own_criterion": False}}
+    green = next(i for i in data["indicators"] if i["key"] == "green_m2_per_inhabitant")
+    assert green["year"] == 2025 and green["value"] == pytest.approx(172.788)
+    assert data["fit"] == []
+
+
+def test_municipality_missing_is_null(mini):
+    data = mini.get("/municipality/28079").json()
+    green = next(i for i in data["indicators"] if i["key"] == "green_m2_per_inhabitant")
+    assert green["value"] is None and green["source"]["source"] == "vpla_redes"   # «sin datos», nunca 0
+    # un indicador del YAML sin fila en la tabla tambien sale, como «sin datos»
+    assert len(data["indicators"]) == len(KEYS)
+    sport = next(i for i in data["indicators"] if i["key"] == "sport_facilities")
+    assert sport["value"] is None and sport["label"] == "Instalaciones deportivas"
+
+
+def test_municipality_unknown_404(mini):
+    for code in ("28999", "abc"):
+        r = mini.get(f"/municipality/{code}")
+        assert r.status_code == 404
+        assert "municipio" in r.json()["detail"]
+
+
+def test_municipality_without_db_is_503(tmp_path):
+    assert _status(tmp_path).status_code == 503
+
+
+def test_municipality_old_db_is_503(tmp_path):
+    """gomad.duckdb anterior a la Task 35 (sin municipality_indicator): 503 legible, no 500."""
+    base = build_mini_data(tmp_path / "data")
+    con = duckdb.connect(str(base / "gomad.duckdb"))
+    con.execute("DROP TABLE municipality_indicator")
+    con.close()
+    r = _status(base)
+    assert r.status_code == 503 and "indicadores" in r.json()["detail"]
+
+
+def test_municipality_no_ranking(mini):
+    text = json.dumps(mini.get("/municipality/28065").json(), ensure_ascii=False).lower()
+    for word in ("rank", "posición", "percentil", "puesto"):
+        assert word not in text
+
+
+@pytest.fixture(scope="module")
+def real():
+    if not (DATA_DIR / "gomad.duckdb").exists():
+        pytest.skip("sin app/data/gomad.duckdb")
+    yield TestClient(app)                     # sin lifespan: get_repo crea Repository(DATA_DIR)
+
+
+@pytest.mark.slow
+def test_municipality_179_respond(real):
+    con = duckdb.connect(str(DATA_DIR / "gomad.duckdb"), read_only=True)
+    codes = [c for (c,) in con.execute("SELECT ine_code FROM municipality ORDER BY ine_code").fetchall()]
+    con.close()
+    assert len(codes) == 179
+    values = {}
+    for code in codes:
+        r = real.get(f"/municipality/{code}")
+        assert r.status_code == 200, (code, r.text)
+        data = r.json()
+        assert [i["key"] for i in data["indicators"]] == KEYS and data["population"] > 0
+        values[code] = {i["key"]: i["value"] for i in data["indicators"]}
+    assert values["28079"]["green_m2_per_inhabitant"] is None      # Madrid fuera de VPLA
+    assert values["28107"]["sport_facilities"] is None             # Patones sin Nomecalles deporte
+    assert values["28065"]["sport_facilities"] == 19
+```
+
+  Run: `.venv/bin/pytest tests/test_municipality.py -q` → Esperado: fallan las de 200/404/503 (hoy el endpoint da 501); `test_municipality_no_ranking` falla al leer `data` del 501 o pasa por vacío (no importa); ninguna con error de importación.
+
+- [ ] **Paso 3: métodos nuevos en `repository.py`** (al final de la clase; `duckdb` ya está importado):
+
+```python
+    def municipality(self, ine_code):
+        """(nombre de la tabla, poblacion) o None si el codigo no es de los 179."""
+        rows = self._query(self.main, "SELECT name, population FROM municipality WHERE ine_code = ?", [ine_code],
+                           required=True)
+        return rows[0] if rows else None
+
+    def municipality_indicators(self, ine_code):
+        """{key: (value, unit, year, source)} de municipality_indicator (Task 35); value None = «sin datos»."""
+        try:
+            rows = self._query(self.main, """SELECT key, value, unit, year, source FROM municipality_indicator
+                                             WHERE ine_code = ?""", [ine_code], required=True)
+        except duckdb.CatalogException as e:      # base anterior a la Task 35
+            raise DataUnavailable("Los indicadores de municipio todavía no están cargados en el servidor.") from e
+        return {key: (_number(value), unit, year, source) for key, value, unit, year, source in rows}
+```
+
+- [ ] **Paso 4: `services/municipality.py`**:
+
+```python
+"""GET /municipality/{ine_code} (F5, RF-17, RF-19): indicadores DEC-09 de un municipio con su fuente y fecha.
+
+Determinista y sin IA. Sin ranking ni comparacion con otros municipios. Que indicadores hay, su etiqueta y su
+orden salen de config/indicators.yaml; los valores, de la tabla municipality_indicator (ingest, Task 35)."""
+import schemas as s
+import settings
+from services.common import data_source
+
+
+class UnknownMunicipality(LookupError):
+    pass
+
+
+def indicators(cfg, rows, labels, dates):
+    """Un Indicator por entrada del YAML, en su orden; sin fila o con NULL -> value None («sin datos»)."""
+    out = []
+    for ind in cfg["indicators"]:
+        value, unit, year, source = rows.get(ind["key"], (None, ind["unit"], ind["year"], ind["source"][0]))
+        out.append(s.Indicator(category=ind["category"], key=ind["key"], label=ind["label"], value=value, unit=unit,
+                               year=year, source=data_source(source, labels, dates.get(source))))
+    return out
+
+
+def municipality(ine_code, repo):
+    info = repo.municipality(ine_code)
+    if info is None:
+        raise UnknownMunicipality(f"No hay ningún municipio de la Comunidad de Madrid con el código «{ine_code}».")
+    name, population = info
+    labels = (settings.load("sources") or {}).get("labels", {})
+    items = indicators(settings.load("indicators"), repo.municipality_indicators(ine_code), labels,
+                       repo.source_dates())
+    return s.MunicipalityResponse(ine_code=ine_code, name=repo.municipality_names().get(ine_code, name),
+                                  population=population, indicators=items, fit=[])
+```
+
+- [ ] **Paso 5: `main.py`** — `from services import municipality as municipality_service` junto a los otros `import` de servicios, y la función:
+
+```python
+@app.get("/municipality/{ine_code}", response_model=s.MunicipalityResponse)
+def municipality(ine_code: str, repo: Repository = Depends(get_repo)):
+    try:
+        return municipality_service.municipality(ine_code, repo)
+    except municipality_service.UnknownMunicipality as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except DataUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e))
+```
+
+- [ ] **Paso 6:** Run: `.venv/bin/pytest tests/test_municipality.py -q` → Esperado: `7 passed` (ninguno saltado: hay `app/data`). Run: `.venv/bin/pytest tests/test_contract.py -q` → Esperado: `5 passed` (el contrato no cambia).
+- [ ] **Paso 7:** Run: `.venv/bin/pytest -q` → Esperado: los 2 fallos de la línea base (`test_recommend_capital_without_vpla`, `test_route_getafe`) y ninguno nuevo.
+- [ ] **Paso 8: commit** — `git -C ../.. add app/api/repository.py app/api/main.py app/api/services/municipality.py app/api/tests/mini_data.py app/api/tests/test_municipality.py && git -C ../.. commit -m "Motor: /municipality/{ine_code} con indicadores DEC-09, fuente y fecha (B1 Task 36)"`
+
+**Terminado cuando:** los 179 códigos responden 200 con los 14 indicadores en el orden del YAML, NULL sale como `value: null`, un código desconocido da 404 y sin base (o sin la tabla) 503; `test_contract.py` en verde sin regenerar.
+
 ### Task 37: B1-M2 · Encaje con preferencias (RF-18) y cambio de contrato
 - **Alcance:** parámetros opcionales `activities`, `profile` y `companions` en `/municipality/{ine_code}`. El campo `fit` (`list[str]`, ya en el contrato) se rellena según la sección `fit` de `indicators.yaml`:
   - primera frase: «Cumple N de M», más «K sin datos» si los hay;
@@ -729,6 +966,222 @@ def create_municipality_indicator(con, config=None):
 - **Es suyo:** lo mismo que en la Task 36, más `app/api/schemas.py` (solo los parámetros nuevos), `app/frontend/src/api/openapi.json` y `schema.d.ts` (regenerados, no a mano).
 - **Pruebas clave:** sin preferencias → `fit` vacío o solo «Cumple 0 de 0» (decidir y registrar un Ruling); actividad sin destinos → «no hay»; perro sin datos → «Sin datos»; ningún texto contiene posición, nota ni percentil; `test_contract.py`.
 - **Terminado cuando:** el encaje sale con las tres entradas y el contrato está regenerado.
+
+#### Detalle de la Task 37 (ejecutor de LB1-2, 16/10)
+
+**Rol:** Motor · **Servicio:** `app/api/` (y `app/frontend/` solo para regenerar el contrato) · **Depende de:** Task 36 · **Duración:** 1 h
+
+**Ficheros:** Modificar `services/municipality.py`, `repository.py` (dos métodos nuevos), `main.py` (solo la firma de `municipality` y su `except`), `tests/test_municipality.py` (pruebas nuevas al final). Regenerar (no a mano) `../frontend/src/api/openapi.json` y `../frontend/src/api/schema.d.ts`.
+
+**Decisiones de esta Task:**
+- Los parámetros nuevos van como `Query` en la firma de `municipality` en `main.py`, con los tipos que ya tiene el contrato (`s.Profile`, `s.Companion`): **`schemas.py` no cambia** (la división lo permitía, «solo los parámetros nuevos»; no hacen falta modelos nuevos). El cambio de contrato es solo en `openapi.json` (`paths`).
+- **Ruling: sin preferencias, `fit = []`** (no «Cumple 0 de 0»): `general` y `sensitive` no miran ningún indicador (`indicators.yaml`), así que sin actividades ni acompañantes no hay nada que contar y una frase vacía confunde. Coste si me equivoco: el front muestra la sección de encaje vacía en vez de «Cumple 0 de 0».
+- **M** de «Cumple N de M» = todas las comprobaciones (actividades + indicadores del perfil + acompañantes), incluidas las «sin datos»; **K sin datos** se dice aparte («Cumple 3 de 4, 1 sin datos»). Un indicador citado por perfil y acompañante a la vez cuenta una vez.
+- Actividad: n.º de destinos distintos del municipio en `destination_activity` (lo mismo que cuenta `catalog_activities`); se cumple si n > `met_if_above`. Actividad fuera de `activities.yaml` → 422 (como `/recommend`); perfil o acompañante fuera del contrato → 422 de FastAPI.
+- Perro: `route_poi` de tipo `dog_area` con `working IS NOT FALSE` en el municipio; 0 → «sin datos» (`when_absent: no_data`), nunca «no». El texto «Áreas caninas» va en el servicio (`POI_LABELS`): es texto para la persona, no un valor de decisión, e `indicators.yaml` no es de esta Task.
+- Números en formato español: enteros sin decimales; el resto con uno (con dos si con uno saldría 0).
+
+**Interfaces:**
+- Produce:
+  - `Repository.activity_counts(ine_code) -> dict[str, int]` y `Repository.poi_count(ine_code, poi_type) -> int`.
+  - `services/municipality.py`: `UnknownActivity(ValueError)`, `POI_LABELS`, `number(value) -> str`, `fit_sentences(fit_cfg, by_key, activities, profile, companions, activity_label, activity_count, poi_count) -> list[str]` (pura: recibe funciones para contar) y `municipality(ine_code, repo, activities=(), profile="general", companions=())`.
+  - `GET /municipality/{ine_code}?activities=…&activities=…&profile=…&companions=…` (todos opcionales).
+
+- [ ] **Paso 1: prueba que falla** — al final de `tests/test_municipality.py`:
+
+```python
+def fit(client, code="28065", **params):
+    r = client.get(f"/municipality/{code}", params=params)
+    assert r.status_code == 200, r.text
+    return r.json()["fit"]
+
+
+def test_fit_without_preferences_is_empty(mini):
+    """Ruling (Task 37): sin preferencias no hay nada que contar -> lista vacia, no «Cumple 0 de 0»."""
+    assert fit(mini) == []
+    assert fit(mini, profile="general") == [] and fit(mini, profile="sensitive") == []
+
+
+def test_fit_activities(mini):
+    assert fit(mini, activities=["walk", "padel", "gym"]) == [
+        "Cumple 2 de 3", "Caminar: sí, 5 sitios", "Pádel: no hay en este municipio", "Gimnasio y cubierto: sí, 1 sitio"]
+
+
+def test_fit_profile_and_companions(mini):
+    assert fit(mini, profile="senior", companions=["kids", "dog"]) == [
+        "Cumple 3 de 4, 1 sin datos",
+        "Centros de salud y consultorios: sí, 9 centros",
+        "Desfibriladores por 1.000 hab.: sí, 1,4 por 1.000 hab.",
+        "Centros educativos: sí, 105 centros",
+        "Áreas caninas: sin datos"]                 # Getafe sin areas caninas en route_poi: nunca «No»
+
+
+def test_fit_no_and_no_data(mini):
+    assert fit(mini, "28079", profile="senior") == [
+        "Cumple 0 de 2, 1 sin datos", "Centros de salud y consultorios: no hay en este municipio",
+        "Desfibriladores por 1.000 hab.: sin datos"]
+    assert fit(mini, "28079", profile="stroller") == [
+        "Cumple 0 de 1, 1 sin datos", "Zonas verdes por habitante: sin datos"]
+
+
+def test_fit_dog_yes_where_there_is_data(mini):
+    assert fit(mini, "28079", companions=["dog"]) == ["Cumple 1 de 1", "Áreas caninas: sí, 1 área"]
+
+
+def test_fit_bad_preferences_are_422(mini):
+    assert mini.get("/municipality/28065", params={"activities": ["parapente"]}).status_code == 422
+    assert mini.get("/municipality/28065", params={"profile": "astronauta"}).status_code == 422
+    assert mini.get("/municipality/28065", params={"companions": ["gato"]}).status_code == 422
+
+
+def test_fit_never_ranks(mini):
+    every = [a["id"] for a in settings.load("activities")["activities"]]
+    for code in ("28065", "28079"):
+        text = " ".join(fit(mini, code, activities=every, profile="senior", companions=["kids", "dog"])).lower()
+        for word in ("posición", "puesto", "nota", "percentil", "ranking", "mejor", "peor", "media"):
+            assert word not in text
+
+
+def test_number_format():
+    from services.municipality import number
+    assert [number(9.0), number(1.366), number(172.788), number(1234.5), number(0.04)] == [
+        "9", "1,4", "172,8", "1.234,5", "0,04"]
+
+
+@pytest.mark.slow
+def test_fit_real_getafe(real):
+    f = fit(real, "28065", activities=["walk", "swim"], profile="senior", companions=["dog"])
+    assert f[0].startswith("Cumple ") and len(f) == 6
+    assert f[1].startswith("Caminar: sí, ")
+```
+
+  Run: `.venv/bin/pytest tests/test_municipality.py -q` → Esperado: fallan las de `fit` (hoy `fit` es `[]` y los parámetros se ignoran) y `test_number_format` (`ImportError`); las 7 de la Task 36 siguen en verde.
+
+- [ ] **Paso 2: `repository.py`** — dos métodos nuevos al final de la clase:
+
+```python
+    def activity_counts(self, ine_code):
+        """{actividad: n.º de destinos distintos del municipio} (destination_activity, como catalog_activities)."""
+        rows = self._query(self.main, """SELECT a.activity, count(DISTINCT d.id) FROM destination d
+                                         JOIN destination_activity a ON a.destination_id = d.id
+                                         WHERE d.ine_code = ? GROUP BY a.activity""", [ine_code], required=True)
+        return dict(rows)
+
+    def poi_count(self, ine_code, poi_type):
+        """N.º de puntos de ruta de un tipo en el municipio (los fuera de servicio no cuentan)."""
+        rows = self._query(self.main, """SELECT count(*) FROM route_poi
+                                         WHERE ine_code = ? AND type = ? AND working IS NOT FALSE""",
+                           [ine_code, poi_type], required=True)
+        return rows[0][0]
+```
+
+- [ ] **Paso 3: `services/municipality.py`** — añadir:
+
+```python
+POI_LABELS = {"dog_area": ("Áreas caninas", "área", "áreas")}   # route_poi del encaje: etiqueta, singular, plural
+
+
+class UnknownActivity(ValueError):
+    pass
+
+
+def number(value):
+    """Formato espanol: enteros sin decimales; el resto con uno (con dos si con uno saldria 0)."""
+    digits = 0 if float(value).is_integer() else (1 if abs(value) >= 0.05 else 2)
+    return f"{value:,.{digits}f}".replace(",", " ").replace(".", ",").replace(" ", ".")
+
+
+def fit_sentences(fit_cfg, by_key, activities, profile, companions, activity_label, activity_count, poi_count):
+    """Encaje RF-18: «Cumple N de M[, K sin datos]» y una frase por preferencia. Sin nota, orden ni percentil.
+
+    activity_count(actividad) y poi_count(tipo) dicen cuantos hay en el municipio."""
+    above = fit_cfg["met_if_above"]
+    checks = []                                   # (True cumple | False no | None sin datos, frase)
+    for a in dict.fromkeys(activities):
+        n = activity_count(a)
+        checks.append((True, f"{activity_label[a]}: sí, {n} {'sitio' if n == 1 else 'sitios'}") if n > above
+                      else (False, f"{activity_label[a]}: no hay en este municipio"))
+    wanted = list(fit_cfg["profiles"].get(profile, []))
+    for c in dict.fromkeys(companions):
+        spec = fit_cfg["companions"].get(c, [])
+        wanted.extend([spec] if isinstance(spec, dict) else spec)
+    seen = set()
+    for w in wanted:
+        if isinstance(w, dict):                   # punto de ruta (OSM/Ayto., cobertura parcial)
+            label, one, many = POI_LABELS[w["route_poi"]]
+            n = poi_count(w["route_poi"])
+            if n > above:
+                checks.append((True, f"{label}: sí, {n} {one if n == 1 else many}"))
+            elif w.get("when_absent") == "no_data":
+                checks.append((None, f"{label}: sin datos"))          # perro: nunca «No»
+            else:
+                checks.append((False, f"{label}: no hay en este municipio"))
+            continue
+        if w in seen:
+            continue
+        seen.add(w)
+        ind = by_key[w]
+        if ind.value is None:
+            checks.append((None, f"{ind.label}: sin datos"))
+        elif ind.value > above:
+            checks.append((True, f"{ind.label}: sí, {number(ind.value)} {ind.unit}"))
+        else:
+            checks.append((False, f"{ind.label}: no hay en este municipio"))
+    if not checks:
+        return []
+    met = sum(1 for ok, _ in checks if ok)
+    no_data = sum(1 for ok, _ in checks if ok is None)
+    return [f"Cumple {met} de {len(checks)}" + (f", {no_data} sin datos" if no_data else "")] + [t for _, t in checks]
+```
+
+  y `municipality` pasa a:
+
+```python
+def municipality(ine_code, repo, activities=(), profile="general", companions=()):
+    activity_label = {a["id"]: a["label"] for a in settings.load("activities")["activities"]}
+    for a in activities:
+        if a not in activity_label:
+            raise UnknownActivity(f"Actividad desconocida: {a}")
+    info = repo.municipality(ine_code)
+    if info is None:
+        raise UnknownMunicipality(f"No hay ningún municipio de la Comunidad de Madrid con el código «{ine_code}».")
+    name, population = info
+    cfg = settings.load("indicators")
+    labels = (settings.load("sources") or {}).get("labels", {})
+    items = indicators(cfg, repo.municipality_indicators(ine_code), labels, repo.source_dates())
+    counts = repo.activity_counts(ine_code) if activities else {}
+    fit = fit_sentences(cfg["fit"], {i.key: i for i in items}, activities, profile, companions, activity_label,
+                        lambda a: counts.get(a, 0), lambda t: repo.poi_count(ine_code, t))
+    return s.MunicipalityResponse(ine_code=ine_code, name=repo.municipality_names().get(ine_code, name),
+                                  population=population, indicators=items, fit=fit)
+```
+
+  (el docstring del módulo añade RF-18 y «encaje sin ranking»).
+
+- [ ] **Paso 4: `main.py`** — solo la función `municipality`:
+
+```python
+@app.get("/municipality/{ine_code}", response_model=s.MunicipalityResponse)
+def municipality(ine_code: str,
+                 activities: list[str] = Query(default=[], description="Actividades del catálogo para el encaje (RF-18)"),
+                 profile: s.Profile = "general", companions: list[s.Companion] = Query(default=[]),
+                 repo: Repository = Depends(get_repo)):
+    try:
+        return municipality_service.municipality(ine_code, repo, activities, profile, companions)
+    except municipality_service.UnknownActivity as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except municipality_service.UnknownMunicipality as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except DataUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e))
+```
+
+- [ ] **Paso 5:** Run: `.venv/bin/pytest tests/test_municipality.py -q` → Esperado: `16 passed`. Run: `.venv/bin/pytest tests/test_contract.py -q` → Esperado: **1 failed** (`test_versioned_openapi_is_up_to_date`: el contrato cambió).
+- [ ] **Paso 6: contrato** — Run: `.venv/bin/python scripts/export_openapi.py` → Esperado: `Escrito …/frontend/src/api/openapi.json`. En `../frontend`: `npm ci` (si falta `node_modules`) y `npm run contract` → Esperado: regenera `src/api/schema.d.ts` y `tsc -b` sin errores. `git -C ../.. diff --stat` → Esperado: solo `openapi.json` y `schema.d.ts` en `app/frontend` (parámetros `activities`, `profile`, `companions` de `/municipality/{ine_code}`).
+- [ ] **Paso 7:** Run: `.venv/bin/pytest -q` → Esperado: los 2 fallos de la línea base y ninguno nuevo (`test_contract.py` en verde). En `../frontend`: `npm test && npm run build && npm run lint` → Esperado: en verde.
+- [ ] **Paso 8: commit** — `git -C ../.. add app/api/repository.py app/api/main.py app/api/services/municipality.py app/api/tests/test_municipality.py app/frontend/src/api/openapi.json app/frontend/src/api/schema.d.ts && git -C ../.. commit -m "Motor: encaje con preferencias en /municipality y contrato regenerado (B1 Task 37)"`
+
+**Terminado cuando:** `/municipality/{ine_code}` acepta `activities`, `profile` y `companions`, `fit` sale con «Cumple N de M» y una frase por preferencia (perro nunca «no», NULL «sin datos», sin nota ni orden), y el contrato está regenerado con `test_contract.py` en verde. **Aviso a los demás bloques** (en el informe): el contrato cambió solo en los parámetros de `/municipality/{ine_code}`; B2 (Task 68) debe partir de este `openapi.json`.
 
 ---
 
