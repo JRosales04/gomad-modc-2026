@@ -101,7 +101,7 @@ Orden propuesto: primero las **bloqueantes** (D-01 a D-04), que impiden empezar 
 **Recomendación:** combinación probable: «día en alerta» (Sanidad o AEMET) → proponer cubierto o franja temprana; dentro del día, elegir la hora con menor sensación térmica (propuesta detallada en `umbrales.md` §2.3).
 **Desbloqueado: umbrales oficiales, tabla municipio → zona (`docs/assets/heat_zones.csv`) y propuesta en `docs/assets/umbrales.md` §2.3.**
 
-**Decidido el 16/10: opción C, «día de calor» simple (sin niveles de la Ecuación 1).**
+**Decidido el 16/10: opción C, «día de calor» simple (sin niveles de la Ecuación 1).** *(Desde DEC-16 la Tmáx prevista es la diaria de Open-Meteo, `daily.temperature_2m_max`, no el máximo horario de AEMET.)*
 - **Día de calor** (municipio, día) = máximo de la `temperatura` horaria de AEMET de ese día **>** umbral de Tmáx de su zona meteosalud (35,8 / 37,4 / 39,2 °C; plan de Sanidad 2026, Anexo I pág. 41; zona por `heat_zones.csv`). Oficial: umbrales y zonas. Criterio propio: usar el máximo horario como Tmáx y evaluar día a día, sin el sumatorio de 3 días.
 - **Perfiles de riesgo:** `senior`, `stroller` y «Salgo con…» `kids` (Anexo V pág. 52: mayores de 65 y menores de 4 años; que carrito o niños sean menores de 4 años es lectura propia).
 - **Efecto:** en día de calor y con perfil de riesgo, las horas de 14:00 a 19:00 no valen para exterior (RF-09: cubierto u otra franja), citando «especialmente entre las 14:00h y las 19:00h» (Anexo V pág. 52; convertirlo en bloqueo es criterio propio). Entre las horas válidas, desempate por menor `sensTermica` (criterio propio; hace falta para el caso de Carmen). Resto de perfiles: solo aviso informativo «Día de calor en tu zona», sin bloqueo.
@@ -184,7 +184,9 @@ Resuelto en `docs/arquitectura.md` §1 (D-13: Docker Compose en VM de OCI). **No
 - **Dominio (A-03, V-F4):** subdominio gratuito de DuckDNS apuntando a la IP de la VM; `DOMAIN` en `app/deploy/.env` de la VM.
 - **Hueco de Getafe (B3):** 0 destinos de nadar, tenis y baloncesto porque Getafe no está en EIEL y los nombres de Nomecalles no lo dicen. Se descartan las palabras clave (habría que adivinar que «Polideportivo» tiene piscina) y OSM amplio (falsos positivos de comunidades y colegios). **Decidido: OSM filtrado** como fuente de destinos: centros deportivos y estadios con `sport` y nombre; pistas de tenis, baloncesto y pádel con nombre o `access=yes|public`; piscinas solo con nombre o `access=public`; `suitability` 0,8. Detalle en la ficha B3 de `docs/trabajo-paralelo.md`.
 
-## DEC-13 (P-13) · Cuota de AEMET
+## DEC-13 (P-13) · Cuota de AEMET — **superada por DEC-16**
+
+> **Superada por DEC-16 (16/10):** la previsión ya no es de AEMET sino de Open-Meteo. De esta decisión solo sigue valiendo que una previsión de más de 12 h no se usa. Lo que sigue es histórico.
 
 **Contexto:** `docs/PENDIENTES.md` P-13. Cada municipio son 2 peticiones; el 14/10, 7 peticiones en ~1 min dieron 429 y volvió a responder a los ~100 s. Con `AEMET_PAUSE_S=10` salen ~12 peticiones/min: falla. AEMET **elabora la previsión municipal unas 3 veces al día** (vistas el 14–16/10: `elaborado` 12:01, 20:53 y 07:09), así que bajarla cada hora no aporta nada.
 
@@ -198,6 +200,8 @@ Resuelto en `docs/arquitectura.md` §1 (D-13: Docker Compose en VM de OCI). **No
 
 ## DEC-15 · Datos en tiempo real sin persistencia
 
+> *La parte de AEMET (cola, cuota, vecino) la sustituye DEC-16: Open-Meteo, una petición para los 179.*
+
 **Contexto:** el diseño anterior de B2 recargaba `realtime.duckdb` cada hora y, si una fuente caía, enseñaba el último dato con aviso. Eso permite mostrar aire o meteo de hace muchas horas, que no sirve para decidir «¿salgo ahora?». Medido el 16/10 a las 16:14: `aire_dia` 24 KB en 0,24 s (última hora válida, la 13: ~3 h de retraso de la propia red), `ay_aire` 19 KB en 2,1 s, `ay_meteo` 14 KB en 0,9 s, `pm.xml` 2,2 MB en 0,4 s: se pueden pedir en directo.
 
 **Decidido el 16/10:**
@@ -207,6 +211,21 @@ Resuelto en `docs/arquitectura.md` §1 (D-13: Docker Compose en VM de OCI). **No
 - **AEMET** no se pide en cada consulta (2 peticiones por municipio, 429 a ~6/min): cola en la API a 4 peticiones/min con prioridad para los municipios pedidos y los pilotos; un municipio sin previsión usa la del más cercano con previsión dentro de `forecast_fallback_km` y lo dice. Sustituye a la rotación 1/6 de DEC-13 desde la ingesta.
 - **Polen** (`mediciones_polen` y `captadores_polen` del CKAN de la Comunidad, comprobados el 16/10; dato diario con ~5 días de retraso): Could, fuente nueva que aprueba el equipo; solo aviso, no puntúa.
 - Plan: `docs/planes/tiempo-real.md`; ficha B2 en `docs/trabajo-paralelo.md`.
+
+## DEC-16 · Open-Meteo sustituye a AEMET
+
+**Contexto (16/10):** la API OpenData de AEMET limita a ~6 peticiones/min por IP y, tras un 429, bloquea mucho tiempo: la VM llevaba más de 30 min con 429 y la web decía «Previsión: sin datos». Con 2 peticiones por municipio, los 179 necesitaban ~90 min de cola. Open-Meteo devuelve los 179 municipios en **una** petición (comprobado el 16/10: 0,4 s, 3 llamadas seguidas con 200), sin clave.
+
+**Decidido el 16/10 (equipo):**
+- Se elimina AEMET por completo (código, configuración, pruebas y documentación vigente) y la previsión pasa a **Open-Meteo** (`api.open-meteo.com/v1/forecast`, 3 días, horaria).
+- **Una petición por hora** con un punto por municipio (`app/config/forecast_points.csv`: centroide del contorno o, si cae fuera, un punto interior). 179 × 24 ≈ 4.300 coordenadas al día, dentro del límite de uso no comercial (10.000/día, 5.000/h, 600/min).
+- Tras un error o 429, **espera global** que se duplica (120 s → 3.600 s), nunca una petición por tick. Caché de arranque `data/live/forecast.json` (se descarta lo de más de 12 h).
+- **Privacidad:** a Open-Meteo solo van esos 179 puntos, nunca la ubicación de la persona (prueba `test_user_location_never_sent`).
+- **Licencia:** CC BY 4.0, atribución «Weather data by Open-Meteo.com» con enlace a https://open-meteo.com/ en la pantalla de Fuentes.
+- **Calor (DEC-06):** la Tmáx del día es `daily.temperature_2m_max` de Open-Meteo (criterio propio usarla frente al umbral de Sanidad, que se definió con la Tmáx de AEMET).
+- **Sin hora de elaboración:** la fecha de la previsión que se muestra es la de descarga.
+- Fuera: cola por municipio, cuota, pilotos, previsión del municipio vecino, `AEMET_API_KEY`, `AEMET_MUNICIPALITIES`, `AEMET_PAUSE_S`, `INIT_AEMET_MUNICIPALITIES`.
+- Plan: `docs/planes/open-meteo.md` (Tasks 72–79).
 
 ## D-14 · PDF de presentaciones en el repositorio (46 MB)
 

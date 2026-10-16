@@ -1,5 +1,7 @@
 # Plan del bloque B3 — Calor y hueco de Getafe (DEC-06, RF-04, RF-09)
 
+> **Nota (16/10):** AEMET sustituida por Open-Meteo (DEC-16); la Tmáx del día es la diaria de Open-Meteo (`docs/planes/open-meteo.md`).
+
 > **Para agentes:** ejecutar con `superpowers:executing-plans`, Task a Task, con TDD. Ledger: `.superpowers/sdd/calor-getafe/progress.md` (no el del plan general). Pasos con casillas (`- [ ]`).
 
 **Objetivo:** que el motor aplique el «día de calor» de DEC-06 por zona meteosalud y que Getafe (y los municipios grandes sin EIEL) tengan destinos de nadar, tenis y baloncesto desde OSM filtrado.

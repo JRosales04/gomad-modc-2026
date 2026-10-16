@@ -36,7 +36,7 @@
 | Orden | Qué | Bloque | Por qué en este orden | Cuándo |
 |---|---|---|---|---|
 | **0** | Desplegar lo que ya hay: arrancar la VM, copiar `app/data`, `deploy.sh`, **dominio + HTTPS** | **D (manual, tú)** | Sin HTTPS el móvil no da GPS; sin despliegue no se prueba nada fuera de tu PC | Vie mañana |
-| **0** | Decisiones: ✅ DEC-09 (indicadores F5), ✅ DEC-13 (cuota AEMET), ✅ DEC-06 (calor) — cerradas el 16/10; ✅ dominio (DuckDNS), ✅ teselas (OpenFreeMap → PMTiles), ✅ hueco de Getafe (OSM filtrado) | Equipo | Bloquean B1, B2, B3 y M | Vie 12:00 |
+| **0** | Decisiones: ✅ DEC-09 (indicadores F5), ✅ DEC-13 (cuota AEMET; superada por DEC-16, Open-Meteo), ✅ DEC-06 (calor) — cerradas el 16/10; ✅ dominio (DuckDNS), ✅ teselas (OpenFreeMap → PMTiles), ✅ hueco de Getafe (OSM filtrado) | Equipo | Bloquean B1, B2, B3 y M | Vie 12:00 |
 | **1** | Vista de municipio y fuentes (F5, RF-19) | **B1** | F5 es MVP y Fuentes da la trazabilidad que puntúa en 1.1 | Vie |
 | **1** | Mapa sincronizado con la lista (RF-11, Must) | **M** | Es Must y lo que más se ve en la demo | Vie |
 | **1** | Diseño del front | **F** | No depende de nadie; empieza ya | Vie → dom |
@@ -106,13 +106,14 @@ Rangos de Task para que no choquen los números: **B1 33–39 · B2 40–46 y 68
 
 ### Bloque B2 — Datos en tiempo real (aire, tiempo, tráfico; polen si da tiempo)
 - **Rama:** una por lote (`docs/guia-ejecucion.md` §8) · Tasks **40–46 y 68–71** en `docs/planes/tiempo-real.md`.
+- **DEC-16 (16/10, `docs/planes/open-meteo.md`, Tasks 72–79):** la previsión pasa de AEMET a **Open-Meteo**: una petición por hora para los 179 municipios (puntos de `app/config/forecast_points.csv`), sin clave, espera global creciente tras un error, caché `data/live/forecast.json`. Fuera la cola por municipio, la cuota, los pilotos, la previsión del vecino y `AEMET_API_KEY`. Lo que sigue sobre AEMET es histórico.
 - **Rediseñado el 16/10 (DEC-15, `docs/decisiones-pendientes.md`):** sustituye al B2 «Datos vivos» (cron horario que reescribía `realtime.duckdb` y rotación de AEMET), que no se había empezado. Aire, previsión y tráfico **no se guardan en disco**: la API los pide a los portales en segundo plano, los tiene en memoria con su TTL y **nunca enseña un dato más viejo que su `max_age`** (aire 3 h, previsión 12 h, tráfico 15 min; `config/realtime.yaml`). Para horas futuras: previsión horaria de AEMET (hoy y mañana) y patrón histórico del aire (estimación, V-D3).
 - **Qué:** `LiveStore` en la API (Task 40), aire en vivo (41), AEMET con cola y cuota en la API (42), patrón del aire (43), sensores de tráfico → tramos (44), tráfico en vivo en `/route` de la capital (45), aire futuro estimado en `/recommend` (46), `/conditions/{ine_code}` (68, cambio de contrato), conexión en el front (69), recarga programada solo de referencia/diaria/semanal (70), polen (71, Could, fuente nueva que aprueba el equipo).
 - **Es suyo:** `app/api/live/`, `app/config/realtime.yaml`, los cuerpos de `Repository.forecast` y `Repository.air_categories` (misma firma), `Repository.air_pattern`, la línea del `LiveStore` en `lifespan`, `app/api/services/conditions.py` y la función `conditions` de `main.py`, el trozo de `services/route.py` que elige el tráfico de cada tramo, el trozo de `services/recommend.py` que rellena el aire por hora, `app/ingest/traffic.py`, la función `air_pattern` en `build_db.py`, `app/ingest/jobs/`, `app/ingest/Dockerfile`, el servicio `ingest` en `app/deploy/docker-compose.yml`, `app/.env.example` (AEMET), `src/data/conditions.ts`. Detalle por Task en el plan.
-- **Sigue valiendo de DEC-13:** 4 peticiones/min a AEMET, reintento de un 429 tras 120 s, aviso «previsión antigua» con más de 12 h y pilotos primero. **Deja de valer:** la rotación horaria 1/6 desde la ingesta y `realtime.duckdb` para aire y previsión (se deja de leer; se borra tras la demo).
+- **De DEC-13 solo sigue valiendo** que la previsión de más de 12 h no se usa (`max_age_h`). Cuota, pilotos y reintento de 429 por municipio desaparecen con DEC-16. *(Antes: 4 peticiones/min a AEMET, reintento de un 429 tras 120 s, aviso «previsión antigua» con más de 12 h y pilotos primero. **Deja de valer:** la rotación horaria 1/6 desde la ingesta y `realtime.duckdb` para aire y previsión (se deja de leer; se borra tras la demo).)*
 - **Contrato:** solo la Task 68 lo cambia, y después de B1 (un bloque a la vez, §1).
 - **Ya existe (16/10):** `app/ingest/Dockerfile` + `app/ingest/scripts/init_data.sh` + `app/deploy/docker-compose.init.yml`, para inicializar los datos de un equipo nuevo. La Task 70 puede reutilizar la imagen (añadiendo el cron) en vez de crear otra.
-- **Necesita:** `AEMET_API_KEY` en `app/.env` (en la VM también) para la Task 42; nada más. LB2-1 y LB2-2 pueden empezar ya.
+- **Necesita:** nada (la previsión de Open-Meteo no lleva clave, DEC-16; antes, `AEMET_API_KEY` para la Task 42). LB2-1 y LB2-2 pueden empezar ya.
 
 ### Bloque B3 — Calor y hueco de Getafe
 - **Rama:** `motor/calor-getafe` · Tasks 47–51 en `docs/planes/calor-getafe.md`.
@@ -133,7 +134,7 @@ heat:            # DEC-06 (16/10): «dia de calor» por zona meteosalud, sin niv
   tiebreak: feels_like              # en dia de calor, entre horas validas, la de menor sensTermica (criterio propio)
   source: "Ministerio de Sanidad, Plan Nacional de Actuaciones Preventivas de los Efectos del Exceso de Temperaturas sobre la Salud 2026: Anexo I pag. 41 (umbrales y zonas), Anexo V pag. 52 (grupos de riesgo y horas)"
   own_criterion: true               # los umbrales y zonas son oficiales; la regla de aplicacion no
-  own_criterion_items: [daily_max_from_hourly, day_by_day_no_3day_sum, stroller_kids_as_under_4, avoid_hours_block, feels_like_tiebreak, all_year]
+  own_criterion_items: [daily_max_from_open_meteo, day_by_day_no_3day_sum, stroller_kids_as_under_4, avoid_hours_block, feels_like_tiebreak, all_year]
 ```
 
   - **Ficheros que añade a «Es suyo»:** `app/config/heat_zones.csv` (copia; `docs/` no se monta en el contenedor), `app/api/engine/slots.py` (solo el desempate) y en `app/api/services/recommend.py` solo pasar `companions` y la Tmáx del día a `evaluate_outdoor` y cambiar el aviso de calor. `validate_rules` comprueba las 3 zonas y que la tabla cubre los 179 municipios.

@@ -13,7 +13,7 @@ Este archivo es el contexto completo del proyecto para Claude Code. Se escribió
 - **El proyecto ha sido aprobado** en la fase de ideas. Estamos en **fase de desarrollo** (13–20 oct 2026).
 - **Demo presencial: martes 20 de octubre de 2026**, 10 minutos. Después el jurado accede al prototipo y a los datasets. Ganadores ese mismo día.
 - **Objetivo del equipo:** no solo una demo, sino una **app web usable que se pueda ofrecer directamente** a la ciudadanía (desplegada, con HTTPS, rápida en móvil).
-- **El equipo ya tiene clave de AEMET OpenData.** Va en `app/.env` como `AEMET_API_KEY`, nunca en el repositorio. Esquema y cuota comprobados con la clave el 14/10 (§7.1).
+- **Previsión del tiempo: Open-Meteo, sin clave** (DEC-16, 16/10): sustituye a AEMET OpenData, que limitaba a ~6 peticiones/min por IP y bloqueaba la VM con 429. Los 179 municipios llegan en una petición (§7.1). `AEMET_API_KEY` ya no se usa.
 - **El equipo ya tiene cuenta de Oracle** (acceso de Oracle Academy/OCI para el reto). Las credenciales **nunca** van en el repositorio ni en este archivo: solo en `.env` (ver `.env.example`).
 - **Código de la app en marcha (16/10):** ingesta + normalización + `build_db`, grafo de rutas, API FastAPI (`/activities`, `/recommend`, `/route` y `/location` reales; `/municipality`, `/sources` y `/assistant/*` todavía en 501) y front React; despliegue con Docker Compose. Comandos y flujo en §3.1.
 - **Nombre del proyecto: GoMad** (*Guía de Ocio: Madrid Activo y Deportivo*), decidido el 15/10.
@@ -30,7 +30,7 @@ Este archivo es el contexto completo del proyecto para Claude Code. Se escribió
 8. **Privacidad:** sin registro, sin datos de salud, la ubicación solo se usa en la consulta. Al proveedor de IA no se envía ubicación exacta ni datos personales.
 9. **Explicabilidad y trazabilidad:** cada recomendación lleva su motivo; cada dato mostrado, su fuente y fecha (RF-19); umbrales tomados de fuentes oficiales y citados. **No es consejo médico** (aviso visible).
 10. **Accesibilidad:** móvil primero, WCAG 2.1 AA, cada indicador con icono + color de semáforo + texto (nunca solo color).
-11. **Licencias:** atribución de cada fuente en la app (CKAN Comunidad y Ayuntamiento: CC BY 4.0; OSM: ODbL; AEMET: su aviso legal). Los datasets que publiquemos: CC BY.
+11. **Licencias:** atribución de cada fuente en la app (CKAN Comunidad y Ayuntamiento: CC BY 4.0; OSM: ODbL; Open-Meteo: CC BY 4.0 con la atribución «Weather data by Open-Meteo.com» y enlace a https://open-meteo.com/). Los datasets que publiquemos: CC BY.
 12. **Alcance:** priorizar F1–F5 sobre los pilotos. No añadir funcionalidades ni fuentes nuevas sin preguntar; el plazo es muy corto.
 13. Si cambias requisitos o fuentes, **actualiza `docs/assets/requisitos_fuentes.json` y este archivo**.
 
@@ -72,7 +72,7 @@ docs/prompt_task_executer.md      ← plantilla para ejecutar tareas (executing-
 # solo la primera vez (cada servicio Python tiene su venv; igual en app/api):
 #   cd app/ingest && python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 cd app/ingest && . .venv/bin/activate
-cp ../.env.example ../.env                                                # y poner la clave de AEMET
+cp ../.env.example ../.env                                                # claves de IA/Oracle si hacen falta (la previsión no necesita clave)
 python3 scripts/download_sources.py --list
 python3 scripts/download_sources.py --group full
 python3 scripts/download_sources.py --refresh reference --include-heavy   # mensual
@@ -80,14 +80,14 @@ python3 scripts/download_sources.py --refresh daily                       # 04:0
 python3 scripts/download_sources.py --refresh hourly                      # cada hora
 python3 scripts/download_sources.py --refresh weekly --include-heavy      # OSM (y despues el grafo)
 ```
-`aemet` está en el grupo `minimal` y en el nivel `hourly`: sin `AEMET_API_KEY` en `app/.env` falla (las demás fuentes siguen) y con `AEMET_MUNICIPALITIES=todos` son 179 × 2 peticiones por ejecución, que gastan cuota.
+`open_meteo` está en el grupo `minimal` y en el nivel `hourly`: una sola petición con los 179 puntos de `app/config/forecast_points.csv`, sin clave (DEC-16).
 Capas marcadas PESADAS (no se bajan por defecto; `--include-heavy`): `vpla_redes`, `viales`, `cubierta_terrestre` (~137.000 polígonos: mejor pedirla filtrada por `bbox` del piloto), `aire_historico`, `ay_bancos`, `osm` (~85 MB), `callejero` (~33 MB zip). `--force` descarga aunque la fuente no haya cambiado.
 
-**Inicializar los datos en un equipo nuevo, sin instalar Python** (desde `app/`; 20–30 min la primera vez, Docker con ≥ 6 GB de RAM; la clave de AEMET de `app/.env` si existe):
+**Inicializar los datos en un equipo nuevo, sin instalar Python** (desde `app/`; 20–30 min la primera vez, Docker con ≥ 6 GB de RAM):
 ```bash
 docker compose -f deploy/docker-compose.init.yml run --rm ingest     # descarga, normaliza, gomad.duckdb, realtime.duckdb y grafo regional
 ```
-Opciones: `--skip-download` (rehacer con lo ya descargado) y `--skip-graph`; `INIT_AEMET_MUNICIPALITIES` (por defecto `28065,28079`) y `GOMAD_DATA_PATH` (otra carpeta de datos). Imagen `app/ingest/Dockerfile`, guion `app/ingest/scripts/init_data.sh`. Solo para equipos de desarrollo: no forma parte del despliegue.
+Opciones: `--skip-download` (rehacer con lo ya descargado) y `--skip-graph`; y `GOMAD_DATA_PATH` (otra carpeta de datos). Imagen `app/ingest/Dockerfile`, guion `app/ingest/scripts/init_data.sh`. Solo para equipos de desarrollo: no forma parte del despliegue.
 
 **Levantar la app con Docker Compose** (desde `app/`):
 ```bash
@@ -128,7 +128,7 @@ Los markdown de `docs/` son **contexto del proyecto**: léelos cuando la tarea t
 | `docs/trabajo-paralelo.md` | **Reparto vigente desde el 16/10:** bloques F, M, B1–B5, D y L, cada uno con su rama, sus ficheros («Es suyo»), su rango de Tasks y su plan en `docs/planes/<bloque>.md` (B1: `docs/planes/municipio-fuentes.md`, lotes en `docs/guia-ejecucion.md` §7); reglas para los ficheros compartidos, decisiones del 16/10 ya cerradas, prompt base y orden de fusión | Antes de empezar cualquier bloque de trabajo |
 | `docs/guia-ejecucion.md` | Orden de ejecución por lotes y roles, estado de cada tarea y PR, ciclo EJECUTAR → VERIFICAR (dos conversaciones distintas) → PR | Para saber qué está hecho y qué toca después |
 | `docs/prompt_task_executer.md` / `prompt_task_checker.md` | Plantillas para ejecutar (`superpowers:executing-plans`, TDD, ledger en `.superpowers/`) y verificar en solo lectura; se cambia solo la primera línea (`TAREAS`, `RAMA`, `BASE`) | Cuando la persona pida ejecutar o verificar tareas del plan |
-| `docs/PENDIENTES.md` | Tareas P-00…P-13 (p. ej. P-12 hora de cambio de día de `aire_dia`, P-13 cuota de AEMET) | Al tocar ingesta horaria o AEMET |
+| `docs/PENDIENTES.md` | Tareas P-00…P-13 (p. ej. P-12 hora de cambio de día de `aire_dia`, P-13 cuota de AEMET, superada por DEC-16) | Al tocar ingesta horaria o la previsión |
 | `docs/decisiones-pendientes.md` | Fichas D-01…D-14 con opciones y cifras. Muchas ya están decididas (ver §11); **D-10 «GOATS» está superada: el nombre es GoMad** | Para entender el porqué de una decisión |
 | `docs/informe-datos.md` | Perfil real de las 46 fuentes (filas, cobertura, codificación, CRS) y 12 trampas de datos con su tratamiento | Antes de escribir o cambiar un normalizador |
 | `docs/assets/umbrales.md` | ICA del BOE (bandas, periodos, colores, recomendaciones literales) y calor del plan de Sanidad 2026 (umbrales por zona, regla de niveles, propuesta DEC-06); `heat_zones.csv` = municipio → zona | Antes de tocar `rules.yaml`, `ica_thresholds.yaml` o textos de salud |
@@ -254,7 +254,7 @@ Tablas con nombre en inglés desde el 14/10 (`municipio` → `municipality`, `de
 - `destination(id PK '{source}:{id_origen}', source, name, type [instalacion|parque|area_recreativa|senda|zona_bano], actividades[], covered, exterior, accessible, condition, owner, water, url, ine_code FK, geom, updated)`
 - `air_station(id PK, network [CM|AY], name, area_type, magnitudes[], ine_code, geom)`
 - `air_reading(station_id, magnitude, ts, value, flag)` — formato largo (H01…H24 → filas)
-- `forecast(ine_code, ts, temp, feels_like, precip_prob, precip, wind, sky)`
+- `forecast(ine_code, ts, temp, feels_like, precip_prob, precip, wind, sky, issued, temp_max_day)` — Open-Meteo (DEC-16): `precip_prob` horaria, `issued` = fecha de descarga, `temp_max_day` = Tmáx diaria del día de `ts` (calor, DEC-06)
 - `edge(id, u, v, geom, longitud_m, tipo_via, pct_verde, trafico, fuente_cerca)` — en `app/data/graph/<zona>/edges.parquet`: `length_m`, `highway`, `traffic`, `green_pct` (NaN = municipio sin VPLA), `near_fountain/bench/aed` y `fountain_id/bench_id/aed_id` (punto más cercano a ≤ `poi_radius_m`; la ruta cuenta puntos distintos y solo fuentes con `working IS NOT FALSE`)
 - `route_poi(id, type [fuente|banco|papelera|aseo|area_canina|juegos|dea|biosaludable|supermercado], source, status, working, geom)` — `status`: estado de origen (p. ej. `CERRADA_TEMPORALMENT`), nulo si no hay; `working`: boolean, nulo = sin dato. La ruta solo cuenta `working IS NOT FALSE` (las fuentes fuera de servicio se muestran, no cuentan).
 - `service(id, categoria [salud|farmacia|educacion|social|cultura|transporte], subtipo, ine_code, geom)`
@@ -265,8 +265,8 @@ Código de municipio: INE de 5 dígitos `28` + 3 dígitos (`MUN` en EIEL, `CMUN`
 ### 6.2 Lógica de recomendación (borradores a validar por el equipo)
 - **Filtros duros:** actividad, tiempo, distancia máxima; cubierto si llueve, calor extremo o aire desfavorable.
 - **Puntuación ponderada 0–10:** cercanía, adecuación a la actividad, verde/sombra, aire previsto, meteorología. Pesos por defecto **por definir**; el usuario los cambia (RF-16).
-- **Umbrales:** aire → bandas del **Índice Nacional de Calidad del Aire (MITECO)**: **una sola tabla de bandas**; lo que cambia por población es la recomendación (BOE-A-2020-10426, `umbrales.md` §1.5); calor → umbrales oficiales (Ministerio de Sanidad / AEMET). **Copiarlos de la fuente oficial, no de memoria**, y citarlos en la app.
-- **Mejor franja:** evaluar cada hora con AEMET + patrón horario de la estación (histórico).
+- **Umbrales:** aire → bandas del **Índice Nacional de Calidad del Aire (MITECO)**: **una sola tabla de bandas**; lo que cambia por población es la recomendación (BOE-A-2020-10426, `umbrales.md` §1.5); calor → umbrales oficiales del Ministerio de Sanidad, comparados con la Tmáx prevista de Open-Meteo (DEC-06, DEC-16). **Copiarlos de la fuente oficial, no de memoria**, y citarlos en la app.
+- **Mejor franja:** evaluar cada hora con la previsión horaria de Open-Meteo + patrón horario de la estación (histórico).
 - **Borrador actividad → destino (RF-02), pendiente de cerrar:**
   - *Caminar / pasear:* parques (EIEL, Nomecalles, VPLA zonas verdes, Ayto.), sendas, vías pecuarias, áreas recreativas.
   - *Correr:* lo anterior + pistas de atletismo (EIEL `ATLETISMO`) + nombres con «atletismo».
@@ -288,7 +288,7 @@ Cada fuente se recarga según la frecuencia con que la publica su portal: ni má
 |---|---|---|
 | **1. Referencia** | Al publicarse una versión nueva: comprobación mensual + botón «Recargar todas las fuentes» solo en administración | `eiel_*` (EIEL 2023), `vpla_redes` (planeamiento 2025), `sendas`, `vias_pecuarias`, `municipios`, `zonas_aire`, `areas_recreativas`, `cubierta_terrestre`, `viales`, `padron`, `densidad`, `renta`, `zonas_bano`, `educativos`, `aire_estaciones`, `estaciones_aire_idem`, `ay_aire_estaciones`, `aire_historico`, `aire_zonas` (CKAN, municipio → zona; no estaba en la tabla original), `callejero` |
 | **2. Diario** | Una vez al día, de madrugada (tarea programada) | `sanitarios`, `farmacias`, `desfibriladores`, `atencion_social`, `nmc_*` (Nomecalles), `ay_polideportivos`, `ay_idb`, `ay_piscinas`, `ay_parques`, `ay_fuentes`, `ay_bancos`, `ay_areas_caninas`; OSM **semanal** (rehacer el grafo de rutas es costoso) |
-| **3. Horario** | Cada hora, automático, con caché del último dato válido | `aire_dia`, `ay_aire`, `ay_meteo`, previsión AEMET (respetar su cuota) |
+| **3. Horario** | Cada hora, automático, con caché del último dato válido | `aire_dia`, `ay_aire`, `ay_meteo`, previsión de Open-Meteo (en la API, una petición por hora para los 179; DEC-16) |
 | **4. Bajo demanda** | Al pedirlo el usuario, con caché corta (5–15 min) | `ay_trafico` (cambia cada 5 min); botón de usuario «Actualizar ahora», que **solo** refresca aire, tráfico y previsión, limitado a una vez cada pocos minutos |
 
 **Implementado el 14/10** (`refresh`, `--refresh`, comprobación de cambios por `metadata_modified` / `ETag`-`Last-Modified` / sha256); nivel extra `weekly` para OSM; `aire_zonas` en `reference`. En las capas WFS de IDEM el sha256 ignora el `timeStamp` de la respuesta y los ids `fid-…` que GeoServer genera en cada petición (no manda `ETag` ni `Last-Modified`). Falta la tarea programada por nivel (sábado, S-D2).
@@ -298,7 +298,7 @@ Implementación mínima (no sobredimensionar):
 - **Antes de descargar, comprobar si la fuente ha cambiado** (`metadata_modified` de CKAN o cabecera `Last-Modified`/`ETag`); si no ha cambiado, no se descarga ni se reprocesa.
 - Una tarea programada (cron o el planificador del despliegue) por nivel; tras cada descarga, reprocesar solo las tablas afectadas.
 - Guardar en `data/raw/manifest.json` la fecha de cada recarga y mostrarla en la app («Aire actualizado hace 12 min», RF-19).
-- Nunca un botón público que recargue todo: son ~220 MB, varios minutos, y saturaría los portales y la cuota de AEMET.
+- Nunca un botón público que recargue todo: son ~220 MB, varios minutos, y saturaría los portales y los límites de uso de Open-Meteo.
 - En la demo, el botón de administración enseña que los datos llegan en directo de los portales oficiales (suma en el criterio 1.1).
 
 ### 6.5 Otros usos de IA barajados (DEC-11, 15/10: n.º 1 descartado, se usan palabras clave; n.º 2 pendiente, necesita un LLM; ver §11)
@@ -322,7 +322,7 @@ No hacer: recomendador que aprende del usuario (exige guardar historial), IA que
 | **Ayuntamiento de Madrid** https://datos.madrid.es | CKAN `https://datos.madrid.es/api/3/action/…`; ficha `/dataset/<id>` | **Solo capital.** Suele incluir LATITUD/LONGITUD, pero **no** en bancos (3.733 de 76.640) ni áreas caninas (2 de 112): usar `COORD_GIS_X/Y` (EPSG:25830) y reproyectar |
 | **Tráfico Ayto.** | `https://informo.madrid.es/informo/tmadrid/pm.xml` (cada 5 min) | ~4.000 puntos: `idelem`, `descripcion`, `intensidad`, `ocupacion`, `carga`, `nivelServicio`, `error`, `st_x`, `st_y` (UTM) |
 | **OpenStreetMap** | Geofabrik https://download.geofabrik.de/europe/spain/madrid.html (preferido); Overpass solo para pruebas (overpass-api.de dio 406; funcionó `maps.mail.ru/osm/tools/overpass/api/interpreter`; limita peticiones) | ODbL. Mobiliario muy desigual entre municipios |
-| **AEMET OpenData** *(comprobado 14/10 con la clave del equipo: Getafe 28065, Madrid 28079, San Lorenzo 28131)* | `GET https://opendata.aemet.es/opendata/api/prediccion/especifica/municipio/horaria/{cod_ine_5}` con la clave en la **cabecera `api_key`** (aceptada; no hace falta `?api_key=`) → JSON `{descripcion, estado: 200, datos, metadatos}`; `datos` es una URL firmada (`/opendata/sh/…`, sin clave) → lista con un documento: `elaborado`, `nombre`, `provincia`, `id`, `version`, `origen` (copyright y nota legal) y `prediccion.dia[]` (**3 días**: hoy desde las 08–09 h, mañana 00–23 h, pasado 00–07 h, ~48 h). Claves de cada día: `fecha`, `orto`, `ocaso` (`"08:24"`), `estadoCielo[]` (`{value, periodo, descripcion}`; códigos con sufijo `n` de noche, p. ej. `"17n"`), `precipitacion[]`, `nieve[]`, `temperatura[]`, `sensTermica[]`, `humedadRelativa[]` (`{value, periodo}`, horarios: `periodo` = hora `"09"`), `probPrecipitacion[]`, `probTormenta[]`, `probNieve[]` (franjas de 6 h: `periodo` `"0208"`, `"0814"`, `"1420"`, `"2002"`), `vientoAndRachaMax[]` (alterna `{direccion: ["NE"], velocidad: ["7"], periodo}` y `{value: racha, periodo}`, dos por hora). Todos los `value` son **cadenas**. `temperatura`, `sensTermica` y `humedadRelativa` empiezan una hora después que `precipitacion`/`estadoCielo` el primer día. «Ip» (inapreciable) **no aparece en la muestra** (día sin lluvia): tratar como posible valor no numérico. **Codificación: ISO-8859-15** (`Content-Type: text/plain;charset=ISO-8859-15`): `data/raw/aemet/<ine>.json` guarda los bytes tal cual; la muestra `app/ingest/tests/data/aemet_28065.json` está **re-codificada a UTF-8** por `verify_aemet.py` | **Clave gratuita**: https://opendata.aemet.es/centrodedescargas/altaUsuario. **Cuota:** cabecera `Remaining-request-endpoint` (bajó 13 → 11 → 9, una unidad por petición, contando también la de `datos`); sin cabecera de reinicio. Tras 6 peticiones en ~1 min, la 7.ª dio **HTTP 429** (código HTTP, no `estado` en el JSON); ~100 s después volvió a responder. Ventana exacta sin determinar: con `AEMET_PAUSE_S=1.5` los 179 municipios no caben; decidido en DEC-13 (§11): `AEMET_PAUSE_S=30`, pilotos cada hora y el resto en rotación cada 6 h |
+| **Open-Meteo** *(comprobado 16/10, sin clave; sustituye a AEMET OpenData, DEC-16)* | `GET https://api.open-meteo.com/v1/forecast?latitude=<lat1,lat2,…>&longitude=<lon1,lon2,…>&hourly=temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,wind_speed_10m&daily=temperature_2m_max&forecast_days=3&timezone=Europe%2FMadrid` (URL en `app/config/realtime.yaml`). Con varias coordenadas devuelve una **lista**, un objeto por punto y en el mismo orden; con una sola, un objeto. Cada objeto: `latitude`/`longitude` de la celda del modelo (no las pedidas), `elevation`, `hourly` (`time` `"2026-10-16T00:00"` en hora local sin zona; °C, %, mm, código WMO, km/h) y `daily` (`time`, `temperature_2m_max`). **72 horas** desde las 00:00 de hoy, probabilidad de lluvia **horaria**. **Sin hora de elaboración**: la fecha de la previsión es la de descarga. `daily.temperature_2m_max` no siempre coincide con el máximo de las 24 horas (17/10 en Getafe: 23,3 frente a 23,2): se usa la diaria para el calor (DEC-06). 179 municipios en 0,4–0,7 s, 0,9 MB. Equivalencias: `temperature_2m`→`temp`, `apparent_temperature`→`feels_like`, `precipitation_probability`→`precip_prob`, `precipitation`→`precip`, `wind_speed_10m`→`wind`, `weather_code`→`sky` (texto de `app/config/weather_codes.yaml`, tabla WMO 4677), `daily.temperature_2m_max`→`temp_max_day` | **CC BY 4.0**, atribución obligatoria «Weather data by Open-Meteo.com» con enlace a https://open-meteo.com/. Límites de uso no comercial: 600/min, 5.000/h, 10.000/día y **cada coordenada cuenta**: 179 × 24 ≈ 4.300/día (refresco cada hora). Solo se envían los puntos de `app/config/forecast_points.csv` (un punto por municipio), **nunca la ubicación de la persona** (§2.8). Tras un 429 o error, espera global creciente (120 s → 3.600 s) |
 | **MITECO ICA** | https://www.miteco.gob.es/es/calidad-y-evaluacion-ambiental/temas/atmosfera-y-calidad-del-aire/calidad-del-aire/visualizacion-datos-calidad-del-aire/ica.html | Umbrales oficiales (RF-15) |
 | **IGN MDT05** *(comprobado 15/10 por WCS)* | WCS INSPIRE del IGN, sin clave: `https://servicios.idee.es/wcs-inspire/mdt?SERVICE=WCS&VERSION=2.0.1&REQUEST=GetCoverage&COVERAGEID=Elevacion25830_5&SUBSET=x(<xmin>,<xmax>)&SUBSET=y(<ymin>,<ymax>)&FORMAT=image/tiff` (cobertura `Elevacion25830_5`: 5 m, EPSG:25830; también `Elevacion4326_*`, `Elevacion4258_5`). El Centro de Descargas del CNIG no respondió | GeoTIFF int16 en metros enteros. **Máximo 4096 × 4096 píxeles por petición** (≈ 20 km de lado): pedir por teselas. Getafe (caja de 16,6 × 7,7 km): 10 MB en 1,8 s, alturas 535–700 m. Con 1 m de resolución vertical, calcular la pendiente en tramos largos o suavizada. Desnivel (RF-13, Should; DEC-12) |
 
@@ -351,7 +351,7 @@ La **matriz completa requisito → fuente con enlaces** está en `docs/assets/re
 | Instalaciones deportivas | Nomecalles `deporte` (178) | EIEL (detalle, 155), VPLA «Deportivos», OSM `sport=*`, Ayto. |
 | Parques y verde | VPLA zonas verdes (166) | EIEL parques, Nomecalles parques, áreas recreativas, cubierta terrestre, Ayto. |
 | Aire | Red regional (28) + red Ayto. (24) | Sin estación → la de su zona |
-| Meteo | AEMET por municipio | Estaciones Ayto. |
+| Meteo | Open-Meteo, un punto por municipio (DEC-16) | Estaciones Ayto. |
 | Tráfico | Jerarquía de vías (OSM `highway`, viales IDEM) | Tiempo real en capital |
 | Mobiliario de ruta | OSM | EIEL parques (agua), áreas recreativas, Ayto. |
 | Desfibriladores | CKAN Comunidad | — |
@@ -375,7 +375,8 @@ Municipios con al menos uno: fuentes 152, juegos 143, bancos 88, biosaludables 5
 - Nomecalles `bancos` = oficinas bancarias.
 - Enlaces de Nomecalles caducan en 1 h → pedirlos en cada ingesta.
 - Overpass limita peticiones → usar extracto de Geofabrik.
-- Horas futuras del aire vacías (N) → futuro con AEMET + patrón histórico.
+- Open-Meteo: sin hora de elaboración (fecha = descarga), coordenadas de respuesta de la celda del modelo (no las pedidas: asignar por orden) y Tmáx diaria distinta del máximo horario.
+- Horas futuras del aire vacías (N) → futuro con la previsión de Open-Meteo + patrón histórico.
 - Rutas verdes y autobuses interurbanos en CKAN solo como HTML → sendas IDEM y paradas Nomecalles.
 - Más trampas comprobadas el 14/10 (detalle en `docs/informe-datos.md` §2): `.prj` erróneo o ausente en Nomecalles (forzar EPSG:25830); validación del aire con `T` además de `V`/`N`; `aire_dia` de madrugada trae el día anterior; códigos de municipio sin ceros (`6`, `079`); `aire_zonas` solo con nombres en mayúsculas; comas decimales en farmacias, desfibriladores, estaciones y `pm.xml`; 177 centros de atención social «RESERVADO» (no situables; 175 en la descarga del 16/10); coordenadas fuera de la Comunidad (filtrar por polígono); `CATEGORIA` de Nomecalles `deporte` sin el deporte; padrón, densidad y renta mezclan tipos de territorio (filtrar `Tipo territorio`).
 
@@ -386,7 +387,7 @@ Municipios con al menos uno: fuentes 152, juegos 143, bancos 88, biosaludables 5
 ## 10. Plan hasta la demo (miércoles 14 → martes 20)
 | Día | Objetivo |
 |---|---|
-| Mié 14 | Repo y entorno; decidir almacén (DuckDB vs Oracle), proveedor de IA y nombre; verificar la API de AEMET con la clave del equipo (Madrid 28079, Getafe 28065); ingesta → tablas `municipio`, `destino`, `estacion_aire`, `servicio`; campo `refresco` y comprobación de cambios en el script (§6.4) |
+| Mié 14 | Repo y entorno; decidir almacén (DuckDB vs Oracle), proveedor de IA y nombre; verificar la API de AEMET con la clave del equipo (Madrid 28079, Getafe 28065; sustituida por Open-Meteo el 16/10, DEC-16); ingesta → tablas `municipio`, `destino`, `estacion_aire`, `servicio`; campo `refresco` y comprobación de cambios en el script (§6.4) |
 | Jue 15 | Motor de puntuación + mejor franja + alternativa cubierta; `/recommend`; grafo peatonal de Getafe |
 | Vie 16 | Ruta saludable en Getafe (y capital si da tiempo); `/route`; esqueleto del front |
 | Sáb 17 | Front F1–F4 completo; F5 `/municipality/{ine_code}` |
@@ -405,10 +406,12 @@ Roles sugeridos (equipo de hasta 4): **Datos** (ingesta, modelo, licencias), **M
 
 **Viernes 16/10 (DEC-09, DEC-13, DEC-06; detalle en `docs/decisiones-pendientes.md` y fichas B1–B3 de `docs/trabajo-paralelo.md`):**
 - **DEC-09 · Indicadores F5:** 14 indicadores en 7 categorías (deporte 3, naturaleza 3, movilidad 2, salud 3, educación, conectividad, social); registro regional sin filas → 0, fuente parcial fuera de cobertura → «sin datos»; encaje = lista Sí/No/Sin datos por actividad y perfil + «Cumple N de M», sin nota ni orden (criterio propio).
-- **DEC-13 · Cuota AEMET:** `AEMET_PAUSE_S=30` (4 peticiones/min); cada hora los 3 pilotos + 1/6 del resto (todos cada 6 h, ~16,5 min por ejecución); AEMET solo elabora ~3 veces al día; aviso «previsión antigua» si `elaborado` > 12 h (criterio propio).
+- **DEC-13 · Cuota AEMET (superada por DEC-16):** `AEMET_PAUSE_S=30` (4 peticiones/min); cada hora los 3 pilotos + 1/6 del resto (todos cada 6 h, ~16,5 min por ejecución); AEMET solo elabora ~3 veces al día; aviso «previsión antigua» si `elaborado` > 12 h (criterio propio).
 - **DEC-06 · Calor:** «día de calor» = Tmáx horaria del día > umbral de Sanidad de su zona (35,8 / 37,4 / 39,2 °C, `heat_zones.csv`); mayor, carrito y «con niños» sin exterior de 14 a 19 h y desempate por menor sensación térmica; resto, solo aviso. Umbrales oficiales, regla de aplicación criterio propio; sin niveles.
 - **Mapa, dominio y Getafe:** teselas de OpenFreeMap ya y PMTiles local el lunes (demo sin red) · dominio en DuckDNS · OSM filtrado como fuente de destinos deportivos (centros con `sport` y nombre; pistas y piscinas solo con nombre o acceso público), para el hueco de nadar, tenis y baloncesto en Getafe y en los municipios sin EIEL.
 
-- **DEC-15 · Datos en tiempo real (16/10, bloque B2 rediseñado, `docs/planes/tiempo-real.md`):** aire, previsión y tráfico en memoria de la API (sin `realtime.duckdb`), pedidos en segundo plano; nunca se muestra un dato más viejo que su `max_age` (`config/realtime.yaml`); horas futuras con AEMET horaria y patrón histórico del aire como estimación; AEMET por cola con cuota en la API (sustituye a la rotación de DEC-13); polen como Could, pendiente de aprobar. Cuando se implemente, actualizar §6.4 (el nivel horario pasa a la API).
+- **DEC-15 · Datos en tiempo real (16/10, bloque B2 rediseñado, `docs/planes/tiempo-real.md`):** aire, previsión y tráfico en memoria de la API (sin `realtime.duckdb`), pedidos en segundo plano; nunca se muestra un dato más viejo que su `max_age` (`config/realtime.yaml`); horas futuras con AEMET horaria y patrón histórico del aire como estimación; AEMET por cola con cuota en la API (sustituye a la rotación de DEC-13); polen como Could, pendiente de aprobar. Cuando se implemente, actualizar §6.4 (el nivel horario pasa a la API). La previsión es de Open-Meteo desde DEC-16.
+
+- **DEC-16 · Open-Meteo sustituye a AEMET (16/10):** la API OpenData de AEMET limita a ~6 peticiones/min por IP y bloqueaba la VM durante más de 30 min (429; la web decía «Previsión: sin datos»). Open-Meteo da los 179 municipios en **una** petición, sin clave (CC BY 4.0, atribución en Fuentes). API: `app/api/live/forecast.py`, una petición por hora, espera global creciente tras un fallo, caché `data/live/forecast.json`; ingesta: fuente `open_meteo` (nivel `hourly`) → `clean/forecast/<ine>.parquet` con `temp_max_day`. Puntos: `app/config/forecast_points.csv`. Fuera: cola por municipio, cuota, pilotos, previsión del vecino y `AEMET_*`. El calor (DEC-06) usa la Tmáx diaria de Open-Meteo. Plan: `docs/planes/open-meteo.md` (Tasks 72–79).
 
 **Pendientes:** detalle de pantallas (con la maquetadora, al maquetar) · Select AI + APEX (§6.5 n.º 2, necesita un LLM). Lista completa en `docs/arquitectura.md` §10.
