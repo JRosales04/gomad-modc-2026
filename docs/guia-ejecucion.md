@@ -368,11 +368,11 @@ Bloque B1 de `docs/trabajo-paralelo.md`, dividido en **4 lotes pequeños** (Task
 - Ejecutor: `PLAN=docs/planes/municipio-fuentes.md. Lee antes docs/trabajo-paralelo.md (§1 y ficha B1). Primero usa superpowers:writing-plans para detallar en PLAN SOLO las Tasks de TAREAS, sin cambiar lo que fija la división, y haz commit «Plan: B1 Tasks …». Después usa superpowers:executing-plans con PLAN (no con docs/plan-implementacion.md); ledger en .superpowers/sdd/municipio-fuentes/progress.md.`
 - Verificador: `El plan está en docs/planes/municipio-fuentes.md, no en docs/plan-implementacion.md. Compara con la división (alcance, «Es suyo» y pruebas clave), que escribió otra sesión antes de ejecutar, y con el detalle que añadió el ejecutor; un detalle que contradiga la división sin su Ruling es 🟠. Comprueba que la rama solo toca los ficheros «Es suyo» de sus Tasks y la ficha B1 de docs/trabajo-paralelo.md.`
 
-### M-B1 · MANUAL — Prerrequisitos del bloque (en el PC de sobremesa)
+### M-B1 · MANUAL — Prerrequisitos del bloque (en el equipo donde se ejecute)
 
-- **Qué hace:** deja este PC como el portátil. Le faltan las credenciales de GitHub, `superpowers`, los venvs, `node_modules`, `app/.env` y `app/data`.
+- **Qué hace:** deja listo el equipo donde se va a ejecutar el bloque. Si ya tiene algo de esto (acceso a GitHub, `superpowers`, venvs, `node_modules`, `app/.env`, `app/data`), sáltate ese paso.
 - **Qué hacer:**
-  1. Acceso a GitHub desde la terminal (hoy `git fetch` falla con «Authentication failed»): clave SSH o token. La plantilla del ejecutor hace `git pull --ff-only`.
+  1. Acceso a GitHub desde la terminal (clave SSH o token): `git fetch` tiene que funcionar, porque la plantilla del ejecutor hace `git pull --ff-only`.
   2. Instalar `superpowers` con `/plugin`.
   3. Entornos:
      ```bash
