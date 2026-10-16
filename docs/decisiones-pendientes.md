@@ -219,7 +219,7 @@ Resuelto en `docs/arquitectura.md` §1 (D-13: Docker Compose en VM de OCI). **No
 **Decidido el 16/10 (equipo):**
 - Se elimina AEMET por completo (código, configuración, pruebas y documentación vigente) y la previsión pasa a **Open-Meteo** (`api.open-meteo.com/v1/forecast`, 3 días, horaria).
 - **Una petición por hora** con un punto por municipio (`app/config/forecast_points.csv`: centroide del contorno o, si cae fuera, un punto interior). 179 × 24 ≈ 4.300 coordenadas al día, dentro del límite de uso no comercial (10.000/día, 5.000/h, 600/min).
-- Tras un error o 429, **espera global** que se duplica (120 s → 3.600 s), nunca una petición por tick. Caché de arranque `data/live/forecast.json` (se descarta lo de más de 12 h).
+- Tras un error o 429, **espera global** que se duplica (120 s → 3.600 s), nunca una petición por tick. Caché de arranque `data/live/forecast.json` (se descarta lo de más de 12 h y lo que no lleve `provider: open_meteo`, es decir, la caché de AEMET). `/sources` da como fecha de Open-Meteo la última descarga de la API.
 - **Privacidad:** a Open-Meteo solo van esos 179 puntos, nunca la ubicación de la persona (prueba `test_user_location_never_sent`).
 - **Licencia:** CC BY 4.0, atribución «Weather data by Open-Meteo.com» con enlace a https://open-meteo.com/ en la pantalla de Fuentes.
 - **Calor (DEC-06):** la Tmáx del día es `daily.temperature_2m_max` de Open-Meteo (criterio propio usarla frente al umbral de Sanidad, que se definió con la Tmáx de AEMET).
