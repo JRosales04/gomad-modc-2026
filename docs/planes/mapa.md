@@ -8,7 +8,7 @@
 
 **Arquitectura:** `MapView.tsx` conserva su interfaz (`markers`, `selectedId`, `origin`, `route`, `secondaryRoute`, `className`) y añade `onSelect`. Decide qué pintar: si el navegador tiene WebGL, carga **en diferido** (`React.lazy`) `MapCanvas.tsx`, que es el único módulo que importa `maplibre-gl` y `react-map-gl/maplibre` (así MapLibre, ~800 KB, no entra en el paquete inicial); si no hay WebGL, si MapLibre falla (límite de error) o mientras carga, pinta el esquema SVG actual. jsdom no tiene WebGL (`setupTests.ts` devuelve `null` en `getContext`), así que las pruebas de las demás pantallas siguen viendo el esquema sin cambiar nada; las pruebas del mapa simulan `react-map-gl/maplibre`. El mapa entero sigue `aria-hidden` y fuera del orden de tabulación: la lista es el equivalente completo (RF-11).
 
-**Stack:** React 19, TypeScript 6, Vite 8, Vitest 4 + Testing Library + vitest-axe · `maplibre-gl@5.24.0` · `react-map-gl@8.1.3` (entrada `react-map-gl/maplibre`).
+**Stack:** React 19, TypeScript 6, Vite 8, Vitest 4 + Testing Library + vitest-axe · `maplibre-gl@6.11.2` · `react-map-gl@8.1.3` (entrada `react-map-gl/maplibre`).
 
 ## Restricciones globales
 
@@ -45,7 +45,7 @@
 
 - [ ] **Paso 1: dependencias**
 
-Run: `npm install maplibre-gl@5.24.0 react-map-gl@8.1.3 --save-exact` y después `npm ci`.
+Run: `npm install maplibre-gl@6.11.2 react-map-gl@8.1.3 --save-exact` y después `npm ci`.
 Esperado: `package.json` con las dos en `dependencies` sin `^`; `npm ls react-map-gl maplibre-gl` sin `UNMET PEER`.
 
 - [ ] **Paso 2: pruebas que fallan** — `src/components/MapView.test.tsx`. Arriba, el simulacro de `react-map-gl/maplibre` (sirve para las tres Tasks): `Map` es un `forwardRef` que expone `{ fitBounds: fitBoundsMock }` por `useImperativeHandle`, pinta `<div data-testid="maplibre" data-style={mapStyle}>{children}</div>` y guarda sus props en `lastMapProps`; `Marker` pinta `<div data-lon data-lat onClick={() => onClick?.({ originalEvent: { stopPropagation() {} } })}>{children}</div>`; `Source` pinta `<div data-source={id} data-coords={JSON.stringify(data.coordinates)}>{children}</div>`; `Layer` pinta `<div data-layer={id} />`. Un `withWebGL()` hace `vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({} as never)`.
