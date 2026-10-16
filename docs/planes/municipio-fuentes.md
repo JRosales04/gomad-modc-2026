@@ -1246,3 +1246,34 @@ El verificador (⚠️ APTO con observaciones) escaló un Important: «Nadar: no
 - **Es suyo:** `app/frontend/src/data/municipality.ts`, `src/data/sources.ts`, sus pruebas y, solo para los textos de ejemplo, `Municipality.tsx` y `Sources.tsx`.
 - **Pruebas clave:** `npm test`, `npm run lint` y `npm run build` en verde; error 404/503 → estado de error con «Reintentar»; sin llamadas de red en las pruebas.
 - **Terminado cuando:** Municipio y Fuentes muestran datos reales en `npm run dev` con la API local.
+
+#### Detalle de la Task 39 (ejecutor de LB1-4, 16/10)
+
+**Rol:** Front · **Servicio:** `app/frontend/` · **Depende de:** Task 37 (parámetros `activities`, `profile`, `companions` de `/municipality`, ya en `main`) y Task 38 (`/sources`) · **Duración:** 45 min
+
+**Ficheros:** Modificar `src/data/municipality.ts`, `src/data/sources.ts`, `src/test/http.test.ts` (pruebas en modo real con `fetch` simulado); en el commit de textos, `src/components/Municipality.tsx`, `src/components/Sources.tsx`, `src/test/Municipality.test.tsx` y `src/test/Sources.test.tsx`.
+
+**Decisiones de esta Task:**
+- Mismo patrón que `recommend.ts` y `location.ts`: `if (sampleDataMode()) return simulate(mock)`; si no, `getJson` (prefijo `/api`, errores como `ApiError` con su código). En `MODE=test` nada cambia: sin red.
+- `getMunicipality(ineCode, prefs?)`: `prefs = { activities?: string[]; profile?: Profile; companions?: Companion[] }`. La query repite el parámetro (`activities=walk&activities=padel&companions=dog`), que es lo que espera FastAPI. `profile` solo va si no es `general` (en el servidor es el valor por defecto) y sin preferencias no hay `?`. El código INE va con `encodeURIComponent`.
+- **Ruling: `listMunicipalities` sigue con la lista estática** de `mock/municipalities.ts` (179 municipios de IDEM, CC BY 4.0, con su centro) en los dos modos. El contrato no tiene endpoint de lista (P-09), `/location` necesita texto y un endpoint nuevo sería una funcionalidad no pedida.
+- Para que la llamada lleve «las preferencias del perfil», `Municipality.tsx` pasa `profile` y `companions` de `useAppState().preferences` (2 líneas, sin diseño; ver Ruling). Las actividades no se envían porque el estado no guarda actividades preferidas.
+- Textos: en un commit aparte se quitan solo el aviso «Cifras de ejemplo…» de Municipio y el párrafo «Lista de ejemplo…» de Fuentes. Las pruebas que los buscaban pasan a comprobar que ya no están.
+- Los estados de error con «Reintentar» (503) y el 404 legible ya tienen prueba en `Municipality.test.tsx` y `Sources.test.tsx`. Aquí se prueba que la función real lanza `ApiError` con el código, que es lo que esas pantallas consumen.
+
+**Interfaces:**
+- Consume: `GET /api/municipality/{ine_code}?activities=…&profile=…&companions=…` → `MunicipalityResponse`; `GET /api/sources` → `SourcesResponse`. El contrato no cambia, así que no hace falta `npm run contract`.
+- Produce: `getMunicipality(ineCode: string, prefs?: MunicipalityPrefs): Promise<MunicipalityResponse>`, `export interface MunicipalityPrefs` y `getSources(): Promise<SourcesResponse>`. `listMunicipalities()` no cambia.
+
+- [ ] **Paso 1: pruebas que fallan.** En `src/test/http.test.ts`, con `vi.stubEnv("MODE", "production")` y `fetch` simulado:
+  - «fuera de las pruebas, getMunicipality llama a /api/municipality con las preferencias»: `getMunicipality("28065", { activities: ["walk", "padel"], profile: "senior", companions: ["dog"] })` → URL `/api/municipality/28065?activities=walk&activities=padel&profile=senior&companions=dog`; sin preferencias o con `profile: "general"` → `/api/municipality/28065`.
+  - «getMunicipality con 404 o 503 lanza ApiError con su código»: 404 → `status 404`; 503 con `detail` → `status 503` y el mensaje del `detail`.
+  - «fuera de las pruebas, getSources llama a GET /api/sources».
+- [ ] **Paso 2:** `npx vitest run src/test/http.test.ts` → Esperado: FAIL en las 3 pruebas nuevas (la función sigue devolviendo el ejemplo y `fetch` no se llama).
+- [ ] **Paso 3:** implementar `municipality.ts` y `sources.ts`; en `Municipality.tsx`, pasar `profile` y `companions`.
+- [ ] **Paso 4:** `npx vitest run src/test/http.test.ts` → Esperado: todas pasan. `npm test` → Esperado: todo en verde.
+- [ ] **Paso 5: commit** `Front: Municipio y Fuentes llaman a la API real (B1 Task 39)`.
+- [ ] **Paso 6:** cambiar las pruebas de textos (`Municipality.test.tsx`: «Cifras de ejemplo» ya no está; `Sources.test.tsx`: «Lista de ejemplo» ya no está). `npx vitest run src/test/Municipality.test.tsx src/test/Sources.test.tsx` → Esperado: FAIL. Quitar los dos textos → Esperado: PASS.
+- [ ] **Paso 7:** `npm test && npm run lint && npm run build` → Esperado: verde. **Commit** `Front: quitar los avisos de datos de ejemplo de Municipio y Fuentes (B1 Task 39)`.
+
+**Terminado cuando:** con `uvicorn` en `:8000` y `npm run dev`, Municipio (Getafe 28065, Madrid 28079, Patones 28107) y Fuentes muestran datos reales.
