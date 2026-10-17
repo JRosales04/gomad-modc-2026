@@ -362,9 +362,9 @@ La **matriz completa requisito → fuente con enlaces** está en `docs/assets/re
 | Servicios | CKAN Comunidad | EIEL, panel de barrios |
 | Movilidad (F5) | Nomecalles paradas, metro, cercanías | Bici pública |
 | Conectividad (F5) | EIEL núcleos (155) | Resto: «sin datos» |
-
-Indicadores F5 (C3, 17/10, `docs/planes/indicadores-municipio.md`): «Instalaciones deportivas» une Nomecalles + EIEL + Ayto. + OSM sin contar dos veces un punto a ≤ `dedupe_radius_m` de otra fuente (179 municipios); «Zonas verdes por habitante» usa VPLA y, en los 12 sin VPLA, OSM (`osm_green`, incluye bosque); campo `complement` de `indicators.yaml`. La columna `source` de `municipality_indicator` lleva las fuentes usadas en ese municipio separadas por comas (la API pone la primera en `source` y el resto en `extra_sources`). Solo `good_3g_pct` sigue «sin datos» (24 fuera de EIEL).
 | Comercio (F6) | Nomecalles (grandes superficies) | OSM `shop=supermarket/convenience`, censo de locales Ayto. |
+
+Indicadores F5 (C3, 17/10, `docs/planes/indicadores-municipio.md`): «Instalaciones deportivas» une Nomecalles + EIEL + Ayto. + OSM sin contar dos veces un punto a ≤ `dedupe_radius_m` de otra fuente ni a ≤ `same_name_radius_m` con el mismo nombre (radios de `recommend.yaml`; 179 municipios); «Zonas verdes por habitante» usa VPLA y, en los 12 sin VPLA, solo parques de OSM (`osm_parks` de `indicators.yaml` → `clean/osm_parks.parquet`, que escribe `osm_green.py`; sin bosque ni pradera); campo `complement` de `indicators.yaml`. La columna `source` de `municipality_indicator` lleva las fuentes usadas en ese municipio separadas por comas (la API pone la primera en `source` y el resto en `extra_sources`). Solo `good_3g_pct` sigue «sin datos» (24 fuera de EIEL).
 
 ### 7.4 Mobiliario en OSM (6/10/2026, 30.672 elementos)
 Municipios con al menos uno: fuentes 152, juegos 143, bancos 88, biosaludables 59, papeleras 57, áreas caninas 57, aseos 56. Nivel A (≥50 bancos, ≥10 papeleras, ≥5 fuentes) 16 municipios; B 88; C 64; nada 11. En la app: mostrar «donde hay datos» con aviso de cobertura. MVP de ruta: fuentes, bancos, sombra, áreas caninas, juegos, desfibriladores.
