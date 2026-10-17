@@ -262,7 +262,7 @@ Tablas con nombre en inglés desde el 14/10 (`municipio` → `municipality`, `de
 - `edge(id, u, v, geom, longitud_m, tipo_via, pct_verde, trafico, fuente_cerca)` — en `app/data/graph/<zona>/edges.parquet`: `length_m`, `highway`, `traffic`, `green_pct` (NaN = municipio sin VPLA), `near_fountain/bench/aed` y `fountain_id/bench_id/aed_id` (punto más cercano a ≤ `poi_radius_m`; la ruta cuenta puntos distintos y solo fuentes con `working IS NOT FALSE`)
 - `route_poi(id, type [fuente|banco|papelera|aseo|area_canina|juegos|dea|biosaludable|supermercado], source, status, working, geom)` — `status`: estado de origen (p. ej. `CERRADA_TEMPORALMENT`), nulo si no hay; `working`: boolean, nulo = sin dato. La ruta solo cuenta `working IS NOT FALSE` (las fuentes fuera de servicio se muestran, no cuentan). Fuentes: Ayuntamiento (capital), desfibriladores de la Comunidad y mobiliario de OSM (`bench`, `fountain`, `bin`, `playground`, `dog_area`; OSM `drinking_water=no` u `operational_status=closed` → `working` false); en la capital no se cargan de OSM los tipos que da el Ayuntamiento (`routing.yaml` `osm_poi.skip_where_official`) y los DEA son solo de la Comunidad.
 - `service(id, categoria [salud|farmacia|educacion|social|cultura|transporte], subtipo, ine_code, geom)`
-- `municipality_indicator(ine_code, categoria, indicador, valor (NULL = sin datos), unidad, anio, source)`
+- `municipality_indicator(ine_code, categoria, indicador, valor (NULL = sin datos), unidad, anio, source)` — `source`: ids separados por comas (C3)
 
 Código de municipio: INE de 5 dígitos `28` + 3 dígitos (`MUN` en EIEL, `CMUN` en Nomecalles, `CD_MUNICIPIO` en VPLA). Madrid = 28079, Getafe = 28065, San Lorenzo de El Escorial = 28131.
 
@@ -364,6 +364,8 @@ La **matriz completa requisito → fuente con enlaces** está en `docs/assets/re
 | Movilidad (F5) | Nomecalles paradas, metro, cercanías | Bici pública |
 | Conectividad (F5) | EIEL núcleos (155) | Resto: «sin datos» |
 | Comercio (F6) | Nomecalles (grandes superficies) | OSM `shop=supermarket/convenience`, censo de locales Ayto. |
+
+Indicadores F5 (C3, 17/10, `docs/planes/indicadores-municipio.md`): «Instalaciones deportivas» une Nomecalles + EIEL + Ayto. + OSM sin contar dos veces un punto a ≤ `dedupe_radius_m` de otra fuente ni a ≤ `same_name_radius_m` con el mismo nombre (radios de `recommend.yaml`; 179 municipios); «Zonas verdes por habitante» usa VPLA y, en los 12 sin VPLA, solo parques de OSM (`osm_parks` de `indicators.yaml` → `clean/osm_parks.parquet`, que escribe `osm_green.py`; sin bosque ni pradera); campo `complement` de `indicators.yaml`. La columna `source` de `municipality_indicator` lleva las fuentes usadas en ese municipio separadas por comas (la API pone la primera en `source` y el resto en `extra_sources`). Solo `good_3g_pct` sigue «sin datos» (24 fuera de EIEL).
 
 ### 7.4 Mobiliario en OSM (6/10/2026, 30.672 elementos)
 Municipios con al menos uno: fuentes 152, juegos 143, bancos 88, biosaludables 59, papeleras 57, áreas caninas 57, aseos 56. Nivel A (≥50 bancos, ≥10 papeleras, ≥5 fuentes) 16 municipios; B 88; C 64; nada 11. En la app: mostrar «donde hay datos» con aviso de cobertura. MVP de ruta: fuentes, bancos, sombra, áreas caninas, juegos, desfibriladores.
