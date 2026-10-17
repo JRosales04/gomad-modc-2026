@@ -478,3 +478,35 @@ Run: `cd app/api && .venv/bin/pytest tests/services/test_map_points.py -q` · Es
 - [ ] **Paso 3: commit** `Front: Estas aqui en tiempo real y buscar desde aqui (Task 149)`.
 
 **Terminado cuando:** las tres peticiones del equipo funcionan con pruebas; informe con contrato cambiado y qué desplegar (imágenes `api` y `frontend`, sin datos nuevos).
+
+---
+
+## Observaciones del verificador de C2 (Tasks 150–154)
+
+> 17/10, tras «APTO con observaciones». Mismas restricciones que C2. Commits con «(verificador)».
+
+### Task 150: «Lugares a la vista» accesible con teclado
+**Rol:** Front · **Ficheros:** crear `src/components/NearbyList.tsx`; modificar `MapCanvas.tsx`, `useNearbyPoints.ts` (centro de la vista pedida), `mapUtils.ts` (`NEARBY_LIST_SIZE = 8`, `closestPoints`), `src/test/mapMock.tsx`, `src/styles/map.css`; pruebas en `src/test/MapNearby.test.tsx`.
+**Interfaces:** `closestPoints(points, center, n)`; `NearbyList({points, onPick})` → `<details><summary>Lugares a la vista (n)</summary><ul role="list"><li><button>`: icono + «Tipo: nombre» (+ «fuera de servicio»). Al pulsarlo: pin resaltado en el mapa (`map-marker--highlight`, `role="img"`) y anuncio en el `role="status"`. Sin peticiones extra.
+- [ ] Pruebas que fallan: `closestPoints ordena por cercania al centro y corta en N`, `la lista de lugares a la vista se activa con teclado, resalta y anuncia`, `la lista no hace peticiones extra`, axe. → PASS. Commit.
+
+### Task 151: aviso de cobertura en la leyenda
+**Rol:** Front · **Ficheros:** `MapLegend.tsx`, pruebas.
+- Pistas con «juegos» y «donde hay datos» (CLAUDE.md §7.4); a zoom ≥ 15, «Sin datos en esta zona: …» con los tipos de punto útil que no aparecen.
+- [ ] Pruebas que fallan → PASS. Commit.
+
+### Task 152: tipo «piscina» sin duplicar `pool_activity`; `MapPointKind` derivado
+**Rol:** Front + Motor · **Ficheros:** `mapIcons.ts`, `MapCanvas.tsx`, `Results.tsx`, `RouteView.tsx`, `schemas.py`, pruebas.
+- `destinationKind(type)` ya no sabe nada de «swim»: el pin de un resultado toma el `kind` que la API dio a ese mismo id en `/map/points` (que decide con `pool_activity`); sin él, el `type` del destino.
+- `MapPointKind = Literal[MapDestinationKind, MapPoiKind]` sin cambiar el JSON del contrato (`test_contract`).
+- [ ] Pruebas que fallan → PASS. Commit.
+
+### Task 153: «Buscar desde aquí» y seguimiento
+**Rol:** Front · **Ficheros:** `Results.tsx`, `livePosition.ts`, `map.css`, pruebas.
+- Fuera de la Comunidad → `LOCATION_MESSAGES.outside` (no se reutiliza el municipio anterior).
+- Anuncio (`role="status"`, siempre presente) separado del botón.
+- Limitación con cola: la última posición pendiente se aplica al vencer `LIVE_MIN_INTERVAL_MS`.
+- [ ] Pruebas que fallan → PASS. Commit.
+
+### Task 154: menores de la leyenda y pruebas
+- «… fuera de servicio» con el icono y la etiqueta de su tipo; comentario de prueba sin tildes. Commit.
