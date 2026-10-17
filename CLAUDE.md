@@ -103,6 +103,7 @@ Las claves de `app/.env` solo llegan al contenedor `api`; Caddy (`frontend`) rec
 **Flujo de datos** (cada paso lee lo que deja el anterior en `app/data/`; `GOMAD_DATA_DIR` y `GOMAD_CONFIG_DIR` cambian las rutas, por defecto `app/data` y `app/config`):
 1. `app/ingest/scripts/download_sources.py` → `data/raw/<fuente>/` + `manifest.json`.
 2. `cd app/ingest && python -m normalize [fuente…]` → GeoParquet limpio (un módulo por dominio en `normalize/`; una fuente rota no para el resto y se conserva el parquet anterior).
+2b. `python osm_green.py` → `clean/osm_green.parquet` (áreas verdes de OSM con las etiquetas `osm_green` de `routing.yaml`; ~70 s, tras descargar `osm` y antes de `build_db main`). Sin él, `build_db` deja `green` NULL fuera de VPLA.
 3. `python -m build_db main | realtime | all` → `data/gomad.duckdb` y `data/realtime.duckdb` (se escriben en un fichero temporal y se sustituyen de golpe; la API los abre en solo lectura).
 4. `python graph.py [28065 | <ine> | all]` → `data/graph/<zona>/` (nodos y `edges.parquet`) desde el extracto OSM; `all` = grafo regional.
 
@@ -253,7 +254,7 @@ Soporte: Discord https://discord.gg/ZfNFQvrRb · Web: https://datathon-mad.sel.i
 ### 6.1 Modelo de datos destino
 Tablas con nombre en inglés desde el 14/10 (`municipio` → `municipality`, `destino` → `destination`, `estacion_aire` → `air_station`, `lectura_aire` → `air_reading`, `prevision` → `forecast`, `tramo` → `edge`, `poi_ruta` → `route_poi`, `servicio` → `service`, `indicador_municipio` → `municipality_indicator`); columnas en inglés según `build_db.py` (Task 19 del plan); las que Task 19 no define siguen en español y los campos se fijan en el contrato y en `build_db.py`.
 - `municipality(ine_code PK, name, geom, population, densidad, renta_media, zona_aire, in_eiel, in_vpla, piloto_ruta)`
-- `destination(id PK '{source}:{id_origen}', source, name, type [instalacion|parque|area_recreativa|senda|zona_bano], actividades[], covered, exterior, accessible, condition, owner, water, url, ine_code FK, geom, updated)`
+- `destination(id PK '{source}:{id_origen}', source, name, type [instalacion|parque|area_recreativa|senda|zona_bano], actividades[], covered, exterior, accessible, condition, owner, water, url, ine_code FK, geom, updated)` — `green`: fracción de 300 m alrededor en zona verde; VPLA y, en los municipios sin VPLA con áreas verdes en OSM, OSM (`clean/osm_green.parquet`); NULL si no hay ninguna
 - `air_station(id PK, network [CM|AY], name, area_type, magnitudes[], ine_code, geom)`
 - `air_reading(station_id, magnitude, ts, value, flag)` — formato largo (H01…H24 → filas)
 - `forecast(ine_code, ts, temp, feels_like, precip_prob, precip, wind, sky, issued, temp_max_day)` — Open-Meteo (DEC-16): `precip_prob` horaria, `issued` = fecha de descarga, `temp_max_day` = Tmáx diaria del día de `ts` (calor, DEC-06)
@@ -352,7 +353,7 @@ La **matriz completa requisito → fuente con enlaces** está en `docs/assets/re
 | Capa | Principal | Complementos |
 |---|---|---|
 | Instalaciones deportivas | Nomecalles `deporte` (178) | EIEL (detalle, 155), VPLA «Deportivos», OSM `sport=*`, Ayto. |
-| Parques y verde | VPLA zonas verdes (166) | EIEL parques, Nomecalles parques, áreas recreativas, cubierta terrestre, Ayto. |
+| Parques y verde | VPLA zonas verdes (166) | EIEL parques, Nomecalles parques, áreas recreativas, cubierta terrestre, Ayto.; verde de destinos y rutas fuera de VPLA: áreas verdes de OSM (`osm_green`) |
 | Aire | Red regional (28) + red Ayto. (24) | Sin estación → la de su zona |
 | Meteo | Open-Meteo, un punto por municipio (DEC-16) | Estaciones Ayto. |
 | Tráfico | Jerarquía de vías (OSM `highway`, viales IDEM) | Tiempo real en capital |
