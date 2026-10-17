@@ -31,7 +31,7 @@
 
 - **R1 · Categoría de una hora prevista:** igual que la medida (`live/air.py:air_categories`): media móvil de `period_hours` por contaminante (O₃ 8 h, PM 24 h, NO₂ 1 h) en `[t − (h−1), t]`, solo con `min_coverage`; categoría = la peor de los contaminantes. La serie CAMS lleva `past_days=1` para que las medias de las primeras horas de hoy estén completas. Sin SO₂ (la ficha pide O₃, NO₂, PM10, PM2.5). El valor horario de CAMS en `t` se toma como la hora que acaba en `t`, como `h01…h24` (error ≤ 1 h). Coste si me equivoco: una categoría desplazada una hora.
 - **R2 · Qué dato usa cada hora:** hora en curso (= hora de `now`) y anteriores → medición real (`category_at`); si no hay medición válida, la previsión. Horas futuras → previsión del municipio del destino; si no la hay, como hoy (última medición durante `air_reading_valid_h`). Coste: si CAMS se desvía mucho de la estación, la hora futura puede cambiar de categoría bruscamente respecto a la actual.
-- **R3 · «Previsto» sin contrato:** las razones de aire de una hora prevista terminan en « (previsto)»; `sources` del resultado lleva `DataSource(source="cams_air", label="Calidad del aire prevista (CAMS, Open-Meteo)", date=<descarga>)` y la explicación lo cita en «Fuentes: …». Coste: el front no puede pintar distinto la casilla de una hora prevista (haría falta un campo nuevo).
+- **R3 · «Previsto» sin contrato:** las razones de aire de una hora prevista terminan en « (prevista)» (concuerda con «Calidad del aire»); `sources` del resultado lleva `DataSource(source="cams_air", label="Calidad del aire prevista (CAMS, Open-Meteo)", date=<descarga>)` y la explicación lo cita en «Fuentes: …». Coste: el front no puede pintar distinto la casilla de una hora prevista (haría falta un campo nuevo).
 - **R4 · `/sources` sin fecha de recarga de CAMS:** `services/sources.py` es de la fila 1; la entrada `cams_air` sale con su etiqueta, editor y licencia pero `last_refresh` nulo. Se añade después con 2 líneas (como `open_meteo`) cuando entre la fila 1. Coste: en la página de fuentes no se ve «actualizado hace…» de CAMS.
 
 ## Review Focus
@@ -106,16 +106,16 @@
 
 **Interfaces:**
 - Consume: `AirForecastFeed.get(ine)` (Task 91).
-- Produce: `air_forecast_feed(repo) -> AirForecastFeed | None` (lee `repo.live.air_forecast`; las pruebas lo sustituyen con `monkeypatch`); `PREDICTED = " (previsto)"`; fuente `cams_air`.
+- Produce: `air_forecast_feed(repo) -> AirForecastFeed | None` (lee `repo.live.air_forecast`; las pruebas lo sustituyen con `monkeypatch`); `PREDICTED = " (prevista)"`; fuente `cams_air`.
 
 - [ ] **Step 1: pruebas que fallan** (feed falso con `get(ine)` que devuelve categorías por hora para `28065` e `issued = NOW`):
-  - `test_future_hours_use_air_forecast`: ventana 10–15 h, medición «good» a las 09 h, previsión «poor» de 11 h en adelante, perfil `sensitive` → `hours[0].aqi_category == "good"`, `hours[1..].aqi_category == "poor"`, las razones de las horas 11+ que empiezan por «Calidad del aire» terminan en « (previsto)», hay una fuente `cams_air` con «prevista» en la etiqueta y la explicación contiene «Calidad del aire prevista».
+  - `test_future_hours_use_air_forecast`: ventana 10–15 h, medición «good» a las 09 h, previsión «poor» de 11 h en adelante, perfil `sensitive` → `hours[0].aqi_category == "good"`, `hours[1..].aqi_category == "poor"`, las razones de las horas 11+ que empiezan por «Calidad del aire» terminan en « (prevista)» (concuerda con «Calidad del aire»), hay una fuente `cams_air` con «prevista» en la etiqueta y la explicación contiene «Calidad del aire prevista».
   - `test_current_hour_without_measurement_uses_forecast`: `air=False` en `build_mini_data` y previsión «fair» → `hours[0].aqi_category == "fair"` y no sale el aviso «Aire: sin medición reciente cerca…».
   - `test_window_tomorrow_uses_forecast`: ventana mañana 08–10 h (con previsión del tiempo para esas horas) → todas las horas con la categoría prevista.
   - `test_without_air_forecast_behaves_as_before`: feed `None` → igual que `test_air_from_nearest_station_with_coverage` (última hora `None`) y sin fuente `cams_air`.
   - `test_covered_site_has_no_cams_source`: el polideportivo cubierto no lleva `cams_air`.
 - [ ] **Step 2:** `.venv/bin/pytest tests/services/test_recommend.py -q` → Esperado: las 5 nuevas FAIL (`air_forecast_feed` no existe / sin «previsto»).
-- [ ] **Step 3:** implementar R2 y R3 en `recommend.py`: `recommend()` pasa a `_Run` la hora en curso (`window[0]` si es la de `now`, ya que `window_hours` empieza en ella); `_hour_contexts` elige medición o previsión por hora y guarda qué horas son previstas por clave; `score` añade « (previsto)» a las razones de aire de esas horas; `_sources` añade `cams_air` si algún hora no cubierta la usa; el filtro de fuentes de la explicación incluye `cams_air`.
+- [ ] **Step 3:** implementar R2 y R3 en `recommend.py`: `recommend()` pasa a `_Run` la hora en curso (`window[0]` si es la de `now`, ya que `window_hours` empieza en ella); `_hour_contexts` elige medición o previsión por hora y guarda qué horas son previstas por clave; `score` añade « (prevista)» a las razones de aire de esas horas; `_sources` añade `cams_air` si algún hora no cubierta la usa; el filtro de fuentes de la explicación incluye `cams_air`.
 - [ ] **Step 4:** `.venv/bin/pytest -m "not slow" -q` → Esperado: todo PASS.
 - [ ] **Step 5:** commit `Motor: /recommend usa el aire previsto de CAMS en las horas futuras (Task 92)`.
 
