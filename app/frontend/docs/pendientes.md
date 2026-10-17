@@ -91,6 +91,11 @@ Depende de que el contrato (Task 11) esté en `main`: `app/frontend/src/api/open
 - [x] `role="list"` en listas con `list-style: none` (VoiceOver); nombre «Ajustar preferencias» en los dos botones «Ajustar»; quitar CSS muerto (`.filter-chip`, `.results-filter-chips`). *(15/10)*
 - [ ] Categorías del municipio como `h3`; fecha absoluta con `<time>` en Fuentes; números del mapa ilegibles (se va con MapLibre); `useAsync` escribe un ref en el render.
 
+### B3. Corrección C2 del mapa (17/10, hecha por el agente a petición del equipo)
+- [x] **Mapa explorable:** al mover o ampliar el mapa (Resultados y Ruta) se piden a `GET /api/map/points` los destinos de la zona visible desde el zoom 13 y, desde el 15, también fuentes, bancos, desfibriladores y áreas caninas; MapLibre los agrupa (clusters). Constantes en `components/mapUtils.ts`; topes de la API en `app/config/map.yaml`. Plan: `docs/planes/mapa.md`, Tasks 140–149.
+- [x] **Pines por tipo** (`components/mapIcons.ts`, `MapPin.tsx`) con Material Symbols, texto alternativo y leyenda plegable (`MapLegend.tsx`); tocar un punto lo nombra en un `role="status"`.
+- [x] **«Estás aquí» en tiempo real** (`data/livePosition.ts`): `watchPosition` solo si la ubicación vino del GPS o el permiso ya estaba dado; en Resultados, a más de 300 m del origen aparece «Buscar desde aquí» (no recalcula solo).
+
 ## C. Aplazado
 
 - [ ] **Iconos:** Google Material Symbols con un fichero `.woff`/`.woff2` propio en `public/fonts/` (sin pedir nada a Google), `@font-face` y clase en `icons.css`. Decidir si se recorta (el `.woff2` completo de Rounded pesa 5,4 MB). Mientras tanto, solo **cerrar el comentario de `icons.css:1`**, que está abierto. Cuando lleguen: icono + color + texto en cada indicador y en la barra inferior. *(15/10: comentario de `icons.css` cerrado; componente `Icon` ya colocado en pastillas, actividades y categorías.)*
