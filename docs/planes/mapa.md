@@ -510,3 +510,8 @@ Run: `cd app/api && .venv/bin/pytest tests/services/test_map_points.py -q` · Es
 
 ### Task 154: menores de la leyenda y pruebas
 - «… fuera de servicio» con el icono y la etiqueta de su tipo; comentario de prueba sin tildes. Commit.
+
+### Task 155: «Sin datos en esta zona» solo con una respuesta que lo pruebe (segundo verificador)
+**Rol:** Front · **Ficheros:** `useNearbyPoints.ts` (tipos pedidos de la respuesta aplicada), `MapLegend.tsx` (prop `checkedPoiKinds`), `MapCanvas.tsx`, pruebas en `src/test/MapNearby.test.tsx`.
+- La línea sale solo si la última respuesta aplicada pidió esos tipos (zoom ≥ 15) y no está truncada; con `nearby` null (petición en curso al acercar, sin red) no sale.
+- [ ] Pruebas que fallan: leyenda sin tipos comprobados o truncada no dice «Sin datos»; al acercar de 14 a 15 con la petición en curso o fallida, tampoco. → PASS. Commit «Front: … (verificador)».
