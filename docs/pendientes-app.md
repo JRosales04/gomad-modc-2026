@@ -162,7 +162,7 @@ ssh -i ~/.ssh/gomad-oci.key ubuntu@YOUR_SERVER_IP "cd ~/GoMad && GOMAD_URL=https
 ```
 
 **Si la fila cambia datos** (`gomad.duckdb`, `graph/`, `clean/`), mientras no esté la fila 1: regenerarlos en un PC y copiarlos.
-1. Regenerar, desde `app/ingest`: `.venv/bin/python -m normalize`, luego `.venv/bin/python -m build_db all`, y `.venv/bin/python graph.py all` si cambia el grafo.
+1. Regenerar, desde `app/ingest`: `.venv/bin/python -m normalize`, `.venv/bin/python osm_green.py`, `.venv/bin/python osm_poi.py`, luego `.venv/bin/python -m build_db all`, y `.venv/bin/python graph.py all` si cambia el grafo.
 2. Copiar a la VM y reiniciar la API:
 ```bash
 rsync -az -e "ssh -i ~/.ssh/gomad-oci.key" ~/GoMad/app/data/{gomad.duckdb,realtime.duckdb,graph,clean} ubuntu@YOUR_SERVER_IP:~/GoMad/app/data/ && ssh -i ~/.ssh/gomad-oci.key ubuntu@YOUR_SERVER_IP "cd ~/GoMad && docker compose -f app/deploy/docker-compose.yml restart api"
