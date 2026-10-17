@@ -152,3 +152,47 @@ Uniones por código comprobadas contra el cruce espacial: educativos y atención
 | Los otros 10 | 179 → 179 | sin cambios |
 
 Filas NULL: 38 → 24 (solo `good_3g_pct` fuera de EIEL). Ejemplos: Getafe deporte 19 → 28 (`nmc_deporte,osm`); Madrid deporte 596 → 1.119 y zonas verdes «sin datos» → 82,1 m²/hab. (`osm`); San Lorenzo de El Escorial deporte 4 → 11 (`nmc_deporte,eiel_deporte`); Patones «sin datos» → 4 (`eiel_deporte`); La Acebeda (28001) sin cambios.
+
+---
+
+## Correcciones del verificador (17/10, Tasks 175–178)
+
+### Task 175: zonas verdes por habitante de OSM solo con parques
+
+**Rol:** Datos · **Servicio:** ingest
+
+**Files:** Modify `app/ingest/osm_green.py`, `app/ingest/indicators.py`, `app/ingest/build_db.py` (`load_osm_parks`, uso en `indicator_values`), `app/config/indicators.yaml`; Test `app/ingest/tests/test_osm_green.py`, `app/ingest/tests/test_indicators.py`, `app/ingest/tests/test_municipality_indicator.py`.
+
+**Interfaces:**
+- `indicators.yaml`: clave nueva `osm_parks: {own_criterion: true, source: …, tags: {leisure: [park, garden, playground], landuse: [recreation_ground, village_green]}}`; `indicators.validate` exige `own_criterion: true` y `tags` como mapa clave → lista no vacía si existe.
+- `osm_green.read_area_sets(pbf, sets: dict[str, dict[str, list[str]]]) -> dict[str, GeoDataFrame]` (una sola lectura del extracto); `read_green_areas(pbf, tags)` sigue igual (usa la anterior). `extract()` escribe `clean/osm_green.parquet` (sin cambios: mismas etiquetas, mismas columnas) y `clean/osm_parks.parquet` (`osm_id`, `geometry`); devuelve `(ruta_verde, n_verde, ruta_parques, n_parques)`.
+- `build_db.load_osm_parks(path=None) -> GeoDataFrame | None`; el indicador usa `osm_green_area(munis_sin_vpla, load_osm_parks())`. El verde de destinos (`load_osm_green`) no cambia.
+- Ruling previsto: fichero aparte en vez de columna en `osm_green.parquet`: así `osm_green.parquet` queda idéntico y no cambian destinos ni rutas.
+
+- [ ] Step 1: pruebas `test_read_area_sets_splits_by_tags` (parque + bosque en el XML mínimo: `green` con ambos, `parks` solo el parque), `test_osm_parks_config_needs_own_criterion`, `test_green_outside_vpla_uses_parks_file` (monkeypatch de `load_osm_parks`).
+- [ ] Step 2: ejecutar → Esperado: FAIL.
+- [ ] Step 3: implementar.
+- [ ] Step 4: ejecutar → Esperado: verde.
+- [ ] Step 5: `python osm_green.py` real (~70 s) → `osm_green.parquet` con los mismos `osm_id` que antes; `osm_parks.parquet` nuevo.
+- [ ] Step 6: commit `Datos: zonas verdes de OSM del indicador solo con parques (Task 175, verificador)`.
+
+### Task 176: instalaciones repetidas con el mismo nombre
+
+**Files:** Modify `app/ingest/build_db.py` (`sport_union`), `app/config/indicators.yaml` (comentario); Test `test_municipality_indicator.py`.
+
+**Interfaces:** `sport_union(facilities: DataFrame[id, source, name, ine_code, lon, lat], radius_m, same_name_radius_m=None)`: además de ≤ `radius_m`, se descarta un punto a ≤ `same_name_radius_m` de uno ya contado de otra fuente del mismo municipio con el mismo nombre normalizado (`_plain` + espacios colapsados). `indicator_values` pasa `same_name_radius_m` de `recommend.yaml` (300).
+
+- [ ] Step 1: `test_sport_union_same_name_within_300m` (mismo nombre a 120 m → 1; otro nombre a 120 m → 2; mismo nombre a 400 m → 2).
+- [ ] Step 2–4: FAIL → implementar → verde.
+- [ ] Step 5: commit `Datos: instalaciones con el mismo nombre de otra fuente a menos de 300 m cuentan una vez (Task 176, verificador)`.
+
+### Task 177: CLAUDE.md y etiqueta de OSM
+
+**Files:** `CLAUDE.md` (párrafo C3 debajo de la tabla §7.3), `app/config/sources.yaml` (etiqueta `osm` con «instalaciones deportivas»), su prueba si la hay.
+
+- [ ] Commit `Docs: párrafo de indicadores bajo la tabla y etiqueta de OSM con instalaciones deportivas (Task 177, verificador)`.
+
+### Task 178: regenerar y comprobar
+
+- [ ] `python -m build_db main`; ingest `pytest -m "not slow"` + `tests/test_municipality_indicator.py tests/test_indicators.py`; api `pytest -m "not slow"` + `tests/test_municipality.py tests/test_contract.py`; destinos idénticos a antes (`green` de `destination`); tabla de cobertura y valores de Getafe, Madrid, Guadarrama y Ciempozuelos en este plan.
+- [ ] Commit `Datos: cobertura tras las correcciones del verificador (Task 178, verificador)`.
