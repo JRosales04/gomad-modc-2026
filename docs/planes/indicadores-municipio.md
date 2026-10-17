@@ -140,3 +140,15 @@ Uniones por código comprobadas contra el cruce espacial: educativos y atención
 - [ ] **Step 5:** commit `Datos: pruebas reales, documentación y tabla de cobertura de indicadores (Task 174)`.
 
 **Terminado cuando:** base regenerada, pruebas verdes y documentación al día.
+
+## Resultado (17/10, `gomad.duckdb` regenerado con `python -m build_db main`)
+
+| Indicador | Con valor antes → después | > 0 antes → después |
+|---|---|---|
+| `sport_facilities` | 178 → **179** | 178 → 179 |
+| `sport_facilities_per_1000` | 178 → **179** | 178 → 179 |
+| `green_m2_per_inhabitant` | 167 → **179** | 163 → 175 |
+| `good_3g_pct` | 155 → 155 | 150 → 150 |
+| Los otros 10 | 179 → 179 | sin cambios |
+
+Filas NULL: 38 → 24 (solo `good_3g_pct` fuera de EIEL). Ejemplos: Getafe deporte 19 → 28 (`nmc_deporte,osm`); Madrid deporte 596 → 1.119 y zonas verdes «sin datos» → 82,1 m²/hab. (`osm`); San Lorenzo de El Escorial deporte 4 → 11 (`nmc_deporte,eiel_deporte`); Patones «sin datos» → 4 (`eiel_deporte`); La Acebeda (28001) sin cambios.
