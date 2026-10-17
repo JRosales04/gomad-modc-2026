@@ -119,3 +119,24 @@
 - [ ] **Step 3:** línea en CLAUDE.md §3.1; commit `Motor: pruebas reales y latencia de /location (Task 133)`.
 
 **Terminado cuando:** `cd app/api && .venv/bin/pytest -q` en verde (salvo fallos ajenos documentados) y latencias anotadas.
+
+---
+
+## Arreglos del verificador (17/10, «APTO con observaciones»)
+
+Un commit por arreglo, prefijo «Motor:» y «(verificador)» al final; pruebas en `app/api/tests/test_location.py`.
+
+### Task 134: resultados de Nomecalles sin relación con el texto
+- Prueba `test_location_remote_unrelated_discarded`: el remoto devuelve «Calle Madrid» para «zzqxw» → `[]`; la errata «calle madrd 10 getafe» sigue resolviendo `address`. `test_location_remote_timeout_from_config`: el `timeout` de la petición es `remote_timeout_s` de `location.yaml`.
+- Regla: un vial remoto vale si alguna palabra del texto (sin tipo, número, palabras vacías ni el municipio nombrado) es prefijo de una palabra de su nombre o se le parece (`difflib`, razón ≥ `remote_min_similarity`, 0,8).
+- `location.yaml`: `remote_timeout_s: 2.0`, `remote_min_similarity: 0.8`.
+
+### Task 135: `location.yaml` ausente o incompleto → error claro al arrancar
+- Prueba `test_location_config_missing_is_clear`: `config=None` con `settings.load("location") is None` → `ValueError("falta config/location.yaml")`; sin una clave → `ValueError` con «falta la clave max_candidates». El `Geocoder` se crea en `lifespan`, así que el error para el arranque.
+
+### Task 136: desempate por población del municipio
+- Prueba: con `clean/population.parquet` (último año), «calle toledo» → Madrid antes que Leganés; sin el fichero, población 0 (orden de antes).
+- Orden de viales: (…, nombre corto, **población del municipio**, portales del vial, municipio).
+
+### Task 137: filtrar por `ine_code` además de `street_code`
+- `_local` y `_remote` leen los portales con `street_code IN (…) AND ine_code IN (…)`. Prueba: un vial con el mismo `street_code` en otro municipio no se mezcla.
