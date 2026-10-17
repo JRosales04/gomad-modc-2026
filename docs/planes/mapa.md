@@ -307,3 +307,174 @@ git commit -m "Front: seleccion sincronizada entre tarjetas y marcadores en Resu
 3. Comprobación a mano con `npm run dev` (si la API local responde): Resultados y Ruta en escritorio y a 375 px.
 4. Revisión final de la rama: solo ficheros del bloque M (+ el cableado de `Results.tsx`).
 5. Informe: estado por Task, commits, pruebas con salida real, Rulings, qué desplegar (solo la imagen `frontend`: `deploy.sh` en la VM) y siguiente paso (PMTiles local, L-4).
+
+---
+
+# Corrección C2 — Mapa explorable, ubicación en tiempo real y pines por tipo (Tasks 140–149)
+
+> Escrito el 17/10 con `superpowers:writing-plans` (rama `front/mapa`, base `main` tras la PR #48). **Especificación:** ficha C2 del encargo (corrección pedida por el equipo tras probar la app; no está en `docs/pendientes-app.md`). Por excepción a «front manual guiado», la persona usuaria pidió que el agente haga back y front. Ledger: `.superpowers/sdd/mapa/progress.md` (sección C2).
+
+**Objetivo:** (1) al mover o ampliar el mapa se ven los destinos de la zona visible y, de cerca, los puntos útiles (fuentes, bancos, desfibriladores, áreas caninas), agrupados cuando hay muchos; (2) el punto «Estás aquí» se mueve en tiempo real mientras el mapa está abierto, sin volver a pedir la recomendación salvo que la persona lo pida tras alejarse; (3) pines con icono por tipo, leyenda accesible y texto alternativo, con el pin seleccionado sincronizado con la lista (RF-11).
+
+**Arquitectura:**
+- **Back:** `GET /map/points?bbox=oeste,sur,este,norte&kinds=…` → `MapPointsResponse {points, truncated, clipped}`. `services/map_points.py` valida la caja, la recorta a `max_span_deg` alrededor de su centro (`clipped`) y pide a `Repository.map_points` (método nuevo) como mucho `max_points` puntos de `destination` (tipo; `pool` si tiene la actividad `pool_activity`) y `route_poi` (tipo), los más cercanos al centro de la caja (`truncated` si había más). Valores en `app/config/map.yaml` (criterio propio). La caja es la de la vista del mapa y no va a los logs (el middleware solo escribe la ruta; Caddy ya tacha la query).
+- **Front:** `src/data/mapPoints.ts` (`getMapPoints`, con datos de ejemplo en pruebas). `src/components/mapIcons.ts`: tipos, etiquetas, colores y trazos de Material Symbols (Apache 2.0, extraídos de la fuente Material Symbols Rounded). `MapCanvas` pide los puntos en `onMoveEnd` (con espera corta y descartando respuestas viejas) y los pinta con una fuente GeoJSON de MapLibre con `cluster: true` (círculo con número) y una capa de símbolos con imágenes de pin por tipo dibujadas en un lienzo (`styleimagemissing`). Por debajo de `NEARBY_MIN_ZOOM` no pide nada; desde `POI_MIN_ZOOM` pide también los puntos útiles. Los destinos recomendados siguen siendo `Marker` de React (numerados, con icono por tipo y `role="img"` + `aria-label`). Leyenda `<details>` con icono + color + texto y el recuento de lo visible; tocar un punto muestra su nombre en un cuadro `role="status"`.
+- **Ubicación en tiempo real:** `src/data/livePosition.ts` (`useLivePosition`) usa `watchPosition` solo si la ubicación de la búsqueda vino del GPS o el permiso ya está concedido (nunca abre el aviso de permiso por su cuenta), limita las actualizaciones (`LIVE_MIN_INTERVAL_MS`, `LIVE_MIN_MOVE_M`) y hace `clearWatch` al desmontar. La posición se queda en el navegador. En Resultados, si la persona se aleja más de `LIVE_OFFER_DISTANCE_M` del origen, aparece el botón «Buscar desde aquí» (no se recalcula solo).
+
+**Stack:** el del bloque M; sin dependencias nuevas (los clusters son de MapLibre).
+
+## Restricciones globales (C2)
+- Solo estos ficheros. Back: `app/api/services/map_points.py` (nuevo), la función del endpoint en `main.py` (+1 línea en `lifespan` para validar `map.yaml`), un método **nuevo** en `repository.py`, los modelos nuevos en `schemas.py`, `app/config/map.yaml` (nuevo) y su fila en `app/config/README.md`, pruebas nuevas, `tests/test_contract.py` (la ruta nueva) y `tests/mini_data.py` (solo filas añadidas). Front: componentes del mapa y sus pruebas, `src/data/mapPoints.ts`, `src/data/mock/mapPoints.ts`, `src/data/livePosition.ts`, `src/api/{openapi.json,schema.d.ts,types.ts}`, `src/styles/map.css`, `src/test/mapMock.tsx`, y en `Results.tsx`/`RouteView.tsx` solo el cableado (props del mapa y el botón «Buscar desde aquí»). Una constante exportada en `src/data/geolocation.ts` (`BROWSER_LOCATION_LABEL`).
+- **No tocar** `geocoding.py` (rama `motor/busqueda`) ni la lógica de `/recommend` y `/route`.
+- **Cambia el contrato:** `scripts/export_openapi.py`, `npm run contract`, `test_contract.py`; avisarlo en el informe.
+- Privacidad: la caja del mapa nunca va a los logs; la posición en tiempo real nunca sale del navegador salvo como origen de una consulta que la persona pide.
+- Código en inglés; comentarios sin tildes; textos visibles con tildes. Sin push, sin merge, sin PR.
+
+## Foco de revisión (C2)
+1. **Caja enorme o mal formada** (zoom regional, parámetros manipulados): 422 legible si está mal formada; si es grande se recorta y nunca devuelve más de `max_points`. → Task 140 `test_parse_bbox_rejects…`, `test_clip_bbox…`; Task 142 `test_map_points_bad_bbox_is_422`, `test_map_points_caps_points`.
+2. **La caja no va a los logs.** → Task 142 `test_map_points_does_not_log_bbox`.
+3. **Ráfaga de movimientos del mapa:** solo cuenta la última respuesta; por debajo del zoom mínimo no se pide nada. → Task 145 `nearbyRequest…`, Task 146 `descarta una respuesta vieja`.
+4. **Permiso denegado o sin GPS:** la app sigue con la ubicación escrita, sin errores ni avisos de permiso inesperados; al salir del mapa se para el seguimiento. → Task 148 `no pide permiso si no estaba concedido`, `limpia el seguimiento al desmontar`, `si se deniega deja de seguir`.
+5. **Accesibilidad:** cada tipo con icono + color + texto en la leyenda; pines con texto alternativo; axe sin violaciones. → Task 144 y 147.
+
+---
+
+### Task 140: C2 (1/10) · `map.yaml` y validación de la caja
+
+**Rol:** Motor · **Servicio:** `app/api/`
+
+**Ficheros:** Crear `app/config/map.yaml`, `app/api/services/map_points.py`, `app/api/tests/services/test_map_points.py`. Modificar `app/config/README.md` (una fila).
+
+**Interfaces:**
+- `map.yaml`: `own_criterion: true`, `max_span_deg` (0.3), `max_points` (1500), `pool_activity` (`swim`).
+- `services/map_points.py` → `class InvalidBbox(ValueError)`, `validate_map_config(cfg) -> None` (ValueError si falta o no es positivo), `parse_bbox(text: str) -> tuple[float, float, float, float]`, `clip_bbox(bbox, max_span) -> tuple[bbox, bool]`.
+
+- [ ] **Paso 1: pruebas que fallan** (`tests/services/test_map_points.py`): `test_parse_bbox_reads_four_numbers` (`"-3.75,40.29,-3.70,40.32"` → tupla), `test_parse_bbox_rejects_bad_text` (`"a,b,c,d"`, `"1,2,3"`, `"nan,0,1,1"`, oeste ≥ este, sur ≥ norte, lat > 90 → `InvalidBbox`), `test_clip_bbox_keeps_small_box` (igual y `False`), `test_clip_bbox_centres_big_box` (0,0,1,1 con 0.3 → 0.35,0.35,0.65,0.65 y `True`), `test_validate_map_config_needs_positive_values`, `test_shipped_map_config_is_valid` (lee `settings.load("map")`).
+Run: `cd app/api && .venv/bin/pytest tests/services/test_map_points.py -q` · Esperado: FAIL (no existe el módulo).
+- [ ] **Paso 2: implementación** mínima de las cuatro funciones y `map.yaml`. Run lo mismo · Esperado: PASS.
+- [ ] **Paso 3: commit** `Motor: map.yaml y validacion de la caja del mapa (Task 140)`.
+
+**Terminado cuando:** las pruebas pasan y `map.yaml` está en el README de config.
+
+### Task 141: C2 (2/10) · `Repository.map_points`
+
+**Rol:** Motor · **Servicio:** `app/api/`
+
+**Ficheros:** Modificar `app/api/repository.py` (método nuevo), `app/api/tests/mini_data.py` (una piscina: destino `facility` con actividad `swim`), `app/api/tests/test_repository.py` (pruebas nuevas).
+
+**Interfaces:** `Repository.map_points(bbox, destination_kinds, poi_kinds, limit, pool_activity) -> list[tuple(id, kind, name, source, working, lon, lat)]`, ordenados por cercanía al centro de la caja (distancia equirectangular) y después por id; `limit + 1` filas para que el servicio sepa si hay más. `required=True` (sin base → `DataUnavailable`).
+
+- [ ] **Paso 1: pruebas que fallan:** `test_map_points_filters_by_box_and_kind`, `test_map_points_marks_pools`, `test_map_points_includes_out_of_service_fountains` (con `working False`), `test_map_points_orders_by_centre_and_limits`, `test_map_points_without_db_is_unavailable`. Run: `.venv/bin/pytest tests/test_repository.py -q -k map_points` · Esperado: FAIL (`AttributeError`).
+- [ ] **Paso 2: implementación** (una consulta con `UNION ALL`; listas vacías de tipos no consultan esa tabla). Esperado: PASS, y el resto de `test_repository.py` sigue en verde.
+- [ ] **Paso 3: commit** `Motor: Repository.map_points para el mapa (Task 141)`.
+
+**Terminado cuando:** pruebas en verde sin cambiar métodos existentes.
+
+### Task 142: C2 (3/10) · `GET /map/points` y contrato
+
+**Rol:** Motor · **Servicio:** `app/api/` (+ `app/frontend/src/api/openapi.json`)
+
+**Ficheros:** Modificar `schemas.py` (modelos nuevos), `services/map_points.py` (`map_points()`), `main.py` (endpoint + validación en `lifespan`), `tests/test_contract.py` (ruta nueva). Crear `tests/test_map_points_endpoint.py`. Regenerar `app/frontend/src/api/openapi.json`.
+
+**Interfaces:**
+- `MapPointKind = Literal["facility", "pool", "park", "recreation_area", "trail", "bathing_area", "fountain", "bench", "aed", "dog_area", "playground"]`; `MapPoint {id, kind, name: str | None, coordinate: Coordinate, working: bool | None, source}`; `MapPointsResponse {points, truncated, clipped}`.
+- `GET /map/points?bbox=<o,s,e,n>&kinds=<k>&kinds=…` (por defecto, los tipos de destino). 422 si la caja está mal; 503 sin datos.
+- `services.map_points.map_points(bbox_text, kinds, repo, cfg) -> MapPointsResponse`.
+
+- [ ] **Paso 1: pruebas que fallan** (con `build_mini_data` y `GOMAD_DATA_DIR` como en `test_endpoints.py`): `test_map_points_returns_destinations_by_default`, `test_map_points_kinds_select_pois`, `test_map_points_bad_bbox_is_422`, `test_map_points_clips_big_box`, `test_map_points_caps_points` (config con `max_points: 2` → 2 puntos y `truncated`), `test_map_points_does_not_log_bbox` (caplog sin los números de la caja), `test_map_points_real_data_latency` (`slow`: Getafe a zoom 15, < 0,5 s). En `test_contract.py`, `("get", "/map/points")` en `ROUTES`. Run · Esperado: FAIL (404 / ruta ausente).
+- [ ] **Paso 2: implementación;** `scripts/export_openapi.py`. Run: `.venv/bin/pytest -m "not slow" -q` · Esperado: todo PASS (incluido `test_versioned_openapi_is_up_to_date`).
+- [ ] **Paso 3: commit** `Motor: GET /map/points con caja recortada y tope de puntos (Task 142)`.
+
+**Terminado cuando:** endpoint con pruebas, contrato exportado, ninguna prueba previa rota.
+
+### Task 143: C2 (4/10) · Tipos del contrato y `getMapPoints` en el front
+
+**Rol:** Front · **Servicio:** `app/frontend/`
+
+**Ficheros:** Regenerar `src/api/schema.d.ts` (`npm run contract`); modificar `src/api/types.ts` (alias `MapPoint`, `MapPointsResponse`, `MapPointKind`); crear `src/data/mapPoints.ts`, `src/data/mock/mapPoints.ts`; pruebas en `src/test/data.test.ts`.
+
+**Interfaces:** `type Bbox = [number, number, number, number]`; `getMapPoints(bbox: Bbox, kinds: MapPointKind[]): Promise<MapPointsResponse>` → `GET /api/map/points?bbox=…&kinds=…` (en pruebas, `mapPointsMock`: los puntos de ejemplo dentro de la caja y de esos tipos).
+
+- [ ] **Paso 1: prueba que falla:** `getMapPoints filtra los de ejemplo por caja y tipo`; `getMapPoints pide /api/map/points con la caja y los tipos` (modo `production` con `vi.stubEnv` y `fetch` simulado). Run: `npx vitest run src/test/data.test.ts` · Esperado: FAIL.
+- [ ] **Paso 2: implementación.** Esperado: PASS; `npx tsc -b` sin errores.
+- [ ] **Paso 3: commit** `Front: tipos de /map/points y getMapPoints (Task 143)`.
+
+**Terminado cuando:** pruebas y `tsc` en verde.
+
+### Task 144: C2 (5/10) · Iconos por tipo y pines con texto alternativo
+
+**Rol:** Front · **Servicio:** `app/frontend/`
+
+**Ficheros:** Crear `src/components/mapIcons.ts`, `src/components/MapPin.tsx`, `src/test/MapPins.test.tsx`. Modificar `MapView.tsx` (`MapMarker.kind?`), `MapCanvas.tsx` (marcadores con `MapPin`), `src/styles/map.css`, `Results.tsx` y `RouteView.tsx` (pasan `kind`).
+
+**Interfaces:** `KIND_STYLES: Record<MapPointKind, {label: string; color: string; path: string}>` (`label` en español: «Instalación deportiva», «Piscina», «Parque», «Área recreativa», «Senda», «Zona de baño», «Fuente», «Banco», «Desfibrilador», «Área canina», «Juegos infantiles»); `OUT_OF_SERVICE_COLOR`; `destinationKind(type, activity?) -> MapPointKind`; `MapPin({kind, number?, selected?, label})` → `<span className="map-marker map-marker--<kind>[ map-marker--selected]" role="img" aria-label=…><svg aria-hidden>…</svg>{number}</span>`.
+
+- [ ] **Paso 1: pruebas que fallan:** `cada tipo tiene etiqueta, color con contraste >= 3:1 frente al blanco y trazo`, `el pin lleva el icono de su tipo y un texto alternativo con numero, nombre y tipo`, `el seleccionado lo dice en su texto alternativo`, `destinationKind da piscina a una instalacion de nadar`. Run: `npx vitest run src/test/MapPins.test.tsx` · Esperado: FAIL.
+- [ ] **Paso 2: implementación;** los marcadores conservan `.map-marker`, `.map-marker--selected` y el número como texto (las pruebas de Tasks 65–67 siguen igual). Esperado: PASS y `npm test` sin fallos nuevos.
+- [ ] **Paso 3: commit** `Front: pines con icono por tipo y texto alternativo (Task 144)`.
+
+**Terminado cuando:** pruebas en verde; el pin seleccionado sigue sincronizado (MapSync).
+
+### Task 145: C2 (6/10) · Qué pedir según el zoom
+
+**Rol:** Front · **Servicio:** `app/frontend/`
+
+**Ficheros:** Modificar `src/components/mapUtils.ts`; pruebas en `src/test/MapNearby.test.tsx` (nuevo).
+
+**Interfaces:** `NEARBY_MIN_ZOOM = 13`, `POI_MIN_ZOOM = 15`, `NEARBY_DEBOUNCE_MS = 300` (criterio propio, documentados); `nearbyRequest(zoom, bounds) -> {bbox, kinds} | null`; `nearbyFeatures(points, excludeIds) -> FeatureCollection` (propiedades `id`, `kind`, `name`, `icon` = `pin-<kind>` o `pin-off` si `working === false`).
+
+- [ ] **Paso 1: pruebas que fallan:** `por debajo del zoom minimo no pide nada`, `entre los dos zooms pide solo destinos`, `de cerca pide tambien fuentes, bancos, desfibriladores, areas caninas y juegos`, `quita los destinos ya numerados y marca las fuentes fuera de servicio`. Esperado: FAIL → PASS tras implementar.
+- [ ] **Paso 2: commit** `Front: puntos del mapa segun el zoom (Task 145)`.
+
+**Terminado cuando:** pruebas en verde.
+
+### Task 146: C2 (7/10) · Capa de puntos cercanos con clusters
+
+**Rol:** Front · **Servicio:** `app/frontend/`
+
+**Ficheros:** Modificar `src/components/MapCanvas.tsx`, `MapView.tsx` (prop `explore?: boolean`), `src/test/mapMock.tsx` (el `Map` simulado guarda `onMoveEnd`/`onClick`; `Source` expone `data-cluster` y el número de elementos), `Results.tsx`/`RouteView.tsx` (`explore`); pruebas en `src/test/MapNearby.test.tsx`.
+
+**Interfaces:** con `explore`, `onMoveEnd` y `onLoad` → `nearbyRequest` → `getMapPoints` tras `NEARBY_DEBOUNCE_MS`; respuestas viejas descartadas por contador. Fuente `nearby` (`cluster: true`, `clusterMaxZoom: 16`, `clusterRadius: 44`) con capas `nearby-clusters` (círculo), `nearby-count` (número) y `nearby-points` (símbolo `icon-image: ["get", "icon"]`). Imágenes de pin dibujadas con `Path2D` al saltar `styleimagemissing`. Pulsar un punto → cuadro `role="status"` con «Tipo: nombre» (y «fuera de servicio»); pulsar un grupo → acerca dos niveles.
+
+- [ ] **Paso 1: pruebas que fallan:** `al mover el mapa a zoom cercano pide y pinta los puntos de la zona`, `a poco zoom no pide puntos`, `descarta una respuesta vieja`, `sin explore no pide nada`, `pulsar un punto muestra su nombre y tipo`, `pulsar un grupo acerca el mapa`. Esperado: FAIL → PASS.
+- [ ] **Paso 2: commit** `Front: destinos y puntos utiles de la zona visible con clusters (Task 146)`.
+
+**Terminado cuando:** pruebas en verde; Resultados y Ruta exploran.
+
+### Task 147: C2 (8/10) · Leyenda accesible
+
+**Rol:** Front · **Servicio:** `app/frontend/`
+
+**Ficheros:** Crear `src/components/MapLegend.tsx`; modificar `MapCanvas.tsx`, `src/styles/map.css`; pruebas en `src/test/MapNearby.test.tsx`.
+
+**Interfaces:** `MapLegend({kinds, counts, zoom, live, truncated})` → `<details className="map-legend"><summary>Leyenda</summary><ul role="list">…</ul><p>…</p></details>`: una fila por tipo presente (icono + color + texto + recuento), «Estás aquí» si hay posición en vivo, «Fuera de servicio» si hay alguno, y la pista «Acerca el mapa para ver lugares de la zona» / «Acerca más para ver fuentes, bancos y desfibriladores» / «Hay más lugares: acerca el mapa» según el caso.
+
+- [ ] **Paso 1: pruebas que fallan:** `la leyenda lista los tipos visibles con texto y recuento`, `la leyenda pide acercar el mapa a poco zoom`, `axe sin violaciones con puntos y leyenda`. Esperado: FAIL → PASS.
+- [ ] **Paso 2: commit** `Front: leyenda accesible del mapa (Task 147)`.
+
+**Terminado cuando:** pruebas y axe en verde.
+
+### Task 148: C2 (9/10) · `useLivePosition`
+
+**Rol:** Front · **Servicio:** `app/frontend/`
+
+**Ficheros:** Crear `src/data/livePosition.ts`, `src/test/livePosition.test.tsx`; modificar `src/data/geolocation.ts` (solo exportar `BROWSER_LOCATION_LABEL` y usarla).
+
+**Interfaces:** `LIVE_MIN_INTERVAL_MS = 5000`, `LIVE_MIN_MOVE_M = 15`, `LIVE_OFFER_DISTANCE_M = 300` (criterio propio); `distanceM(a, b)`; `useLivePosition({ fromBrowser }) -> Coordinate | null`.
+
+- [ ] **Paso 1: pruebas que fallan** (geolocalización y permisos simulados, temporizadores falsos): `con ubicacion del GPS sigue la posicion`, `con permiso concedido sigue aunque la ubicacion sea escrita`, `no pide permiso si no estaba concedido`, `no actualiza por movimientos pequenos ni antes del intervalo`, `limpia el seguimiento al desmontar`, `si se deniega deja de seguir`, `sin HTTPS no sigue`. Esperado: FAIL → PASS.
+- [ ] **Paso 2: commit** `Front: ubicacion en tiempo real mientras el mapa esta abierto (Task 148)`.
+
+**Terminado cuando:** pruebas en verde; ninguna llamada de red.
+
+### Task 149: C2 (10/10) · «Estás aquí» en el mapa y «Buscar desde aquí»
+
+**Rol:** Front · **Servicio:** `app/frontend/` (+ docs)
+
+**Ficheros:** Modificar `MapView.tsx` (prop `live?: Coordinate | null`, también en el esquema), `MapCanvas.tsx` (marcador `map-marker--live`, fuera del encuadre), `Results.tsx` (hook + botón), `RouteView.tsx` (hook), `src/styles/map.css`; pruebas en `src/test/MapNearby.test.tsx` y `src/test/MapSync.test.tsx`. Docs: `app/frontend/docs/pendientes.md` (nota corta), `CLAUDE.md` §3.1/§6 (endpoint nuevo, mínimo).
+
+- [ ] **Paso 1: pruebas que fallan:** `dibuja Estas aqui sin reencuadrar`, `en Resultados ofrece buscar desde aqui al alejarse y no recalcula solo`, `buscar desde aqui cambia el origen y recalcula`. Esperado: FAIL → PASS.
+- [ ] **Paso 2: verificación completa:** `cd app/api && .venv/bin/pytest -m "not slow" -q` y `-m slow`; `cd app/frontend && npm test && npm run build && npm run lint`. Esperado: verde salvo los fallos que ya había en `main` (anotados en el ledger).
+- [ ] **Paso 3: commit** `Front: Estas aqui en tiempo real y buscar desde aqui (Task 149)`.
+
+**Terminado cuando:** las tres peticiones del equipo funcionan con pruebas; informe con contrato cambiado y qué desplegar (imágenes `api` y `frontend`, sin datos nuevos).
