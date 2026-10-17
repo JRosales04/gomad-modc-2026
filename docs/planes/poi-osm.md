@@ -110,3 +110,21 @@
 - R2: DEA solo de la Comunidad (`desfibriladores`): `graph.OSM_POI` no lee `emergency=defibrillator`, así que no hay duplicado posible.
 - R3: en Madrid capital no se cargan de OSM `bench`, `fountain`, `dog_area` (los da el Ayuntamiento); papeleras y juegos de OSM sí (el Ayuntamiento no se carga para esos tipos).
 - R4: `graph.py` no cambia; su copia del mobiliario OSM en `poi.parquet` se ignora en `route_poi` cuando existe `osm_poi.parquet`. Las etiquetas y los ids son los mismos (`graph.OSM_POI`, `graph.osm_pois`). Diferencia aceptada: el paso nuevo marca `working=False` en 14 fuentes (`drinking_water=no`, `operational_status=closed`); el grafo no, y sus `fountain_id` siguen contándolas.
+
+---
+
+## Correcciones del verificador (Tasks 165–166)
+
+### Task 165: `skip_where_official` solo si la fuente oficial está cargada
+**Files:** `app/ingest/build_db.py` (`route_poi_frame`), `app/ingest/tests/test_build_db.py`.
+- [ ] Step 1: `test_route_poi_frame_keeps_osm_without_official`: `poi` sin `ay_bancos` en 28079 y OSM con un banco en 28079 → el banco de OSM se queda; con una fila `ay_fuentes` en 28079, la fuente de OSM en 28079 se quita. Esperado: FAIL.
+- [ ] Step 2: en `route_poi_frame`, los pares que se saltan = `skip` ∩ pares (`ine_code`, `type`) con filas no OSM en `poi`. Esperado: PASS (y las pruebas anteriores, ajustadas para que tengan su fila oficial).
+- [ ] Step 3: commit `Datos: skip_where_official solo con fuente oficial cargada (Task 165, verificador)`.
+
+### Task 166: fuera de servicio solo para fuentes
+**Files:** `app/ingest/osm_poi.py` (`read_furniture`), `app/config/routing.yaml` (`osm_poi.out_of_service` pasa a `{tipo: {clave: [valores]}}`, solo `fountain`), `app/ingest/tests/test_osm_poi.py`.
+- [ ] Step 1: `test_out_of_service_only_its_type`: parque infantil con `drinking_water=no` → `status` None, `working` NA; la fuente con `drinking_water=no` sigue `working=False`. `test_out_of_service_config_strings` sobre la forma nueva. Esperado: FAIL.
+- [ ] Step 2: `read_furniture(pbf, out_of_service)` con `out_of_service = {tipo: {clave: [valores]}}`; el estado se mira con las etiquetas del tipo del elemento (`OSM_POI`). `status` sigue siendo `"clave=valor"` (la etiqueta de origen, como el `status` de las demás fuentes; no se inventa texto). Esperado: PASS.
+- [ ] Step 3: commit `Datos: fuera de servicio de OSM solo para fuentes (Task 166, verificador)`.
+
+**Terminado cuando:** pruebas en verde; recuentos de `route_poi` iguales con los datos actuales (si no, se regenera `gomad.duckdb`).
