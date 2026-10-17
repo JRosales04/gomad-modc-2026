@@ -196,3 +196,10 @@ Filas NULL: 38 → 24 (solo `good_3g_pct` fuera de EIEL). Ejemplos: Getafe depor
 
 - [ ] `python -m build_db main`; ingest `pytest -m "not slow"` + `tests/test_municipality_indicator.py tests/test_indicators.py`; api `pytest -m "not slow"` + `tests/test_municipality.py tests/test_contract.py`; destinos idénticos a antes (`green` de `destination`); tabla de cobertura y valores de Getafe, Madrid, Guadarrama y Ciempozuelos en este plan.
 - [ ] Commit `Datos: cobertura tras las correcciones del verificador (Task 178, verificador)`.
+
+### Resultado tras el verificador (17/10, `gomad.duckdb` regenerado)
+
+Cobertura igual que arriba (179 en deporte y zonas verdes; NULL 38 → 24, solo `good_3g_pct`). Cambian los valores:
+- Instalaciones deportivas con la regla del mismo nombre: total 2.154; Madrid 1.119 → **985**; Getafe 28; San Lorenzo 11; Patones 4.
+- Zonas verdes fuera de VPLA solo con parques de OSM: Madrid 82,1 → **13,7**; Guadarrama 1.516 → **46,7**; Ciempozuelos 1.343 → **3,8** m²/hab. Getafe (VPLA) 172,8 sin cambios.
+- Destinos: `green` idéntico en los 23.469 (`osm_green.parquet` no cambia).
