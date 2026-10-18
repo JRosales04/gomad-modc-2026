@@ -9,7 +9,8 @@
 - **En producción:** https://example.com (VM de OCI, HTTPS, `main` en `76bb820`).
 - **MVP F1–F5 completo:** 9 pantallas con mapa MapLibre; `/activities`, `/recommend` (nota, mejor hora, alternativa cubierta, calor por zona, lluvia, aire, explicación), `/route` (grafo de toda la Comunidad), `/location`, `/municipality` (14 indicadores y encaje), `/sources` (39 fuentes).
 - **Datos en vivo:** previsión de **Open-Meteo** (179 municipios en 1 petición, cada hora, sin clave; AEMET eliminada, DEC-16) y aire medido (Comunidad + Ayuntamiento, últimas 4 h).
-- **Sin hacer:** `/assistant/*` (501), `/conditions`, aire de horas futuras, desnivel, tráfico en vivo, polen y recarga automática de datos en la VM.
+- **Asistente F6 hecho (PR #62, 18/10):** `/assistant/interpret` con OCI Language + diccionario del catálogo RF-21 (`app/config/assistant.yaml`) y `/assistant/route` con plantillas, sin LLM; ruta por distancia o duración, ida y vuelta o solo ida (fila 5). En la VM falta la fila 13 (credenciales de OCI); sin ellas el asistente usa solo el diccionario.
+- **Sin hacer:** `/conditions`, aire de horas futuras, desnivel, tráfico en vivo, polen y recarga automática de datos en la VM.
 
 **Decisiones del 17/10:**
 - La demo es **sobre la web, en modo móvil**; la presentación la prepara el equipo.
@@ -27,14 +28,14 @@
 | 1 | Recarga programada por fuente en la VM | 🔴 | — |
 | 2 | Aire de las horas futuras con CAMS | 🔴 | — |
 | 3 | `/conditions` + «Ahora en tu zona» | 🟠 | 2 |
-| 4 | Asistente F6, fase A | 🔴 | 13 al desplegar |
-| 5 | Ruta circular por distancia | 🟠 | 4 |
+| 4 | Asistente F6, fase A — ✅ hecha (PR #62) | 🔴 | 13 al desplegar |
+| 5 | Ruta circular por distancia — ✅ hecha (PR #62) | 🟠 | 4 |
 | 6 | Desnivel | 🟠 | — |
 | 7 | Tráfico en tiempo real en la capital | 🟡 | — |
 | 8 | Polen (medido + previsto) | 🟡 | 2 |
 | 9 | Diseño del front | 🟠 | — |
 | 12 | Caché ante caídas de todas las fuentes en vivo | 🟠 | 1, 7, 8 |
-| 13 | `~/.oci` en la VM | 🔴 cuando entre 4 | 4 |
+| 13 | `~/.oci` en la VM — compose listo (rama `deploy/oci-f6`); faltan los pasos en la VM | 🔴 | 4 |
 | 16 | CLAUDE.md al día | 🟡 | — |
 | 17 | Limpieza de ramas en GitHub | 🟡 | — |
 
@@ -62,15 +63,15 @@ Cada ficha dice qué hacer y **qué ficheros son suyos**. Una fila no toca los f
 - **Es suyo:** `app/api/services/conditions.py`, la función `conditions` de `main.py`, el contrato (`schemas.py`, `openapi.json`, `schema.d.ts`), `src/data/conditions.ts`, lo mínimo de `Home.tsx`.
 - **Rama:** `motor/conditions` · Tasks desde la 100.
 
-### 4 · Asistente F6, fase A 🔴
+### 4 · Asistente F6, fase A 🔴 — ✅ hecha (PR #62)
 - **Qué:** `/assistant/interpret`: entidades y frases clave de OCI Language + búsqueda directa de las palabras del catálogo RF-21 (Language no detecta «fuentes») + negaciones («sin cuestas» → `avoid`) → `AssistantParams` validado; ambiguo → `clarification`; consejo médico o fuera de catálogo → `rejection`; **nunca envía ubicación a OCI**; si OCI falla, solo diccionario. `/assistant/route` (sin ruta circular): ruta saludable que pasa por el punto pedido más cercano; comprueba cada condición con el motor (`Condition`) y redacta con plantillas; `written_by_ai=False`; respuestas grabadas en `app/api/ai/recorded.py`. Front: `interpret` y `assistantRoute` de `src/data/assistant.ts` llaman a la API. Diseño de referencia: CLAUDE.md §6.3 y §11 (DEC-03).
 - **Es suyo:** `app/api/ai/*`, `app/api/services/assistant.py`, las funciones `assistant_*` de `main.py`, `src/data/assistant.ts`.
 - **Rama:** `motor/asistente` · Tasks 58–64 en `docs/planes/asistente.md`.
 
-### 5 · Ruta circular por distancia 🟠
+### 5 · Ruta circular por distancia 🟠 — ✅ hecha (PR #62)
 - **Qué:** RF-22: puntos de paso a ≈ objetivo/3 encadenados con la ruta saludable, ±10 %; si no se alcanza, la más cercana con aviso. La usa el asistente.
 - **Es suyo:** `app/api/routing/loop.py` y su uso en `services/assistant.py`.
-- **Rama:** la del 4 o `motor/ruta-circular`.
+- **Rama:** `motor/ruta-circular`, integrada en `motor/asistente` y fusionada con el PR #62 (ida y vuelta o solo ida; «hasta la fuente» = solo ida, «hasta las nueve» = hora).
 
 ### 6 · Desnivel 🟠
 - **Qué:** MDT05 del IGN por WCS (`Elevacion25830_5`, teselas de ≤ 4096 px; CLAUDE.md §7.1), `rasterio` en `app/ingest/pyproject.toml`, altura por nodo y pendiente por tramo (en tramos largos o suavizada: alturas en metros enteros), peso `hills` en `routing.yaml`, condición «evitar cuestas», desnivel en el resumen de ruta (RF-13). Sin altura → «sin datos de desnivel». Se reconstruye el grafo regional (~4 GB de RAM).
@@ -96,8 +97,18 @@ Cada ficha dice qué hacer y **qué ficheros son suyos**. Una fila no toca los f
 - Si una fuente en vivo cae (aire, tráfico, polen), la API sigue con el último dato válido dentro de su `max_age` y avisa con la hora real; pasado ese tiempo, «sin datos». La previsión de Open-Meteo ya lo hace (`data/live/forecast.json`); falta el resto.
 - **Es suyo:** `app/api/live/` (los feeds de aire, tráfico y polen) y `app/config/realtime.yaml`.
 
-### 13 · `~/.oci` en la VM 🔴 (cuando entre el 4)
-- Copiar `~/.oci` del PC a la VM (por `scp`, nunca por git), montarlo en solo lectura en el servicio `api` de `docker-compose.yml`, poner las variables `OCI_*` en `app/.env` de la VM y reiniciar la API.
+### 13 · `~/.oci` en la VM 🔴 (el 4 ya está en `main`)
+- **Hecho en la rama `deploy/oci-f6`:** el servicio `api` de `docker-compose.yml` monta `${OCI_DIR:-${HOME}/.oci}` en `/oci` **en solo lectura** y fija `OCI_CONFIG_FILE=/oci/config` (gana a `app/.env`). La API corre como root en el contenedor, así que lee los ficheros `600` del anfitrión. `deploy.sh` crea la carpeta con permisos `700` antes del `up` si falta (si no, Docker la crearía como root); vacía, el asistente usa solo el diccionario.
+- **Pasos en la VM** (nunca por git). El paso 1 va **antes del primer despliegue con esta rama**:
+  1. Desde el PC, con la clave SSH propia de cada uno (§6, «Acceso a la VM para otra persona»): `scp -i ~/.ssh/<tu_clave> -r ~/.oci ubuntu@YOUR_SERVER_IP:~/`. En la VM: `chmod 700 ~/.oci && find ~/.oci -type f -exec chmod 600 {} +`. Si `~/.oci` ya existe como root (un despliegue anterior lo creó Docker): `sudo chown -R ubuntu: ~/.oci` y repetir el `scp`.
+  2. En `~/.oci/config` de la VM, `key_file=/oci/<clave>.pem` (ruta **dentro del contenedor**, sin `~`: dentro, `~` es `/root`).
+  3. En `app/.env` de la VM: `IA_PROVEEDOR=oci_language`, `OCI_COMPARTMENT_ID=…`, `OCI_REGION=eu-madrid-1` y `OCI_CONFIG_FILE=/oci/config`.
+  4. Fusionar la rama y desplegar con `app/deploy/deploy.sh` (§6; como `ubuntu`, no con `sudo`, para que `${HOME}` sea el suyo).
+  5. Comprobar, en la VM desde `~/GoMad`:
+     - `curl -s -X POST https://example.com/api/assistant/interpret -H 'content-type: application/json' -d '{"text":"5 km por un parque"}'` → `params` con `distance_km: 5` y `pass_by: ["park"]`.
+     - `docker compose -f app/deploy/docker-compose.yml exec api sh -c 'echo $OCI_CONFIG_FILE; ls -l /oci'` → `/oci/config` y los ficheros de `~/.oci`.
+     - `docker compose -f app/deploy/docker-compose.yml logs api | grep "asistente:"` → **vacío** (ni «sin fichero de configuracion», ni «no disponible», ni «OCI Language fallo»).
+     - `stat -c %U ~/.oci` → `ubuntu`.
 
 ### 16 · CLAUDE.md al día 🟡
 - §1 (estado), §6 (la barra dice «Preferencias», no «Perfil»), §10 (fechas). Cada fila actualiza CLAUDE.md §7 si añade una fuente.
