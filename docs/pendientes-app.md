@@ -98,13 +98,17 @@ Cada ficha dice qué hacer y **qué ficheros son suyos**. Una fila no toca los f
 - **Es suyo:** `app/api/live/` (los feeds de aire, tráfico y polen) y `app/config/realtime.yaml`.
 
 ### 13 · `~/.oci` en la VM 🔴 (el 4 ya está en `main`)
-- **Hecho en la rama `deploy/oci-f6`:** el servicio `api` de `docker-compose.yml` monta `${OCI_DIR:-${HOME}/.oci}` en `/oci` **en solo lectura** y fija `OCI_CONFIG_FILE=/oci/config` (gana a `app/.env`). La API corre como root en el contenedor, así que lee los ficheros `600` del anfitrión. Si la carpeta no existe, Docker la crea vacía y el asistente usa solo el diccionario.
-- **Pasos en la VM** (después de fusionar la rama; nunca por git):
-  1. `scp -r ~/.oci <vm>:~/` desde el PC; en la VM, `chmod 700 ~/.oci && chmod 600 ~/.oci/*`.
+- **Hecho en la rama `deploy/oci-f6`:** el servicio `api` de `docker-compose.yml` monta `${OCI_DIR:-${HOME}/.oci}` en `/oci` **en solo lectura** y fija `OCI_CONFIG_FILE=/oci/config` (gana a `app/.env`). La API corre como root en el contenedor, así que lee los ficheros `600` del anfitrión. `deploy.sh` crea la carpeta con permisos `700` antes del `up` si falta (si no, Docker la crearía como root); vacía, el asistente usa solo el diccionario.
+- **Pasos en la VM** (nunca por git). El paso 1 va **antes del primer despliegue con esta rama**:
+  1. Desde el PC, con la clave SSH propia de cada uno (§6, «Acceso a la VM para otra persona»): `scp -i ~/.ssh/<tu_clave> -r ~/.oci ubuntu@YOUR_SERVER_IP:~/`. En la VM: `chmod 700 ~/.oci && find ~/.oci -type f -exec chmod 600 {} +`. Si `~/.oci` ya existe como root (un despliegue anterior lo creó Docker): `sudo chown -R ubuntu: ~/.oci` y repetir el `scp`.
   2. En `~/.oci/config` de la VM, `key_file=/oci/<clave>.pem` (ruta **dentro del contenedor**, sin `~`: dentro, `~` es `/root`).
   3. En `app/.env` de la VM: `IA_PROVEEDOR=oci_language`, `OCI_COMPARTMENT_ID=…`, `OCI_REGION=eu-madrid-1` y `OCI_CONFIG_FILE=/oci/config`.
-  4. `app/deploy/deploy.sh` (ejecutado como el usuario dueño de `~/.oci`, no con `sudo`, para que `${HOME}` sea el suyo).
-  5. Comprobar: `curl -s -X POST https://example.com/api/assistant/interpret -H 'content-type: application/json' -d '{"text":"5 km por un parque"}'` → `params` con `distance_km: 5` y `pass_by: ["park"]`; en `docker compose logs api` no debe salir «OCI Language no disponible».
+  4. Fusionar la rama y desplegar con `app/deploy/deploy.sh` (§6; como `ubuntu`, no con `sudo`, para que `${HOME}` sea el suyo).
+  5. Comprobar, en la VM desde `~/GoMad`:
+     - `curl -s -X POST https://example.com/api/assistant/interpret -H 'content-type: application/json' -d '{"text":"5 km por un parque"}'` → `params` con `distance_km: 5` y `pass_by: ["park"]`.
+     - `docker compose -f app/deploy/docker-compose.yml exec api sh -c 'echo $OCI_CONFIG_FILE; ls -l /oci'` → `/oci/config` y los ficheros de `~/.oci`.
+     - `docker compose -f app/deploy/docker-compose.yml logs api | grep "asistente:"` → **vacío** (ni «sin fichero de configuracion», ni «no disponible», ni «OCI Language fallo»).
+     - `stat -c %U ~/.oci` → `ubuntu`.
 
 ### 16 · CLAUDE.md al día 🟡
 - §1 (estado), §6 (la barra dice «Preferencias», no «Perfil»), §10 (fechas). Cada fila actualiza CLAUDE.md §7 si añade una fuente.
