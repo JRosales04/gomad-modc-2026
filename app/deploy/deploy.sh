@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Despliega GoMad en la VM: actualiza el repo, compila y levanta el Compose y comprueba que responde.
-# Se ejecuta desde la raiz del repo (~/GoMad en la VM):  app/deploy/deploy.sh [--no-pull]
+# Compila y levanta el Compose del checkout actual y comprueba que responde.
+# No consulta ni modifica remotos Git.
 # No usa sudo, no borra volumenes y nunca imprime el contenido de los .env.
 set -euo pipefail
 
@@ -8,7 +8,7 @@ usage() {
     cat <<'TXT'
 Uso: app/deploy/deploy.sh [--no-pull]
 
-  --no-pull   no hace «git pull» (útil en local o si ya está actualizado)
+  --no-pull   compatibilidad: nunca se hace «git pull»
   -h, --help  muestra esta ayuda
 
 Variables opcionales:
@@ -17,10 +17,9 @@ Variables opcionales:
 TXT
 }
 
-pull=1
 for arg in "$@"; do
     case "$arg" in
-        --no-pull) pull=0 ;;
+        --no-pull) ;;
         -h|--help) usage; exit 0 ;;
         *) echo "Opción desconocida: $arg" >&2; usage >&2; exit 2 ;;
     esac
@@ -57,21 +56,11 @@ echo "==> Comprobando configuración"
 [[ -f "$app_dir/deploy/.env" ]] || fail "falta app/deploy/.env (cópialo de app/deploy/.env.example; DOMAIN=:80 sin dominio)."
 # la cache de la prevision en vivo se monta con escritura; si no existe, Docker la crearia como root
 mkdir -p "$app_dir/data/live"
-# credenciales de OCI (fila 13): se montan en /oci:ro; si no existe, Docker la crearia como root y el scp fallaria.
-# Misma carpeta que el compose cuando OCI_DIR no esta en app/deploy/.env (aqui solo se mira el entorno)
-oci_dir="${OCI_DIR:-$HOME/.oci}"
-{ mkdir -p "$oci_dir" && chmod 700 "$oci_dir"; } \
-    || fail "no se puede preparar $oci_dir (¿es de root? arréglalo con: sudo chown -R \"\$USER\": \"$oci_dir\")."
 command -v docker >/dev/null || fail "no se encuentra docker."
 command -v curl >/dev/null || fail "no se encuentra curl."
 docker info >/dev/null 2>&1 || fail "docker no responde (¿estás en el grupo docker? abre una sesión nueva)."
 
-if [[ "$pull" -eq 1 ]]; then
-    echo "==> Actualizando el repositorio (git pull --ff-only)"
-    git -C "$repo_dir" pull --ff-only || fail "git pull no ha podido avanzar sin fusión (¿cambios locales en la VM?)."
-else
-    echo "==> Sin git pull (--no-pull)"
-fi
+echo "==> Usando el checkout local sin actualizar remotos"
 
 echo "==> Compilando y levantando los contenedores"
 "${compose[@]}" up -d --build || fail_compose "docker compose up ha fallado."

@@ -1,14 +1,14 @@
 /// <reference types="vitest/config" />
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 
 // API de desarrollo: por defecto uvicorn local en :8000 (sin el prefijo /api, como Caddy).
-// Con GOMAD_API (p. ej. GOMAD_API=https://example.com npm run dev) se usa la API
-// desplegada, que ya atiende en /api: solo lectura, sirve para trabajar el diseño sin backend local.
-const remoteApi = process.env.GOMAD_API;
+// GOMAD_API puede venir del entorno o de app/frontend/.env (solo para desarrollo).
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+    const remoteApi = loadEnv(mode, process.cwd(), "GOMAD_").GOMAD_API;
+    return ({
     plugins: [react()],
     server: {
         proxy: {
@@ -24,4 +24,5 @@ export default defineConfig({
         environment: "jsdom",
         setupFiles: ["./src/setupTests.ts"],
     },
+    });
 });

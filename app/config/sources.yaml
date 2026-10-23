@@ -118,9 +118,9 @@ catalog:
   sanidad_calor: {publisher: "Ministerio de Sanidad", license: "Publicación oficial del Ministerio de Sanidad",
                   url: "https://www.sanidad.gob.es/areas/sanidadAmbiental/riesgosAmbientales/calorExtremo/publicaciones/docs/planNacionalExcesoTemperaturas_2026.pdf"}
   destination_activity: {publisher: "Equipo GoMad (elaboración propia)", license: "CC BY 4.0",
-                         url: "https://example.com"}
+                         url: "https://github.com/JRosales04/gomad-modc-2026"}
   "config:weights": &own {publisher: "Equipo GoMad (criterio propio)", license: "CC BY 4.0",
-                          url: "https://example.com"}
+                          url: "https://github.com/JRosales04/gomad-modc-2026"}
   "config:routing": *own
   "config:straight_line": *own
   "config:recommend": *own

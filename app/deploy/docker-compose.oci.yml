@@ -1,0 +1,7 @@
+# Complemento opcional para OCI Language. Nunca copiar la clave al repositorio ni a la imagen.
+services:
+  api:
+    volumes:
+      - ${OCI_DIR:?Define OCI_DIR con la carpeta de credenciales de OCI}:/oci:ro
+    environment:
+      OCI_CONFIG_FILE: /oci/config

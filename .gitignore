@@ -28,6 +28,13 @@ dist/
 wallet/
 *.sso
 *.p12
+*.pem
+*.key
+*.pfx
+id_rsa*
+id_ed25519*
+.oci/
+*.bak-http
 
 # Claude Code: ajustes personales (no compartir)
 .claude/settings.local.json
